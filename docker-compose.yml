@@ -1,0 +1,22 @@
+services:
+  postgres-postgis:
+    image: postgis/postgis:16-3.4
+    container_name: glassflow-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: glassflow_db
+      POSTGRES_USER: glassflow_admin
+      POSTGRES_PASSWORD: glassflow_secure_2026
+    ports:
+      - "5433:5432"
+    volumes:
+      - glassflow_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glassflow_admin -d glassflow_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  glassflow_pg_data:
+    name: glassflow_pg_data
