@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GlassFlow — Plataforma de Control Logístico & Rutas</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚛</text></svg>">
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">📦</div>
+      <div class="brand-text">
+        <h1>GlassFlow</h1>
+        <span>Ciclo Cerrado & Logística</span>
+      </div>
+    </div>
+
+    <ul class="nav-menu">
+      <li class="nav-item active" data-tab="tab-dashboard">
+        <button id="nav-btn-dashboard">
+          <span>📊</span> Dashboard
+        </button>
+      </li>
+      <li class="nav-item" data-tab="tab-kanban">
+        <button id="nav-btn-kanban">
+          <span>📋</span> Tablero Kanban
+        </button>
+      </li>
+      <li class="nav-item" data-tab="tab-logistica">
+        <button id="nav-btn-logistica">
+          <span>🚚</span> Pedidos y Despachos
+        </button>
+      </li>
+      <li class="nav-item" data-tab="tab-simulator">
+        <button id="nav-btn-simulator">
+          <span>📱</span> App Móvil Chofer
+        </button>
+      </li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <div>PostGIS 3.4 & Spring Boot</div>
+      <div class="badge-status">
+        <span class="pulse-dot"></span>
+        <span>PostgreSQL Conectado</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN VIEW -->
+  <main class="main-wrapper">
+    <header class="top-bar">
+      <div>
+        <h2 id="view-title">Dashboard Operativo</h2>
+        <p id="view-subtitle">Monitoreo de trazabilidad logística y rutas de última milla</p>
+      </div>
+      <div class="top-actions">
+        <button class="btn btn-outline" id="btn-refresh-data" title="Actualizar datos">
+          🔄 Actualizar
+        </button>
+        <button class="btn btn-primary" id="btn-quick-order">
+          ➕ Nuevo Pedido
+        </button>
+      </div>
+    </header>
+
+    <div class="content-container">
+
+      <!-- STATS BAR -->
+      <section class="stats-grid">
+        <div class="stat-card blue">
+          <div class="stat-header">
+            <span class="stat-title">Total Pedidos</span>
+            <span class="stat-icon">📦</span>
+          </div>
+          <div class="stat-value" id="stat-total-pedidos">0</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-header">
+            <span class="stat-title">En Ruta</span>
+            <span class="stat-icon">🚛</span>
+          </div>
+          <div class="stat-value" id="stat-en-ruta">0</div>
+        </div>
+        <div class="stat-card emerald">
+          <div class="stat-header">
+            <span class="stat-title">Entregados (e-PoD)</span>
+            <span class="stat-icon">✅</span>
+          </div>
+          <div class="stat-value" id="stat-entregados">0</div>
+        </div>
+        <div class="stat-card rose">
+          <div class="stat-header">
+            <span class="stat-title">Alertas Desviación</span>
+            <span class="stat-icon">⚠️</span>
+          </div>
+          <div class="stat-value" id="stat-alertas-desvio">0</div>
+        </div>
+      </section>
+
+      <!-- TAB 1: DASHBOARD -->
+      <section id="tab-dashboard" class="tab-view active">
+        <div class="card-section">
+          <h3 class="section-title">🚛 Resumen de Rutas y Despachos Activos</h3>
+          <div id="dashboard-recent-dispatches">
+            <p style="color: var(--text-muted);">Cargando entregas recientes...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: TABLERO KANBAN EN VIVO -->
+      <section id="tab-kanban" class="tab-view">
+        <div class="card-section">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+              <h3 class="section-title" style="margin-bottom: 4px;">Tablero Kanban de Despachos en Tiempo Real</h3>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">Monitoreo visual del ciclo de vida: Pendiente ➔ En Ruta ➔ Entregado con Proof of Delivery</p>
+            </div>
+            <button class="btn btn-outline" id="btn-sync-kanban">Sincronizar</button>
+          </div>
+
+          <div class="kanban-board">
+            <!-- Columna Pendientes -->
+            <div class="kanban-col">
+              <div class="kanban-col-header">
+                <span class="kanban-col-title">
+                  <span style="color: var(--accent-amber);">●</span> Pendientes
+                </span>
+                <span class="kanban-counter" id="count-kanban-pendientes">0</span>
+              </div>
+              <div class="kanban-cards-container" id="kanban-list-pendientes">
+                <!-- Tarjetas dinámicas -->
+              </div>
+            </div>
+
+            <!-- Columna En Ruta -->
+            <div class="kanban-col">
+              <div class="kanban-col-header">
+                <span class="kanban-col-title">
+                  <span style="color: var(--primary);">●</span> En Ruta
+                </span>
+                <span class="kanban-counter" id="count-kanban-enruta">0</span>
+              </div>
+              <div class="kanban-cards-container" id="kanban-list-enruta">
+                <!-- Tarjetas dinámicas -->
+              </div>
+            </div>
+
+            <!-- Columna Entregados -->
+            <div class="kanban-col">
+              <div class="kanban-col-header">
+                <span class="kanban-col-title">
+                  <span style="color: var(--accent-emerald);">●</span> Entregados
+                </span>
+                <span class="kanban-counter" id="count-kanban-entregados">0</span>
+              </div>
+              <div class="kanban-cards-container" id="kanban-list-entregados">
+                <!-- Tarjetas dinámicas -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: GESTION DE PEDIDOS Y ASIGNACION -->
+      <section id="tab-logistica" class="tab-view">
+        <div class="card-section">
+          <h3 class="section-title">📍 Registrar Nuevo Pedido con Coordenadas GPS</h3>
+          <form id="form-crear-pedido">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="input-cliente">Nombre del Cliente / Vidriería</label>
+                <input type="text" id="input-cliente" class="form-control" placeholder="Ej. Vidrios y Aluminio El Bosque" required>
+              </div>
+              <div class="form-group">
+                <label for="input-direccion">Dirección Física de Entrega</label>
+                <input type="text" id="input-direccion" class="form-control" placeholder="Ej. Av. 10 de Agosto y Colón, Quito" required>
+              </div>
+              <div class="form-group">
+                <label for="select-ubicacion-predefinida">Ubicación de Referencia en Quito</label>
+                <select id="select-ubicacion-predefinida" class="form-control">
+                  <option value="-0.1807,-78.4678">Quito Norte (Av. Amazonas y Orellana)</option>
+                  <option value="-0.2200,-78.5130">Quito Centro Histórico (La Marín)</option>
+                  <option value="-0.2035,-78.4350">Valle de Cumbayá (Interoceánica)</option>
+                  <option value="-0.1000,-78.4800">Quito Extremo Norte (Carcelén)</option>
+                  <option value="custom">Coordenadas personalizadas...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="input-latitud">Latitud (WGS 84)</label>
+                <input type="number" step="any" id="input-latitud" class="form-control" value="-0.1807" required>
+              </div>
+              <div class="form-group">
+                <label for="input-longitud">Longitud (WGS 84)</label>
+                <input type="number" step="any" id="input-longitud" class="form-control" value="-78.4678" required>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary" id="btn-submit-pedido">Crear Pedido</button>
+          </form>
+        </div>
+
+        <div class="card-section">
+          <h3 class="section-title">📋 Asignar Hoja de Ruta a Chofer (HU-04)</h3>
+          <form id="form-asignar-despacho">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="select-pedido-asignar">Seleccionar Pedido Pendiente</label>
+                <select id="select-pedido-asignar" class="form-control" required>
+                  <option value="">Cargando pedidos pendientes...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="select-chofer-asignar">Seleccionar Chofer Responsable</label>
+                <select id="select-chofer-asignar" class="form-control" required>
+                  <option value="">Cargando choferes...</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-success" id="btn-submit-asignar">Asignar Hoja de Ruta</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- TAB 4: SIMULADOR DE APP MOVIL DEL CHOFER -->
+      <section id="tab-simulator" class="tab-view">
+        <div class="mobile-simulator-wrapper">
+
+          <!-- PANEL LATERAL DE CONTROLES DEL SIMULADOR -->
+          <div class="simulator-controls">
+            <div class="card-section" style="padding: 1.5rem;">
+              <h3 class="section-title">⚙️ Controles del Chofer</h3>
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="sim-select-chofer">Chofer activo en el smartphone:</label>
+                <select id="sim-select-chofer" class="form-control">
+                  <option value="">Cargando choferes...</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label>Sensor GPS del Dispositivo (Hardware):</label>
+                <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.3); padding: 10px 14px; border-radius: var(--radius-sm);">
+                  <span id="sim-gps-status-label" style="font-size: 0.85rem; font-weight: 600; color: #34d399;">🟢 GPS Activo</span>
+                  <label class="switch" style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                    <input type="checkbox" id="sim-toggle-gps" checked style="opacity: 0; width: 0; height: 0;">
+                    <span class="slider" style="position: absolute; cursor: pointer; inset: 0; background-color: #2563eb; border-radius: 24px; transition: .3s;"></span>
+                  </label>
+                </div>
+                <small style="color: var(--text-dim); margin-top: 4px;">Apaga el switch para probar el caso de prueba <strong>CP-LOG-01</strong> (bloqueo por GPS apagado).</small>
+              </div>
+
+              <div class="form-group">
+                <label>Modo de Simulación de Ubicación (CP-LOG-02):</label>
+                <select id="sim-gps-mode" class="form-control">
+                  <option value="match">Ubicación Exacta en el Cliente (Sin desvío, Δ < 10m)</option>
+                  <option value="deviation">Simular Entrega Lejana (> 500m / Alerta de Auditoría)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="card-section" style="padding: 1.5rem;">
+              <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 8px;">Criterios de Aceptación Verificados</h4>
+              <ul style="font-size: 0.82rem; color: var(--text-muted); list-style-position: inside; line-height: 1.6;">
+                <li><strong>HU-05:</strong> Foto en vivo y firma táctil obligatorias.</li>
+                <li><strong>HU-06:</strong> Coordenadas GPS auditadas con PostGIS.</li>
+                <li><strong>CP-LOG-02:</strong> Alerta automática si el desvío es &gt; 500 metros.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- MOCKUP DEL SMARTPHONE ANDROID -->
+          <div class="phone-mockup">
+            <div class="phone-notch">
+              <div class="notch-camera"></div>
+              <div class="notch-speaker"></div>
+            </div>
+
+            <div class="phone-status-bar">
+              <span id="phone-clock">12:30</span>
+              <span>📶 🔋 95%</span>
+            </div>
+
+            <div class="phone-app-header">
+              <div class="phone-app-title">📱 GlassFlow Chofer</div>
+              <span style="font-size: 0.7rem; background: rgba(59,130,246,0.2); color: #93c5fd; padding: 2px 6px; border-radius: 4px;">v1.0</span>
+            </div>
+
+            <div class="phone-app-body" id="phone-app-screen">
+              <!-- VISTA 1: LISTA DE DESPACHOS DEL DÍA -->
+              <div id="phone-view-list" style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Despachos Asignados</span>
+                  <button id="sim-btn-refresh-phone" style="background: transparent; border: none; color: var(--primary); cursor: pointer; font-size: 0.8rem;">🔄</button>
+                </div>
+                <div id="phone-dispatches-container" style="display: flex; flex-direction: column; gap: 10px;">
+                  <p style="font-size: 0.85rem; color: var(--text-dim); text-align: center; padding: 2rem 0;">Cargando despachos...</p>
+                </div>
+              </div>
+
+              <!-- VISTA 2: FORMULARIO DE CIERRE DE ENTREGA (PoD + FIRMA + GPS) -->
+              <div id="phone-view-delivery" style="display: none; flex-direction: column; gap: 14px;">
+                <button id="sim-btn-back-to-list" class="btn btn-outline" style="padding: 6px 12px; font-size: 0.78rem; align-self: flex-start;">
+                  ⬅ Volver a la lista
+                </button>
+
+                <div style="background: #1e293b; padding: 12px; border-radius: var(--radius-sm);">
+                  <div style="font-size: 0.72rem; color: var(--primary); font-weight: 700;" id="phone-delivery-order-id">PEDIDO #1</div>
+                  <div style="font-size: 0.95rem; font-weight: 700;" id="phone-delivery-client">Cliente</div>
+                  <div style="font-size: 0.78rem; color: var(--text-muted);" id="phone-delivery-address">Dirección</div>
+                </div>
+
+                <!-- FOTO DE EVIDENCIA (PoD) -->
+                <div>
+                  <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">1. Foto de Entrega (PoD):</label>
+                  <div class="photo-uploader" id="phone-photo-uploader">
+                    <span id="photo-uploader-label">📸 Tocar para simular captura de cámara</span>
+                    <img id="photo-preview-element" class="photo-preview" alt="Evidencia">
+                  </div>
+                </div>
+
+                <!-- FIRMA TÁCTIL DIGITAL -->
+                <div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted);">2. Firma Táctil del Cliente:</label>
+                    <button id="btn-clear-canvas" style="background: transparent; border: none; color: var(--accent-rose); font-size: 0.72rem; cursor: pointer;">Limpiar</button>
+                  </div>
+                  <div class="signature-box">
+                    <canvas id="signature-canvas" class="signature-canvas" width="310" height="130"></canvas>
+                  </div>
+                </div>
+
+                <!-- COMENTARIOS -->
+                <div>
+                  <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">3. Observaciones:</label>
+                  <textarea id="phone-input-comentarios" class="form-control" rows="2" style="font-size: 0.8rem;" placeholder="Ej. Recibido por el maestro de obra sin novedades."></textarea>
+                </div>
+
+                <!-- BOTON CONFIRMAR ENTREGA -->
+                <button id="btn-phone-submit-delivery" class="btn btn-success" style="width: 100%; margin-top: 6px;">
+                  ✓ Finalizar Entrega (e-PoD)
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- MODAL: VISOR DE EVIDENCIA AUDITADA (e-PoD) -->
+  <div class="modal-overlay" id="modal-evidence">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">📄 Auditoría de Entrega e-PoD</h3>
+        <button class="close-btn" id="btn-close-modal">&times;</button>
+      </div>
+      <div id="modal-evidence-body" style="display: flex; flex-direction: column; gap: 14px;">
+        <!-- Contenido dinámico -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE ALERTA GPS (CP-LOG-01) -->
+  <div class="modal-overlay" id="modal-gps-alert">
+    <div class="modal-content" style="max-width: 420px; text-align: center;">
+      <div style="font-size: 3rem; margin-bottom: 10px;">📍</div>
+      <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 8px;">Permisos de Ubicación Requeridos</h3>
+      <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+        El sistema exige la captura obligatoria de coordenadas GPS al momento del despacho para fines de auditoría legal y control de trazabilidad.
+      </p>
+      <div style="display: flex; gap: 10px; justify-content: center;">
+        <button class="btn btn-outline" id="btn-gps-alert-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="btn-gps-alert-enable">Activar GPS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
