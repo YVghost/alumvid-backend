@@ -142,6 +142,10 @@ public class LogisticaServiceImpl implements LogisticaService {
         return response;
     }
 
+    // Coordenadas base de la Central de Operaciones y Bodega GlassFlow en Quito (Av. Amazonas y Orellana)
+    private static final double LAT_BODEGA_QUITO = -0.1807;
+    private static final double LON_BODEGA_QUITO = -78.4678;
+
     @Override
     @Transactional
     public RutaResponse crearRutaConsolidada(CrearRutaConsolidadaRequest request) {
@@ -159,6 +163,9 @@ public class LogisticaServiceImpl implements LogisticaService {
             }
         }
 
+        // Ordenamiento automatico de destinos por proximidad espacial (Nearest Neighbor TSP)
+        List<Pedido> pedidosOrdenados = ordenarPedidosPorProximidad(pedidos, LAT_BODEGA_QUITO, LON_BODEGA_QUITO);
+
         String codigoRuta = "RUTA-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
 
         Ruta ruta = Ruta.builder()
@@ -173,7 +180,7 @@ public class LogisticaServiceImpl implements LogisticaService {
 
         List<Despacho> paradas = new ArrayList<>();
         int orden = 1;
-        for (Pedido p : pedidos) {
+        for (Pedido p : pedidosOrdenados) {
             Despacho d = Despacho.builder()
                     .ruta(rutaGuardada)
                     .ordenParada(orden++)
@@ -192,6 +199,121 @@ public class LogisticaServiceImpl implements LogisticaService {
         notificarActualizacionTablero();
 
         return response;
+    }
+
+    @Override
+    @Transactional
+    public RutaResponse crearRutaMultiDestino(CrearRutaMultiDestinoRequest request) {
+        Chofer chofer = choferRepository.findById(request.getChoferId())
+                .orElseThrow(() -> new IllegalArgumentException("Chofer no encontrado con ID: " + request.getChoferId()));
+
+        if (request.getDestinos() == null || request.getDestinos().isEmpty()) {
+            throw new IllegalArgumentException("Debe ingresar al menos un destino para la ruta.");
+        }
+
+        // 1. Crear y persistir cada pedido de destino
+        List<Pedido> pedidosCreados = new ArrayList<>();
+        for (CrearRutaMultiDestinoRequest.DestinoItemRequest item : request.getDestinos()) {
+            Point puntoDestino = GeometryUtil.crearPunto(item.getLatitudDestino(), item.getLongitudDestino());
+            Pedido pedido = Pedido.builder()
+                    .cliente(item.getCliente().trim())
+                    .direccionTexto(item.getDireccionTexto().trim())
+                    .coordenadaDestino(puntoDestino)
+                    .estado(EstadoPedido.PENDIENTE)
+                    .fechaSolicitud(LocalDateTime.now())
+                    .build();
+            pedidosCreados.add(pedidoRepository.save(pedido));
+        }
+
+        // 2. Ordenamiento automatico por proximidad desde el origen central
+        List<Pedido> pedidosOrdenados = ordenarPedidosPorProximidad(pedidosCreados, LAT_BODEGA_QUITO, LON_BODEGA_QUITO);
+
+        // 3. Crear la cabecera de la ruta consolidada
+        String codigoRuta = "RUTA-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+        Ruta ruta = Ruta.builder()
+                .codigoRuta(codigoRuta)
+                .chofer(chofer)
+                .estado(EstadoRuta.PENDIENTE)
+                .fechaCreacion(LocalDateTime.now())
+                .comentarios(request.getComentarios())
+                .build();
+
+        Ruta rutaGuardada = rutaRepository.save(ruta);
+
+        // 4. Crear los despachos con orden de parada secuencial optimizado
+        List<Despacho> paradas = new ArrayList<>();
+        int orden = 1;
+        for (Pedido p : pedidosOrdenados) {
+            Despacho d = Despacho.builder()
+                    .ruta(rutaGuardada)
+                    .ordenParada(orden++)
+                    .pedido(p)
+                    .chofer(chofer)
+                    .fechaAsignacion(LocalDateTime.now())
+                    .estado(EstadoDespacho.PENDIENTE)
+                    .build();
+            paradas.add(despachoRepository.save(d));
+        }
+
+        rutaGuardada.setParadas(paradas);
+
+        RutaResponse response = mapearARutaResponse(rutaGuardada);
+        messagingTemplate.convertAndSend("/topic/choferes/" + chofer.getId() + "/rutas-asignadas", response);
+        notificarActualizacionTablero();
+
+        return response;
+    }
+
+    /**
+     * Algoritmo voraz de optimizacion de secuencia por proximidad espacial (Nearest Neighbor TSP).
+     * Inicia en el punto de partida (Bodega Central) y selecciona iterativamente la parada mas cercana.
+     */
+    private List<Pedido> ordenarPedidosPorProximidad(List<Pedido> pedidos, double latOrigen, double lonOrigen) {
+        if (pedidos == null || pedidos.size() <= 1) {
+            return pedidos != null ? new ArrayList<>(pedidos) : new ArrayList<>();
+        }
+
+        List<Pedido> noVisitados = new ArrayList<>(pedidos);
+        List<Pedido> rutaOptimizada = new ArrayList<>();
+
+        double actualLat = latOrigen;
+        double actualLon = lonOrigen;
+
+        while (!noVisitados.isEmpty()) {
+            Pedido masCercano = null;
+            double menorDistancia = Double.MAX_VALUE;
+
+            for (Pedido candidato : noVisitados) {
+                Double candLat = GeometryUtil.extraerLatitud(candidato.getCoordenadaDestino());
+                Double candLon = GeometryUtil.extraerLongitud(candidato.getCoordenadaDestino());
+
+                if (candLat == null || candLon == null) {
+                    continue;
+                }
+
+                double dist = GeometryUtil.calcularDistanciaMetros(actualLat, actualLon, candLat, candLon);
+                if (dist < menorDistancia) {
+                    menorDistancia = dist;
+                    masCercano = candidato;
+                }
+            }
+
+            if (masCercano == null) {
+                masCercano = noVisitados.get(0);
+            }
+
+            rutaOptimizada.add(masCercano);
+            noVisitados.remove(masCercano);
+
+            Double sigLat = GeometryUtil.extraerLatitud(masCercano.getCoordenadaDestino());
+            Double sigLon = GeometryUtil.extraerLongitud(masCercano.getCoordenadaDestino());
+            if (sigLat != null && sigLon != null) {
+                actualLat = sigLat;
+                actualLon = sigLon;
+            }
+        }
+
+        return rutaOptimizada;
     }
 
     @Override

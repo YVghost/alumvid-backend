@@ -21,6 +21,15 @@ let destinationMarkers = [];
 let stompClient = null;
 let currentTrackingDespachoId = null;
 
+// Selector de Ubicaciones en Google Maps y Planificador Multi-Destino
+let pickerMap = null;
+let pickerMarker = null;
+let pickerGeocoder = null;
+let selectedPickerLat = -0.1807;
+let selectedPickerLon = -78.4678;
+let selectedPickerAddress = 'Av. Amazonas y Orellana, Quito';
+let paradasPreparadas = [];
+
 // Simulador Movil
 let simActiveDespacho = null;
 let simGpsInterval = null;
@@ -315,6 +324,176 @@ function renderDestinationMarkersOnMap() {
   });
 }
 
+// -------------------------------------------------------------------------
+// FUNCIONES DEL SELECTOR DE GOOGLE MAPS & GESTION DE PARADAS MULTI-DESTINO
+// -------------------------------------------------------------------------
+function openMapPickerModal() {
+  const modal = document.getElementById('modal-map-picker');
+  if (!modal) return;
+  modal.classList.add('active');
+
+  const currentLat = parseFloat(document.getElementById('input-parada-latitud')?.value) || -0.1807;
+  const currentLon = parseFloat(document.getElementById('input-parada-longitud')?.value) || -78.4678;
+  const currentAddress = document.getElementById('input-parada-direccion')?.value || 'Quito, Ecuador';
+
+  selectedPickerLat = currentLat;
+  selectedPickerLon = currentLon;
+  selectedPickerAddress = currentAddress;
+
+  const addrEl = document.getElementById('map-picker-current-address');
+  const coordEl = document.getElementById('map-picker-current-coords');
+  if (addrEl) addrEl.innerText = selectedPickerAddress;
+  if (coordEl) coordEl.innerText = `${selectedPickerLat.toFixed(5)}, ${selectedPickerLon.toFixed(5)}`;
+
+  setTimeout(() => {
+    if (!pickerMap) {
+      const canvas = document.getElementById('map-picker-canvas');
+      if (!canvas || typeof google === 'undefined' || !google.maps) return;
+
+      pickerGeocoder = new google.maps.Geocoder();
+      pickerMap = new google.maps.Map(canvas, {
+        center: { lat: selectedPickerLat, lng: selectedPickerLon },
+        zoom: 14,
+        mapTypeId: google.maps.MapTypeId.ROADMAP,
+        styles: [
+          { elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+          { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
+          { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+          { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#334155' }] },
+          { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1e293b' }] },
+          { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
+          { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f172a' }] }
+        ]
+      });
+
+      pickerMarker = new google.maps.Marker({
+        position: { lat: selectedPickerLat, lng: selectedPickerLon },
+        map: pickerMap,
+        draggable: true,
+        animation: google.maps.Animation.DROP,
+        title: 'Punto de entrega'
+      });
+
+      pickerMap.addListener('click', e => {
+        setPickerLocation(e.latLng);
+      });
+
+      pickerMarker.addListener('dragend', e => {
+        setPickerLocation(e.latLng);
+      });
+    } else {
+      google.maps.event.trigger(pickerMap, 'resize');
+      pickerMap.setCenter({ lat: selectedPickerLat, lng: selectedPickerLon });
+      if (pickerMarker) {
+        pickerMarker.setPosition({ lat: selectedPickerLat, lng: selectedPickerLon });
+      }
+    }
+  }, 200);
+}
+
+function setPickerLocation(latLng) {
+  selectedPickerLat = latLng.lat();
+  selectedPickerLon = latLng.lng();
+  if (pickerMarker) pickerMarker.setPosition(latLng);
+
+  const coordEl = document.getElementById('map-picker-current-coords');
+  const addrEl = document.getElementById('map-picker-current-address');
+  if (coordEl) coordEl.innerText = `${selectedPickerLat.toFixed(5)}, ${selectedPickerLon.toFixed(5)}`;
+  if (addrEl) addrEl.innerText = 'Consultando dirección satelital...';
+
+  if (pickerGeocoder) {
+    pickerGeocoder.geocode({ location: latLng }, (results, status) => {
+      if (status === 'OK' && results && results[0]) {
+        selectedPickerAddress = results[0].formatted_address;
+      } else {
+        selectedPickerAddress = `Coordenadas: ${selectedPickerLat.toFixed(4)}, ${selectedPickerLon.toFixed(4)}`;
+      }
+      if (addrEl) addrEl.innerText = selectedPickerAddress;
+    });
+  }
+}
+
+function searchMapPickerLocation() {
+  const query = document.getElementById('map-picker-search-input')?.value.trim();
+  if (!query) return;
+
+  if (pickerGeocoder) {
+    const fullQuery = query.toLowerCase().includes('quito') ? query : `${query}, Quito, Ecuador`;
+    pickerGeocoder.geocode({ address: fullQuery }, (results, status) => {
+      if (status === 'OK' && results && results[0]) {
+        const loc = results[0].geometry.location;
+        if (pickerMap) {
+          pickerMap.setCenter(loc);
+          pickerMap.setZoom(16);
+        }
+        setPickerLocation(loc);
+      } else {
+        showToast('No se encontró el sitio indicado en Quito. Puede seleccionarlo con un clic directo en el mapa.', 'warning');
+      }
+    });
+  }
+}
+
+function closeMapPickerModal() {
+  document.getElementById('modal-map-picker')?.classList.remove('active');
+}
+
+function confirmMapPickerSelection() {
+  const inputDir = document.getElementById('input-parada-direccion');
+  const inputLat = document.getElementById('input-parada-latitud');
+  const inputLon = document.getElementById('input-parada-longitud');
+
+  if (inputDir) inputDir.value = selectedPickerAddress;
+  if (inputLat) inputLat.value = selectedPickerLat.toFixed(6);
+  if (inputLon) inputLon.value = selectedPickerLon.toFixed(6);
+
+  closeMapPickerModal();
+  showToast('Ubicación fijada desde Google Maps.', 'success');
+}
+
+function renderParadasPreparadas() {
+  const tbody = document.getElementById('paradas-preparadas-table-body');
+  const countEl = document.getElementById('count-paradas-agregadas');
+  const btnLimpiar = document.getElementById('btn-limpiar-paradas');
+
+  if (countEl) countEl.innerText = paradasPreparadas.length;
+  if (!tbody) return;
+
+  if (paradasPreparadas.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 1.5rem;">
+          No hay destinos agregados a la ruta todavia. Agregue uno o mas destinos arriba usando el selector de mapa.
+        </td>
+      </tr>
+    `;
+    if (btnLimpiar) btnLimpiar.style.display = 'none';
+    return;
+  }
+
+  if (btnLimpiar) btnLimpiar.style.display = 'inline-block';
+
+  tbody.innerHTML = paradasPreparadas.map((p, idx) => `
+    <tr>
+      <td style="font-weight: 700; color: #60a5fa; text-align: center;">#${idx + 1}</td>
+      <td style="font-weight: 700; color: white;">${p.cliente}</td>
+      <td style="color: var(--text-muted); font-size: 0.8rem;">${p.direccionTexto}</td>
+      <td style="font-family: monospace; font-size: 0.75rem; color: #34d399;">${Number(p.latitudDestino).toFixed(4)}, ${Number(p.longitudDestino).toFixed(4)}</td>
+      <td style="text-align: center;">
+        <button type="button" class="btn btn-danger" style="padding: 2px 8px; font-size: 0.72rem;" onclick="eliminarParadaPreparada(${idx})">
+          Quitar
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function eliminarParadaPreparada(index) {
+  paradasPreparadas.splice(index, 1);
+  renderParadasPreparadas();
+  showToast('Parada removida de la lista.', 'info');
+}
+
 function populateSelects() {
   // Pedidos pendientes
   const selectPedido = document.getElementById('select-pedido-disponible');
@@ -325,15 +504,17 @@ function populateSelects() {
         <option value="${p.id}">[${p.cliente}] ${p.direccionTexto}</option>
       `).join('');
 
-  // Choferes disponibles
-  const selectChofer = document.getElementById('select-chofer-disponible');
-  selectChofer.innerHTML = '<option value="">-- Seleccionar chofer --</option>' + allChoferes.map(c => `
-    <option value="${c.id}">${c.nombre} (${c.estadoDisponibilidad})</option>
-  `).join('');
+  // Choferes disponibles para ruta multi-destino
+  const selectChoferRuta = document.getElementById('select-chofer-ruta');
+  if (selectChoferRuta) {
+    selectChoferRuta.innerHTML = '<option value="">-- Seleccionar chofer responsable --</option>' + allChoferes.map(c => `
+      <option value="${c.id}">${c.nombre} (${c.estadoDisponibilidad})</option>
+    `).join('');
+  }
 
   // Choferes en simulador
   const simSelect = document.getElementById('sim-select-chofer');
-  if (simSelect.options.length <= 1) {
+  if (simSelect && simSelect.options.length <= 1) {
     simSelect.innerHTML = allChoferes.map(c => `
       <option value="${c.id}">${c.nombre}</option>
     `).join('');
@@ -704,51 +885,96 @@ function setupEventListeners() {
     }
   });
 
-  // Formulario: Crear Pedido
-  document.getElementById('form-crear-pedido')?.addEventListener('submit', async e => {
-    e.preventDefault();
-    const cliente = document.getElementById('input-pedido-cliente').value.trim();
-    const direccion = document.getElementById('input-pedido-direccion').value.trim();
-    const latitud = parseFloat(document.getElementById('input-pedido-latitud').value);
-    const longitud = parseFloat(document.getElementById('input-pedido-longitud').value);
-
-    try {
-      const res = await fetch(`${LOGISTICA_API}/pedidos`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ cliente, direccionTexto: direccion, latitud, longitud })
-      });
-      if (!res.ok) throw new Error('Error al registrar pedido.');
-
-      showToast('Pedido registrado con georreferenciacion PostGIS.', 'success');
-      document.getElementById('form-crear-pedido').reset();
-      loadAllData();
-    } catch (err) {
-      showToast(err.message, 'error');
+  // -------------------------------------------------------------------------
+  // SELECTOR INTERACTIVO DE UBICACION EN GOOGLE MAPS
+  // -------------------------------------------------------------------------
+  document.getElementById('btn-open-map-picker')?.addEventListener('click', openMapPickerModal);
+  document.getElementById('btn-close-map-picker')?.addEventListener('click', closeMapPickerModal);
+  document.getElementById('btn-cancel-map-picker')?.addEventListener('click', closeMapPickerModal);
+  document.getElementById('btn-confirm-map-picker')?.addEventListener('click', confirmMapPickerSelection);
+  document.getElementById('btn-map-picker-search')?.addEventListener('click', searchMapPickerLocation);
+  document.getElementById('map-picker-search-input')?.addEventListener('keypress', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      searchMapPickerLocation();
     }
   });
 
-  // Formulario: Asignar Hoja de Ruta
-  document.getElementById('form-asignar-ruta')?.addEventListener('submit', async e => {
+  // -------------------------------------------------------------------------
+  // FORMULARIO: AGREGAR PARADA A LA RUTA
+  // -------------------------------------------------------------------------
+  document.getElementById('form-agregar-parada')?.addEventListener('submit', e => {
     e.preventDefault();
-    const pedidoId = document.getElementById('select-pedido-disponible').value;
-    const choferId = document.getElementById('select-chofer-disponible').value;
+    const cliente = document.getElementById('input-parada-cliente').value.trim();
+    const direccionTexto = document.getElementById('input-parada-direccion').value.trim();
+    const latitudDestino = parseFloat(document.getElementById('input-parada-latitud').value);
+    const longitudDestino = parseFloat(document.getElementById('input-parada-longitud').value);
 
-    if (!pedidoId || !choferId) {
-      showToast('Debe seleccionar pedido y chofer.', 'warning');
+    if (!cliente || !direccionTexto || isNaN(latitudDestino) || isNaN(longitudDestino)) {
+      showToast('Complete todos los campos del destino.', 'warning');
       return;
     }
 
+    paradasPreparadas.push({ cliente, direccionTexto, latitudDestino, longitudDestino });
+    renderParadasPreparadas();
+    showToast(`Destino "${cliente}" agregado (${paradasPreparadas.length} paradas en lista).`, 'success');
+
+    // Limpiar campos para la siguiente parada
+    document.getElementById('input-parada-cliente').value = '';
+    document.getElementById('input-parada-direccion').value = '';
+    document.getElementById('input-parada-cliente').focus();
+  });
+
+  // Limpiar lista de paradas
+  document.getElementById('btn-limpiar-paradas')?.addEventListener('click', () => {
+    paradasPreparadas = [];
+    renderParadasPreparadas();
+    showToast('Lista de paradas restablecida.', 'info');
+  });
+
+  // -------------------------------------------------------------------------
+  // FORMULARIO: CREAR RUTA CON N DESTINOS Y OPTIMIZACION TSP
+  // -------------------------------------------------------------------------
+  document.getElementById('form-crear-ruta-consolidada')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (paradasPreparadas.length === 0) {
+      showToast('Debe agregar al menos un destino a la ruta.', 'warning');
+      return;
+    }
+
+    const choferId = document.getElementById('select-chofer-ruta').value;
+    if (!choferId) {
+      showToast('Seleccione un chofer responsable.', 'warning');
+      return;
+    }
+
+    const comentarios = document.getElementById('input-ruta-comentarios')?.value.trim() || null;
+
     try {
-      const res = await fetch(`${LOGISTICA_API}/despachos/asignar`, {
+      const res = await fetch(`${LOGISTICA_API}/rutas/multi-destino`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ pedidoId, choferId })
+        body: JSON.stringify({
+          choferId,
+          destinos: paradasPreparadas,
+          comentarios
+        })
       });
-      if (!res.ok) throw new Error('Error al asignar hoja de ruta.');
 
-      showToast('Ruta asignada. Chofer notificado para dar consentimiento.', 'success');
-      loadAllData();
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || 'Error al generar la ruta.');
+      }
+
+      const rutaGenerada = await res.json();
+      const numParadas = rutaGenerada.paradas?.length || paradasPreparadas.length;
+      showToast(`Ruta ${rutaGenerada.codigoRuta} creada exitosamente con ${numParadas} paradas optimizadas por proximidad.`, 'success');
+
+      paradasPreparadas = [];
+      renderParadasPreparadas();
+      document.getElementById('form-crear-ruta-consolidada').reset();
+
+      await loadAllData();
       document.querySelector('.nav-item[data-tab="tab-kanban"]').click();
     } catch (err) {
       showToast(err.message, 'error');

@@ -98,6 +98,11 @@ public class LogisticaController {
         return ResponseEntity.status(HttpStatus.CREATED).body(logisticaService.crearRutaConsolidada(request));
     }
 
+    @PostMapping("/rutas/multi-destino")
+    public ResponseEntity<RutaResponse> crearRutaMultiDestino(@Valid @RequestBody CrearRutaMultiDestinoRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(logisticaService.crearRutaMultiDestino(request));
+    }
+
     @GetMapping("/rutas")
     public ResponseEntity<List<RutaResponse>> listarRutas() {
         return ResponseEntity.ok(logisticaService.listarRutas());

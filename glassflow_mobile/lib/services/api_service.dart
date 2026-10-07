@@ -1,10 +1,16 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // Para emulador Android estandar se utiliza 10.0.2.2, o localhost para pruebas de escritorio
-  static String baseUrl = 'http://10.0.2.2:8080/api/v1';
+  // Deteccion automatica de entorno: Web usa localhost, emulador Android usa 10.0.2.2
+  static String get baseUrl {
+    if (kIsWeb) {
+      return 'http://localhost:8080/api/v1';
+    }
+    return 'http://10.0.2.2:8080/api/v1';
+  }
 
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();

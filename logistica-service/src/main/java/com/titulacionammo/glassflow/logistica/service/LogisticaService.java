@@ -36,6 +36,8 @@ public interface LogisticaService {
 
     RutaResponse crearRutaConsolidada(CrearRutaConsolidadaRequest request);
 
+    RutaResponse crearRutaMultiDestino(CrearRutaMultiDestinoRequest request);
+
     List<RutaResponse> listarRutas();
 
     List<RutaResponse> listarRutasPorChofer(UUID choferId);

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GlassFlow — Sistema de Control Logistico & Monitoreo en Tiempo Real</title>
-  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="./css/styles.css">
   
   <!-- SockJS y STOMP para Telemetria WebSocket en Tiempo Real -->
   <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
@@ -235,62 +235,127 @@
         </div>
       </section>
 
-      <!-- PESTAÑA 3: PLANIFICACION Y ASIGNACION DE RUTAS -->
+      <!-- PESTAÑA 3: PLANIFICACION Y ASIGNACION DE RUTAS MULTI-DESTINO -->
       <section id="tab-despachos" class="tab-view">
         <div class="card-section">
-          <h3 class="section-title">Registrar Pedido con Coordenadas Destino</h3>
-          <form id="form-crear-pedido">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="input-pedido-cliente">Cliente o Razon Social</label>
-                <input type="text" id="input-pedido-cliente" class="form-control" placeholder="Ej. Vidrieria Moderna del Norte" required>
-              </div>
-              <div class="form-group">
-                <label for="input-pedido-direccion">Direccion de Entrega</label>
-                <input type="text" id="input-pedido-direccion" class="form-control" placeholder="Ej. Av. 10 de Agosto y Colon, Quito" required>
-              </div>
-              <div class="form-group">
-                <label for="select-preset-quito">Ubicaciones Predefinidas (Quito)</label>
-                <select id="select-preset-quito" class="form-control">
-                  <option value="-0.1807,-78.4678">Quito Norte (Av. Amazonas y Orellana)</option>
-                  <option value="-0.2200,-78.5130">Quito Centro (La Marin)</option>
-                  <option value="-0.2035,-78.4350">Valle de Cumbaya (Interoceanica)</option>
-                  <option value="-0.1000,-78.4800">Quito Extremo Norte (Carcelen)</option>
-                  <option value="custom">Coordenadas personalizadas...</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="input-pedido-latitud">Latitud Destino (WGS 84)</label>
-                <input type="number" step="any" id="input-pedido-latitud" class="form-control" value="-0.1807" required>
-              </div>
-              <div class="form-group">
-                <label for="input-pedido-longitud">Longitud Destino (WGS 84)</label>
-                <input type="number" step="any" id="input-pedido-longitud" class="form-control" value="-78.4678" required>
-              </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 class="section-title" style="margin-bottom: 4px;">Planificador de Rutas Multi-Destino con Optimizacion TSP</h3>
+              <p style="font-size: 0.82rem; color: var(--text-muted);">
+                Añada N destinos a la hoja de ruta. El sistema ordenara automaticamente las paradas por proximidad espacial geodésica.
+              </p>
             </div>
-            <button type="submit" class="btn btn-primary" id="btn-submit-crear-pedido">Registrar Pedido</button>
-          </form>
-        </div>
+            <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 6px 12px; font-size: 0.75rem; color: #6ee7b7; font-weight: 700;">
+              [TSP] Algoritmo de Proximidad Activo
+            </div>
+          </div>
 
-        <div class="card-section">
-          <h3 class="section-title">Asignar Hoja de Ruta a Chofer (HU-04)</h3>
-          <form id="form-asignar-ruta">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="select-pedido-disponible">Pedido Pendiente</label>
-                <select id="select-pedido-disponible" class="form-control" required>
-                  <option value="">Cargando pedidos pendientes...</option>
-                </select>
+          <!-- SUB-FORMULARIO: AGREGAR PARADA INDIVIDUAL -->
+          <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem;">
+            <h4 style="font-size: 0.88rem; font-weight: 700; color: #93c5fd; margin-bottom: 12px;">
+              Paso 1: Agregar Parada de Entrega (Destino)
+            </h4>
+
+            <form id="form-agregar-parada">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="input-parada-cliente">Cliente o Razon Social</label>
+                  <input type="text" id="input-parada-cliente" class="form-control" placeholder="Ej. Constructora Los Andes" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="input-parada-direccion">Direccion de Entrega</label>
+                  <div style="display: flex; gap: 8px;">
+                    <input type="text" id="input-parada-direccion" class="form-control" placeholder="Ej. Av. República y Eloy Alfaro, Quito" required style="flex: 1;">
+                    <button type="button" class="btn btn-outline" id="btn-open-map-picker" style="white-space: nowrap; font-size: 0.8rem; padding: 8px 12px; background: rgba(37,99,235,0.15); border-color: rgba(37,99,235,0.4); color: #93c5fd;">
+                      [MAPA] Elegir en Mapa
+                    </button>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="input-parada-latitud">Latitud Destino (WGS 84)</label>
+                  <input type="number" step="any" id="input-parada-latitud" class="form-control" value="-0.1807" required>
+                </div>
+
+                <div class="form-group">
+                  <label for="input-parada-longitud">Longitud Destino (WGS 84)</label>
+                  <input type="number" step="any" id="input-parada-longitud" class="form-control" value="-78.4678" required>
+                </div>
               </div>
-              <div class="form-group">
-                <label for="select-chofer-disponible">Chofer Responsable</label>
-                <select id="select-chofer-disponible" class="form-control" required>
-                  <option value="">Cargando choferes...</option>
-                </select>
+
+              <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+                <button type="submit" class="btn btn-primary" id="btn-agregar-parada-lista" style="padding: 8px 18px; font-size: 0.85rem;">
+                  + Añadir Parada a la Ruta
+                </button>
               </div>
+            </form>
+          </div>
+
+          <!-- TABLA DE PARADAS PREPARADAS PARA LA RUTA -->
+          <div style="margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <h4 style="font-size: 0.88rem; font-weight: 700; color: var(--text-main);">
+                Itinerario de Paradas en Preparacion (<span id="count-paradas-agregadas">0</span>)
+              </h4>
+              <button type="button" class="btn btn-outline" id="btn-limpiar-paradas" style="font-size: 0.75rem; padding: 4px 10px; display: none;">
+                Limpiar Lista
+              </button>
             </div>
-            <button type="submit" class="btn btn-success" id="btn-submit-asignar-ruta">Crear y Notificar Ruta</button>
-          </form>
+
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width: 50px;">Item</th>
+                    <th>Cliente</th>
+                    <th>Direccion</th>
+                    <th>Coordenadas WGS 84</th>
+                    <th style="width: 90px; text-align: center;">Accion</th>
+                  </tr>
+                </thead>
+                <tbody id="paradas-preparadas-table-body">
+                  <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 1.5rem;">
+                      No hay destinos agregados a la ruta todavia. Agregue uno o mas destinos arriba usando el selector de mapa.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ASIGNACION Y GENERACION DE RUTA OPTIMIZADA -->
+          <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 1.25rem;">
+            <h4 style="font-size: 0.88rem; font-weight: 700; color: #34d399; margin-bottom: 12px;">
+              Paso 2: Asignar Chofer y Optimizar por Proximidad
+            </h4>
+
+            <form id="form-crear-ruta-consolidada">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="select-chofer-ruta">Chofer Asignado a la Ruta</label>
+                  <select id="select-chofer-ruta" class="form-control" required>
+                    <option value="">Cargando choferes disponibles...</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="input-ruta-comentarios">Instrucciones / Observaciones (Opcional)</label>
+                  <input type="text" id="input-ruta-comentarios" class="form-control" placeholder="Ej. Entregar antes de las 17:00, vidrios templados 10mm">
+                </div>
+              </div>
+
+              <div style="margin-top: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                <span style="font-size: 0.78rem; color: var(--text-muted);">
+                  Al presionar "Optimizar y Asignar", el servidor calculara la ruta de menor distancia partiendo de la central y asignara las paradas en orden numerico.
+                </span>
+                <button type="submit" class="btn btn-success" id="btn-submit-crear-ruta-final" style="padding: 10px 22px; font-weight: 700;">
+                  Optimizar por Proximidad y Asignar Ruta
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </section>
 
@@ -510,9 +575,55 @@
     </div>
   </div>
 
+  <!-- MODAL: SELECTOR DE UBICACION INTERACTIVO EN GOOGLE MAPS -->
+  <div class="modal-overlay" id="modal-map-picker">
+    <div class="modal-content" style="max-width: 780px; width: 94%;">
+      <div class="modal-header">
+        <h3 class="modal-title">Seleccionar Ubicacion de Destino en Google Maps</h3>
+        <button class="close-btn" id="btn-close-map-picker">&times;</button>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; padding-top: 4px;">
+        <!-- Buscador superior estilo Google Maps -->
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="map-picker-search-input" class="form-control" placeholder="Buscar lugar o direccion en Quito (ej: Quicentro Norte, Cumbaya, La Carolina, Carcelen...)" style="flex: 1;">
+          <button type="button" class="btn btn-primary" id="btn-map-picker-search" style="padding: 8px 16px;">
+            Buscar
+          </button>
+        </div>
+
+        <!-- Canvas interactivo de Google Maps -->
+        <div id="map-picker-canvas" style="height: 380px; width: 100%; border-radius: 8px; border: 1px solid var(--border-accent); position: relative; background: #1e293b;"></div>
+
+        <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0;">
+          Instrucciones: Haga clic sobre cualquier punto del mapa o arrastre el marcador rojo para fijar el sitio exacto de entrega.
+        </p>
+
+        <!-- Informacion del punto fijado en tiempo real -->
+        <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div style="flex: 1; min-width: 220px;">
+            <span style="font-size: 0.7rem; color: #60a5fa; text-transform: uppercase; font-weight: 700; display: block;">Direccion Seleccionada:</span>
+            <span id="map-picker-current-address" style="font-size: 0.85rem; color: white; font-weight: 600;">Haga clic en el mapa para seleccionar</span>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-size: 0.7rem; color: var(--text-dim); display: block;">Coordenadas WGS 84:</span>
+            <span id="map-picker-current-coords" style="font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; color: #34d399;">-0.1807, -78.4678</span>
+          </div>
+        </div>
+
+        <!-- Botones de accion -->
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px;">
+          <button type="button" class="btn btn-outline" id="btn-cancel-map-picker">Cancelar</button>
+          <button type="button" class="btn btn-success" id="btn-confirm-map-picker" style="padding: 8px 20px; font-weight: 700;">
+            Confirmar y Usar Ubicacion
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- CONTENEDOR DE NOTIFICACIONES TOAST -->
   <div class="toast-container" id="toast-container"></div>
 
-  <script src="/js/app.js"></script>
+  <script src="./js/app.js"></script>
 </body>
 </html>

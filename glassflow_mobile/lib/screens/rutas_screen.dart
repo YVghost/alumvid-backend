@@ -31,7 +31,12 @@ class _RutasScreenState extends State<RutasScreen> {
 
     try {
       final choferId = widget.choferData['id'];
-      final res = await ApiService.obtenerDespachosHoy(choferId);
+      final List<dynamic> res = await ApiService.obtenerDespachosHoy(choferId);
+      res.sort((a, b) {
+        final ordA = (a['ordenParada'] as num?)?.toInt() ?? 999;
+        final ordB = (b['ordenParada'] as num?)?.toInt() ?? 999;
+        return ordA.compareTo(ordB);
+      });
       setState(() {
         _despachos = res;
       });
