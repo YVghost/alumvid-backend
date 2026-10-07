@@ -15,7 +15,7 @@ CREATE TABLE usuarios.auth_session (
  user_id UUID NOT NULL REFERENCES usuarios.app_user(id),
  expires_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
-CREATE INDEX session_user ON usuarios.auth_session(user_id);
+CREATE INDEX auth_session_user_idx ON usuarios.auth_session(user_id);
 CREATE TABLE usuarios.audit_event (
  id UUID PRIMARY KEY,
  actor_id UUID REFERENCES usuarios.app_user(id),

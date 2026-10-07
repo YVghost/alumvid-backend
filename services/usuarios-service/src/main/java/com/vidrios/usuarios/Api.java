@@ -25,7 +25,7 @@ class Api {
     @PostMapping("/auth/password") @ResponseStatus(HttpStatus.NO_CONTENT)
     void password(@AuthenticationPrincipal Users.User u, @Valid @RequestBody PasswordChange r) { service.changePassword(u,r.currentPassword(),r.newPassword()); }
     @PostMapping("/auth/logout") @ResponseStatus(HttpStatus.NO_CONTENT)
-    void logout(@RequestHeader("Authorization") String authorization) { users.db.update("DELETE FROM usuarios.auth_session WHERE token_hash=?",Security.hash(authorization.substring(7))); }
+    void logout(@RequestHeader("Authorization") String authorization) { users.db().update("DELETE FROM usuarios.auth_session WHERE token_hash=?",Security.hash(authorization.substring(7))); }
     @GetMapping("/admin/users") List<Users.View> list() { return users.list(); }
     @PostMapping("/admin/users") @ResponseStatus(HttpStatus.CREATED)
     Users.View create(@AuthenticationPrincipal Users.User u,@Valid @RequestBody Create r) { return service.create(u,r); }
@@ -34,6 +34,6 @@ class Api {
     void reset(@AuthenticationPrincipal Users.User u,@PathVariable UUID id,@Valid @RequestBody Reset r) { service.reset(u,id,r.temporaryPassword()); }
     @GetMapping("/admin/audit") List<Map<String,Object>> audit(@AuthenticationPrincipal Users.User u) {
         if (!u.master()) throw new ApiError(403,"Solo el administrador principal puede consultar la auditoría");
-        return users.db.queryForList("SELECT e.id,e.action,e.detail,e.occurred_at,a.identification AS actor,t.identification AS target FROM usuarios.audit_event e LEFT JOIN usuarios.app_user a ON a.id=e.actor_id LEFT JOIN usuarios.app_user t ON t.id=e.target_id ORDER BY e.occurred_at DESC LIMIT 200");
+        return users.db().queryForList("SELECT e.id,e.action,e.detail,e.occurred_at,a.identification AS actor,t.identification AS target FROM usuarios.audit_event e LEFT JOIN usuarios.app_user a ON a.id=e.actor_id LEFT JOIN usuarios.app_user t ON t.id=e.target_id ORDER BY e.occurred_at DESC LIMIT 200");
     }
 }

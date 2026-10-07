@@ -49,7 +49,7 @@ class Security {
         @Override protected void doFilterInternal(HttpServletRequest q, HttpServletResponse r, FilterChain chain) throws ServletException, IOException {
             String auth=q.getHeader("Authorization");
             if (auth!=null && auth.startsWith("Bearer ")) {
-                var ids=users.db.query("SELECT user_id FROM usuarios.auth_session WHERE token_hash=? AND expires_at>CURRENT_TIMESTAMP",
+                var ids=users.db().query("SELECT user_id FROM usuarios.auth_session WHERE token_hash=? AND expires_at>CURRENT_TIMESTAMP",
                     (rs,n)->rs.getObject(1,UUID.class),hash(auth.substring(7)));
                 if (!ids.isEmpty()) {
                     var u=users.byId(ids.get(0));

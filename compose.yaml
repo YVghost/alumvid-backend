@@ -25,7 +25,19 @@ services:
       MASTER_NAME: ${MASTER_NAME:-Administrador principal}
       MASTER_PASSWORD: ${MASTER_PASSWORD:?Configura MASTER_PASSWORD}
     ports:
-      - "127.0.0.1:8081:8081"
+      - "127.0.0.1:${USUARIOS_PORT:-8091}:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  inventario:
+    build: services/inventario-service
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-inventario}
+      DB_USER: ${POSTGRES_USER:-inventario}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}
+      AUTH_URL: http://usuarios:8081
+    ports:
+      - "127.0.0.1:${INVENTARIO_PORT:-8092}:8082"
     depends_on:
       postgres:
         condition: service_healthy

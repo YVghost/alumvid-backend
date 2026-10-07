@@ -16,6 +16,7 @@ class Users {
                 boolean master, boolean active, boolean mustChangePassword) {}
     final JdbcTemplate db;
     Users(JdbcTemplate db) { this.db = db; }
+    JdbcTemplate db() { return db; }
     private final org.springframework.jdbc.core.RowMapper<User> mapper = (r, n) -> new User(
         r.getObject("id", UUID.class), r.getString("identification"), r.getString("full_name"),
         r.getString("password_hash"), decode(r.getString("roles")), r.getBoolean("master"),

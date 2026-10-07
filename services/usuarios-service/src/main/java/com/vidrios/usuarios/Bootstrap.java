@@ -12,8 +12,8 @@ class Bootstrap {
     @Bean ApplicationRunner master(Users users, PasswordEncoder passwords, Environment env, TransactionTemplate tx) {
         return args -> tx.executeWithoutResult(status -> {
             // Bloqueo PostgreSQL compartido incluso con varias instancias arrancando.
-            users.db.execute("SELECT pg_advisory_xact_lock(736241)");
-            if (!users.db.queryForList("SELECT id FROM usuarios.app_user WHERE master=TRUE").isEmpty()) return;
+            users.db().execute("SELECT pg_advisory_xact_lock(736241)");
+            if (!users.db().queryForList("SELECT id FROM usuarios.app_user WHERE master=TRUE").isEmpty()) return;
             String id=env.getProperty("app.master.identification","");
             String name=env.getProperty("app.master.name","");
             String password=env.getProperty("app.master.password","");

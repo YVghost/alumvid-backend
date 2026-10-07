@@ -31,8 +31,8 @@ class UserService {
         var u=candidate.get();
         byte[] bytes=new byte[32]; random.nextBytes(bytes);
         String token=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        users.db.update("DELETE FROM usuarios.auth_session WHERE expires_at<=CURRENT_TIMESTAMP");
-        users.db.update("INSERT INTO usuarios.auth_session(token_hash,user_id,expires_at) VALUES (?,?,?)", Security.hash(token),u.id(),Timestamp.from(Instant.now().plusSeconds(28800)));
+        users.db().update("DELETE FROM usuarios.auth_session WHERE expires_at<=CURRENT_TIMESTAMP");
+        users.db().update("INSERT INTO usuarios.auth_session(token_hash,user_id,expires_at) VALUES (?,?,?)", Security.hash(token),u.id(),Timestamp.from(Instant.now().plusSeconds(28800)));
         users.audit(u.id(),u.id(),"LOGIN","Inicio de sesión");
         return new Login(token,"Bearer",28800,u.view());
     }
@@ -42,11 +42,11 @@ class UserService {
         if (!passwords.matches(current,u.passwordHash())) throw new ApiError(400,"La contraseña actual es incorrecta");
         if (passwords.matches(next,u.passwordHash())) throw new ApiError(400,"La contraseña nueva debe ser diferente");
         if (!u.active()) throw new ApiError(401,"Cuenta desactivada");
-        users.db.update("UPDATE usuarios.app_user SET password_hash=?,must_change_password=FALSE WHERE id=?",encodePassword(next),u.id());
+        users.db().update("UPDATE usuarios.app_user SET password_hash=?,must_change_password=FALSE WHERE id=?",encodePassword(next),u.id());
         users.revoke(u.id()); users.audit(u.id(),u.id(),"PASSWORD_CHANGED","Contraseña cambiada; sesiones revocadas");
     }
     // Serializa cambios administrativos para evitar carreras entre revocación y delegación.
-    private void lock() { users.db.queryForList("SELECT id FROM usuarios.app_user WHERE master=TRUE FOR UPDATE"); }
+    private void lock() { users.db().queryForList("SELECT id FROM usuarios.app_user WHERE master=TRUE FOR UPDATE"); }
     private Users.User actor(Users.User actor) {
         var fresh=users.byId(actor.id());
         if (!fresh.active() || !fresh.admin() || fresh.mustChangePassword()) throw new ApiError(403,"No tienes permisos administrativos");
@@ -68,7 +68,7 @@ class UserService {
         boolean removal=!request.roles().containsAll(target.roles()) || (target.active() && !request.active());
         boolean adminChange=request.roles().contains(Users.Role.ADMINISTRADOR)!=target.admin();
         if (removal || adminChange || target.admin()) requireMaster(actor);
-        users.db.update("UPDATE usuarios.app_user SET full_name=?,roles=?,active=? WHERE id=?",request.fullName().trim(),Users.encode(request.roles()),request.active(),id);
+        users.db().update("UPDATE usuarios.app_user SET full_name=?,roles=?,active=? WHERE id=?",request.fullName().trim(),Users.encode(request.roles()),request.active(),id);
         if (!request.roles().equals(target.roles()) || request.active()!=target.active()) users.revoke(id);
         users.audit(actor.id(),id,"USER_UPDATED","Nombre: "+target.fullName()+" -> "+request.fullName().trim());
         users.audit(actor.id(),id,"ACCESS_UPDATED","Roles: "+Users.encode(target.roles())+" -> "+Users.encode(request.roles())+"; activo: "+target.active()+" -> "+request.active());
@@ -80,7 +80,7 @@ class UserService {
         // Restablecer contraseñas permitiría suplantar usuarios: se reserva al principal.
         requireMaster(actor);
         if (!target.active()) throw new ApiError(409,"Reactiva la cuenta antes de restablecer la contraseña");
-        users.db.update("UPDATE usuarios.app_user SET password_hash=?,must_change_password=TRUE WHERE id=?",encodePassword(temporary),id);
+        users.db().update("UPDATE usuarios.app_user SET password_hash=?,must_change_password=TRUE WHERE id=?",encodePassword(temporary),id);
         users.revoke(id); users.audit(actor.id(),id,"PASSWORD_RESET","Contraseña temporal restablecida");
     }
 }
