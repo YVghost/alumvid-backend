@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+
 /**
  * Controlador REST para gestion de logistica, hojas de ruta y evidencia de entrega e-PoD.
  */
@@ -22,6 +24,7 @@ import java.util.UUID;
 public class LogisticaController {
 
     private final LogisticaService logisticaService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @GetMapping("/health")
     public ResponseEntity<Map<String, String>> healthCheck() {
@@ -98,6 +101,57 @@ public class LogisticaController {
         return ResponseEntity.status(HttpStatus.CREATED).body(logisticaService.crearRutaConsolidada(request));
     }
 
+    @PostMapping("/rutas/simple")
+    public ResponseEntity<RutaResponse> crearRutaSimple(@Valid @RequestBody CrearRutaSimpleRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(logisticaService.crearRuta(request));
+    }
+
+    @PutMapping("/rutas/{id}/chofer")
+    public ResponseEntity<RutaResponse> asignarChoferRuta(
+            @PathVariable UUID id,
+            @Valid @RequestBody AsignarChoferRutaRequest request) {
+        return ResponseEntity.ok(logisticaService.asignarChoferRuta(id, request.getChoferId()));
+    }
+
+    @PostMapping("/rutas/{id}/destinos")
+    public ResponseEntity<RutaResponse> agregarDestinoRuta(
+            @PathVariable UUID id,
+            @Valid @RequestBody DestinoRutaRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(logisticaService.agregarDestinoRuta(id, request));
+    }
+
+    @PutMapping("/rutas/{rutaId}/destinos/{despachoId}")
+    public ResponseEntity<RutaResponse> modificarDestinoRuta(
+            @PathVariable UUID rutaId,
+            @PathVariable UUID despachoId,
+            @Valid @RequestBody DestinoRutaRequest request) {
+        return ResponseEntity.ok(logisticaService.modificarDestinoRuta(rutaId, despachoId, request));
+    }
+
+    @DeleteMapping("/rutas/{rutaId}/destinos/{despachoId}")
+    public ResponseEntity<RutaResponse> eliminarDestinoRuta(
+            @PathVariable UUID rutaId,
+            @PathVariable UUID despachoId) {
+        return ResponseEntity.ok(logisticaService.eliminarDestinoRuta(rutaId, despachoId));
+    }
+
+    @PostMapping("/rutas/{id}/optimizar")
+    public ResponseEntity<RutaResponse> optimizarRuta(@PathVariable UUID id) {
+        return ResponseEntity.ok(logisticaService.optimizarRuta(id));
+    }
+
+    @DeleteMapping("/rutas/{id}")
+    public ResponseEntity<Map<String, String>> eliminarRuta(@PathVariable UUID id) {
+        logisticaService.eliminarRuta(id);
+        return ResponseEntity.ok(Map.of("mensaje", "Ruta eliminada exitosamente."));
+    }
+
+    @DeleteMapping("/choferes/{id}")
+    public ResponseEntity<Map<String, String>> eliminarChofer(@PathVariable UUID id) {
+        logisticaService.eliminarChofer(id);
+        return ResponseEntity.ok(Map.of("mensaje", "Chofer eliminado exitosamente."));
+    }
+
     @PostMapping("/rutas/multi-destino")
     public ResponseEntity<RutaResponse> crearRutaMultiDestino(@Valid @RequestBody CrearRutaMultiDestinoRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(logisticaService.crearRutaMultiDestino(request));
@@ -129,5 +183,19 @@ public class LogisticaController {
             @RequestBody(required = false) Map<String, String> payload) {
         String motivo = payload != null ? payload.get("motivo") : null;
         return ResponseEntity.ok(logisticaService.cancelarRutaConsolidada(id, motivo));
+    }
+
+    @PostMapping("/telemetria")
+    public ResponseEntity<Map<String, Object>> recibirTelemetriaHttp(@RequestBody TelemetriaGpsPayload payload) {
+        if (payload != null) {
+            if (payload.getTimestamp() == null) {
+                payload.setTimestamp(System.currentTimeMillis());
+            }
+            if (payload.getDespachoId() != null) {
+                messagingTemplate.convertAndSend("/topic/despachos/" + payload.getDespachoId() + "/ubicacion", payload);
+            }
+            messagingTemplate.convertAndSend("/topic/choferes-activos", payload);
+        }
+        return ResponseEntity.ok(Map.of("status", "RECEIVED", "timestamp", System.currentTimeMillis()));
     }
 }

@@ -67,4 +67,11 @@ public class AuthController {
         String email = authentication.getName();
         return ResponseEntity.ok(authService.obtenerPerfilActual(email));
     }
+
+    @DeleteMapping("/usuarios/{id}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Map<String, String>> eliminarUsuario(@PathVariable UUID id) {
+        authService.eliminarUsuario(id);
+        return ResponseEntity.ok(Map.of("mensaje", "Usuario eliminado exitosamente."));
+    }
 }

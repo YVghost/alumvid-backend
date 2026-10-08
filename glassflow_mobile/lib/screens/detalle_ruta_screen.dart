@@ -1,616 +1,424 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
-import '../services/location_service.dart';
-import 'epod_screen.dart';
+import 'navegacion_destino_screen.dart';
 
+/// Pantalla que presenta el itinerario completo de una Hoja de Ruta asignada (ej. Ruta 1).
+/// Permite al chofer inspeccionar la totalidad de paradas/destinos y elegir con cual
+/// destino iniciar su recorrido de distribucion.
 class DetalleRutaScreen extends StatefulWidget {
-  final Map<String, dynamic> despacho;
+  final Map<String, dynamic> ruta;
+  final Map<String, dynamic> choferData;
 
-  const DetalleRutaScreen({super.key, required this.despacho});
+  const DetalleRutaScreen({
+    super.key,
+    required this.ruta,
+    required this.choferData,
+  });
 
   @override
   State<DetalleRutaScreen> createState() => _DetalleRutaScreenState();
 }
 
 class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
-  late Map<String, dynamic> _despachoActual;
-  bool _procesando = false;
-
-  // Mapa y Telemetria en tiempo real estilo Uber
-  MapController? _mapController;
-  LatLng? _posicionChofer;
-  StreamSubscription<Position>? _positionStreamSub;
-  double _distanciaRestanteKm = 0.0;
-  bool _cargandoGps = true;
+  late Map<String, dynamic> _rutaActual;
+  bool _cargando = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _despachoActual = widget.despacho;
-    _mapController = MapController();
-    _iniciarSeguimientoGps();
+    _rutaActual = widget.ruta;
+    _recargarDetalleRuta();
   }
 
-  @override
-  void dispose() {
-    _positionStreamSub?.cancel();
-    _mapController?.dispose();
-    super.dispose();
-  }
+  Future<void> _recargarDetalleRuta() async {
+    final rutaId = _rutaActual['id']?.toString();
+    if (rutaId == null) return;
 
-  Future<void> _iniciarSeguimientoGps() async {
+    setState(() {
+      _cargando = true;
+      _error = null;
+    });
+
     try {
-      final pos = await LocationService.determinarPosicionActual();
+      final res = await ApiService.obtenerRutaPorId(rutaId);
       if (mounted) {
         setState(() {
-          _posicionChofer = LatLng(pos.latitude, pos.longitude);
-          _cargandoGps = false;
-          _calcularDistanciaRestante();
+          _rutaActual = res;
         });
       }
-    } catch (_) {
-      // Coordenadas base en Quito para entorno de emulador o navegador
+    } catch (e) {
       if (mounted) {
         setState(() {
-          _posicionChofer = const LatLng(-0.1807, -78.4678);
-          _cargandoGps = false;
-          _calcularDistanciaRestante();
+          _error = e.toString().replaceAll('Exception: ', '');
         });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _cargando = false);
+      }
+    }
+  }
+
+  Color _obtenerColorEstado(String estado) {
+    switch (estado) {
+      case 'PENDIENTE':
+        return const Color(0xFFFBBF24);
+      case 'EN_CURSO':
+        return const Color(0xFF60A5FA);
+      case 'ENTREGADO':
+      case 'COMPLETADA':
+        return const Color(0xFF34D399);
+      case 'CANCELADA':
+        return const Color(0xFFFB7185);
+      default:
+        return const Color(0xFF94A3B8);
+    }
+  }
+
+  Future<void> _iniciarDestinoSeleccionado(Map<String, dynamic> despacho) async {
+    final despachoId = despacho['id']?.toString() ?? '';
+    final estadoDespacho = despacho['estado'] ?? 'PENDIENTE';
+
+    // Si la parada está pendiente, notificar inicio formal al backend
+    if (estadoDespacho == 'PENDIENTE') {
+      try {
+        await ApiService.aceptarEIniciarRuta(despachoId);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Atencion: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: const Color(0xFFF59E0B),
+          ),
+        );
       }
     }
 
-    _positionStreamSub = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 5,
+    if (!mounted) return;
+
+    // Abrir la pantalla de navegacion urbana en tiempo real (estilo Uber con OSRM)
+    final actualizado = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NavegacionDestinoScreen(
+          despacho: despacho,
+          ruta: _rutaActual,
+          choferData: widget.choferData,
+        ),
       ),
-    ).listen((pos) {
-      if (!mounted) return;
-      setState(() {
-        _posicionChofer = LatLng(pos.latitude, pos.longitude);
-        _calcularDistanciaRestante();
-      });
-    }, onError: (_) {});
-  }
-
-  void _calcularDistanciaRestante() {
-    if (_posicionChofer == null) return;
-    final destLat = (_despachoActual['pedido']?['latitudDestino'] as num?)?.toDouble() ?? -0.1807;
-    final destLng = (_despachoActual['pedido']?['longitudDestino'] as num?)?.toDouble() ?? -78.4678;
-
-    final distMetros = Geolocator.distanceBetween(
-      _posicionChofer!.latitude,
-      _posicionChofer!.longitude,
-      destLat,
-      destLng,
     );
-    _distanciaRestanteKm = distMetros / 1000.0;
-  }
 
-  Future<void> _aceptarEIniciar() async {
-    setState(() => _procesando = true);
-    try {
-      final res = await ApiService.aceptarEIniciarRuta(_despachoActual['id']);
-      setState(() {
-        _despachoActual = res;
-      });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Consentimiento registrado. Monitoreo satelital activo hacia la central.'),
-          backgroundColor: Color(0xFF059669),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')),
-          backgroundColor: const Color(0xFFE11D48),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _procesando = false);
+    // Al regresar de la entrega documentada o de la navegacion, refrescar la lista
+    if (actualizado == true || mounted) {
+      _recargarDetalleRuta();
     }
-  }
-
-  Future<void> _cancelarRuta() async {
-    final motivoController = TextEditingController();
-    final confirmar = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF111827),
-        title: const Text('Cancelar Hoja de Ruta', style: TextStyle(color: Colors.white, fontSize: 16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'La transmision de ubicacion satelital sera cortada de inmediato y la ruta pasara a estado CANCELADA.',
-              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: motivoController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'Motivo de cancelacion',
-                labelStyle: TextStyle(color: Color(0xFF94A3B8)),
-                filled: true,
-                fillColor: Color(0xFF0A0E17),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Volver', style: TextStyle(color: Color(0xFF94A3B8))),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE11D48)),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Confirmar Cancelacion', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmar != true) return;
-
-    setState(() => _procesando = true);
-    try {
-      final res = await ApiService.cancelarRuta(
-        _despachoActual['id'],
-        motivoController.text.trim().isEmpty ? 'Cancelada por el chofer' : motivoController.text.trim(),
-      );
-      setState(() {
-        _despachoActual = res;
-      });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ruta cancelada. Transmision satelital finalizada.'),
-          backgroundColor: Color(0xFFE11D48),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')),
-          backgroundColor: const Color(0xFFE11D48),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _procesando = false);
-    }
-  }
-
-  Widget _construirRecuadroMapaUber(Map<String, dynamic> pedido) {
-    final destLat = (pedido['latitudDestino'] as num?)?.toDouble() ?? -0.1807;
-    final destLng = (pedido['longitudDestino'] as num?)?.toDouble() ?? -78.4678;
-    final posDestino = LatLng(destLat, destLng);
-    final posActual = _posicionChofer ?? posDestino;
-
-    return Container(
-      height: 360,
-      decoration: BoxDecoration(
-        color: const Color(0xFF111827),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.4), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(15),
-        child: Stack(
-          children: [
-            // 1. Capa Cartografica Interactiva
-            FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: posActual,
-                initialZoom: 14.5,
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.titulacionammo.glassflow',
-                ),
-                // Linea Polyline de ruta
-                if (_posicionChofer != null)
-                  PolylineLayer(
-                    polylines: [
-                      Polyline(
-                        points: [_posicionChofer!, posDestino],
-                        strokeWidth: 4.5,
-                        color: const Color(0xFF2563EB),
-                      ),
-                    ],
-                  ),
-                // Marcadores
-                MarkerLayer(
-                  markers: [
-                    // Destino
-                    Marker(
-                      point: posDestino,
-                      width: 44,
-                      height: 44,
-                      child: const Icon(
-                        Icons.location_on,
-                        color: Color(0xFFE11D48),
-                        size: 40,
-                      ),
-                    ),
-                    // Vehiculo del Chofer
-                    if (_posicionChofer != null)
-                      Marker(
-                        point: _posicionChofer!,
-                        width: 52,
-                        height: 52,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Container(
-                              width: 52,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFF3B82F6).withValues(alpha: 0.25),
-                              ),
-                            ),
-                            Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFF1E3A8A),
-                                border: Border.all(color: const Color(0xFF60A5FA), width: 2),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.4),
-                                    blurRadius: 4,
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.navigation,
-                                color: Colors.white,
-                                size: 18,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-
-            // 2. Tarjeta Superior Flotante Estilo Navegacion Uber
-            Positioned(
-              top: 12,
-              left: 12,
-              right: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xF00A0E17),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF334155)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2563EB).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.near_me, color: Color(0xFF60A5FA), size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              const Text(
-                                'EN TRAYECTO',
-                                style: TextStyle(
-                                  color: Color(0xFF38BDF8),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${_distanciaRestanteKm.toStringAsFixed(1)} km restantes',
-                                style: const TextStyle(
-                                  color: Color(0xFF34D399),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            pedido['cliente'] ?? 'Cliente Destino',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // 3. Boton Flotante para Recentrar el Mapa
-            Positioned(
-              bottom: 12,
-              right: 12,
-              child: FloatingActionButton.small(
-                heroTag: 'btn-recentrar-mapa',
-                backgroundColor: const Color(0xFF1E293B),
-                foregroundColor: const Color(0xFF60A5FA),
-                onPressed: () {
-                  if (_posicionChofer != null && _mapController != null) {
-                    _mapController!.move(_posicionChofer!, 15.0);
-                  }
-                },
-                child: const Icon(Icons.my_location, size: 20),
-              ),
-            ),
-
-            // 4. Indicador de carga inicial
-            if (_cargandoGps)
-              Positioned(
-                bottom: 12,
-                left: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xCC0F172A),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text(
-                    'Sincronizando satelites GPS...',
-                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final estado = _despachoActual['estado'] ?? 'PENDIENTE';
-    final pedido = _despachoActual['pedido'] ?? {};
+    final String codigoRuta = _rutaActual['codigoRuta'] ?? 'Ruta';
+    final String estadoRuta = _rutaActual['estado'] ?? 'PENDIENTE';
+    final List<dynamic> paradas = (_rutaActual['paradas'] as List<dynamic>?) ?? [];
+
+    // Contabilizar paradas entregadas
+    final int entregadas = paradas.where((p) => p['estado'] == 'ENTREGADO').length;
+    final int totalParadas = paradas.length;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E17),
       appBar: AppBar(
         backgroundColor: const Color(0xFF111827),
         elevation: 0,
-        title: Text(
-          'Despacho #${_despachoActual['id'].toString().substring(0, 8)}',
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // TARJETA DE DATOS DEL CLIENTE
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF111827),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF1E293B)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Text(
+              codigoRuta,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+            ),
+            Text(
+              '$totalParadas Destinos de Entrega Programados',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Color(0xFF94A3B8)),
+            onPressed: _recargarDetalleRuta,
+            tooltip: 'Actualizar paradas',
+          ),
+        ],
+      ),
+      body: _cargando && paradas.isEmpty
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
+          : RefreshIndicator(
+              onRefresh: _recargarDetalleRuta,
+              color: const Color(0xFF2563EB),
+              child: ListView(
+                padding: const EdgeInsets.all(16),
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Datos del Cliente',
-                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w700),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2563EB).withValues(alpha: 0.2),
+                  // 1. TARJETA RESUMEN DE LA RUTA
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF111827),
+                      border: Border.all(color: const Color(0xFF1E293B)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              codigoRuta,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _obtenerColorEstado(estadoRuta).withValues(alpha: 0.15),
+                                border: Border.all(color: _obtenerColorEstado(estadoRuta).withValues(alpha: 0.4)),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                estadoRuta,
+                                style: TextStyle(
+                                  color: _obtenerColorEstado(estadoRuta),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Progreso: $entregadas de $totalParadas entregas documentadas',
+                          style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        ),
+                        const SizedBox(height: 10),
+                        // Barra de progreso
+                        ClipRRect(
                           borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: totalParadas > 0 ? (entregadas / totalParadas) : 0.0,
+                            minHeight: 6,
+                            backgroundColor: const Color(0xFF1E293B),
+                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF34D399)),
+                          ),
                         ),
-                        child: Text(
-                          estado,
-                          style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 11, fontWeight: FontWeight.w700),
-                        ),
+                        if (_rutaActual['comentarios'] != null &&
+                            _rutaActual['comentarios'].toString().isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            'Instrucciones: ${_rutaActual['comentarios']}',
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+                  const Text(
+                    'DESTINOS DE ENTREGA DE ESTA RUTA',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF60A5FA),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Seleccione con cual destino iniciara su recorrido:',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  ),
+                  const SizedBox(height: 12),
+
+                  if (_error != null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE11D48).withValues(alpha: 0.1),
+                        border: Border.all(color: const Color(0xFFE11D48)),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    pedido['cliente'] ?? '-',
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Direccion: ${pedido['direccionTexto'] ?? '-'}',
-                    style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Coordenadas: ${pedido['latitudDestino'] ?? '-'}, ${pedido['longitudDestino'] ?? '-'}',
-                    style: const TextStyle(fontFamily: 'monospace', color: Color(0xFF64748B), fontSize: 11),
-                  ),
+                      child: Text(_error!, style: const TextStyle(color: Color(0xFFFB7185), fontSize: 12)),
+                    ),
+
+                  // 2. LISTA DE PARADAS / DESTINOS
+                  if (paradas.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      alignment: Alignment.center,
+                      child: const Text(
+                        'Esta ruta no contiene destinos asignados aun.',
+                        style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                      ),
+                    )
+                  else
+                    ...paradas.map((d) {
+                      final String estado = d['estado'] ?? 'PENDIENTE';
+                      final Map<String, dynamic> pedido =
+                          (d['pedido'] as Map<String, dynamic>?) ?? {};
+                      final String cliente = pedido['cliente'] ?? 'Cliente';
+                      final String direccion = pedido['direccionTexto'] ?? 'Quito';
+                      final num? orden = d['ordenParada'] as num?;
+                      final bool esEntregado = estado == 'ENTREGADO';
+                      final bool esEnCurso = estado == 'EN_CURSO';
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF111827),
+                          border: Border.all(
+                            color: esEnCurso
+                                ? const Color(0xFF2563EB)
+                                : esEntregado
+                                    ? const Color(0xFF059669).withValues(alpha: 0.4)
+                                    : const Color(0xFF1E293B),
+                            width: esEnCurso ? 1.8 : 1.0,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF1E293B),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          'Parada #${orden ?? 1}',
+                                          style: const TextStyle(
+                                            color: Color(0xFF38BDF8),
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        '#${d['id'].toString().substring(0, 6)}',
+                                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: _obtenerColorEstado(estado).withValues(alpha: 0.15),
+                                      border: Border.all(color: _obtenerColorEstado(estado).withValues(alpha: 0.4)),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      estado,
+                                      style: TextStyle(
+                                        color: _obtenerColorEstado(estado),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                cliente,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(Icons.place, color: Color(0xFF94A3B8), size: 15),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      direccion,
+                                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Boton de accion segun estado
+                              if (esEntregado)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF059669).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.check_circle, color: Color(0xFF34D399), size: 16),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Entrega Finalizada y Documentada con e-PoD',
+                                        style: TextStyle(color: Color(0xFF34D399), fontSize: 12, fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: esEnCurso
+                                          ? const Color(0xFF0284C7)
+                                          : const Color(0xFF2563EB),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    icon: Icon(
+                                      esEnCurso ? Icons.navigation : Icons.play_arrow,
+                                      size: 18,
+                                    ),
+                                    label: Text(
+                                      esEnCurso
+                                          ? 'Continuar Navegacion Urbana a este Destino'
+                                          : 'Iniciar Entrega a este Destino',
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                    ),
+                                    onPressed: () => _iniciarDestinoSeleccionado(d),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-
-            // ESTADO: PENDIENTE
-            if (estado == 'PENDIENTE') ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0x22FBBF24),
-                  border: Border.all(color: const Color(0x66FBBF24)),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text(
-                  'Consentimiento Obligatorio: Al presionar "Aceptar e Iniciar Ruta", usted autoriza expresamente la transmision periodica de su posicion GPS satelital hacia la central administrativa de GlassFlow.',
-                  style: TextStyle(color: Color(0xFFFBBF24), fontSize: 13, height: 1.4),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _procesando ? null : _aceptarEIniciar,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF059669),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: _procesando
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'Aceptar e Iniciar Ruta',
-                        style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700),
-                      ),
-              ),
-            ]
-            // ESTADO: EN CURSO -> RECUADRO DE NAVEGACION ESTILO UBER
-            else if (estado == 'EN_CURSO') ...[
-              _construirRecuadroMapaUber(pedido),
-              const SizedBox(height: 16),
-
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0x222563EB),
-                  border: Border.all(color: const Color(0x662563EB)),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.satellite_alt, color: Color(0xFF60A5FA), size: 20),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Telemetria en tiempo real activa. Sus coordenadas satelitales se transmiten en vivo.',
-                        style: TextStyle(color: Color(0xFF93C5FD), fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              ElevatedButton(
-                onPressed: () async {
-                  final nav = Navigator.of(context);
-                  final exito = await nav.push<bool>(
-                    MaterialPageRoute(
-                      builder: (_) => EpodScreen(despacho: _despachoActual),
-                    ),
-                  );
-                  if (exito == true && mounted) {
-                    nav.pop(true);
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text(
-                  'Completar Entrega Documentada (e-PoD)',
-                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              OutlinedButton(
-                onPressed: _procesando ? null : _cancelarRuta,
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFE11D48)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text(
-                  'Cancelar Ruta Voluntariamente',
-                  style: TextStyle(color: Color(0xFFFB7185), fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ]
-            // ESTADO: ENTREGADO
-            else if (estado == 'ENTREGADO') ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0x22059669),
-                  border: Border.all(color: const Color(0x66059669)),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text(
-                  'Entrega documentada y finalizada con exito. Evidencias e-PoD archivadas legalmente en la base de datos.',
-                  style: TextStyle(color: Color(0xFF34D399), fontSize: 13),
-                ),
-              ),
-            ]
-            // ESTADO: CANCELADA
-            else if (estado == 'CANCELADA') ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0x22E11D48),
-                  border: Border.all(color: const Color(0x66E11D48)),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  'Ruta cancelada. Observacion: ${_despachoActual['comentarios'] ?? 'Cancelada'}',
-                  style: const TextStyle(color: Color(0xFFFB7185), fontSize: 13),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 }

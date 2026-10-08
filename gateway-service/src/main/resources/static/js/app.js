@@ -2,8 +2,11 @@
 // GLASSFLOW LOGISTICS & FLEET MANAGEMENT PLATFORM - JAVASCRIPT
 // =========================================================================
 
-const AUTH_API = '/api/v1/auth';
-const LOGISTICA_API = '/api/v1/logistica';
+const API_BASE = (window.location.protocol === 'file:' || (window.location.port !== '8080' && window.location.port !== ''))
+  ? 'http://localhost:8080'
+  : '';
+const AUTH_API = `${API_BASE}/api/v1/auth`;
+const LOGISTICA_API = `${API_BASE}/api/v1/logistica`;
 const WS_ENDPOINT = 'http://localhost:8082/ws-logistica';
 
 // Estado global de la aplicacion
@@ -13,6 +16,9 @@ let allUsuarios = [];
 let allChoferes = [];
 let allPedidos = [];
 let allDespachos = [];
+let allRutas = [];
+let activeRutaId = null;
+let pickerContext = 'agregar'; // 'agregar' o 'editar'
 
 // Google Maps & Telemetria
 let googleMap = null;
@@ -49,10 +55,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   updatePhoneClock();
   setInterval(updatePhoneClock, 30000);
 
-  await authenticateInitialAdmin();
-  initGoogleMap();
-  connectWebSocket();
-  await loadAllData();
+  if (authToken) {
+    document.getElementById('logged-user-email').innerText = 'admin@glassflow.com';
+    initGoogleMap();
+    connectWebSocket();
+    await loadAllData();
+  } else {
+    showLoginModal();
+  }
 });
 
 // -------------------------------------------------------------------------
@@ -72,29 +82,14 @@ function showToast(message, type = 'success') {
 }
 
 // -------------------------------------------------------------------------
-// AUTENTICACION DE ADMINISTRADOR (JWT)
+// MODAL DE INICIO DE SESION PARA ADMINISTRADOR (JWT)
 // -------------------------------------------------------------------------
-async function authenticateInitialAdmin() {
-  try {
-    const res = await fetch(`${AUTH_API}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: 'admin@glassflow.com',
-        password: 'GlassFlowAdmin2026!'
-      })
-    });
+function showLoginModal() {
+  document.getElementById('modal-login')?.classList.add('active');
+}
 
-    if (res.ok) {
-      const data = await res.json();
-      authToken = data.token;
-      localStorage.setItem('glassflow_token', authToken);
-      currentUser = data;
-      document.getElementById('logged-user-email').innerText = data.email;
-    }
-  } catch (err) {
-    console.warn('Inicio de sesion inicial automatico no completado:', err.message);
-  }
+function hideLoginModal() {
+  document.getElementById('modal-login')?.classList.remove('active');
 }
 
 function getAuthHeaders() {
@@ -273,20 +268,26 @@ function subscribeToSpecificDispatch(despachoId) {
 // -------------------------------------------------------------------------
 async function loadAllData() {
   try {
-    const [pedidosRes, choferesRes, despachosRes] = await Promise.all([
-      fetch(`${LOGISTICA_API}/pedidos`).then(r => r.json()),
-      fetch(`${LOGISTICA_API}/choferes`).then(r => r.json()),
-      fetch(`${LOGISTICA_API}/despachos`).then(r => r.json())
+    const [pedidosRes, choferesRes, despachosRes, rutasRes] = await Promise.all([
+      fetch(`${LOGISTICA_API}/pedidos`).then(r => r.json()).catch(() => []),
+      fetch(`${LOGISTICA_API}/choferes`).then(r => r.json()).catch(() => []),
+      fetch(`${LOGISTICA_API}/despachos`).then(r => r.json()).catch(() => []),
+      fetch(`${LOGISTICA_API}/rutas`).then(r => r.json()).catch(() => [])
     ]);
 
-    allPedidos = pedidosRes;
-    allChoferes = choferesRes;
-    allDespachos = despachosRes;
+    allPedidos = pedidosRes || [];
+    allChoferes = choferesRes || [];
+    allDespachos = despachosRes || [];
+    allRutas = rutasRes || [];
 
     updateStats();
     renderKanban();
     populateSelects();
     renderDestinationMarkersOnMap();
+    renderRutasCards();
+    if (activeRutaId) {
+      renderActiveRuta(activeRutaId);
+    }
   } catch (error) {
     console.error('Error cargando datos logisticos:', error);
   }
@@ -327,14 +328,22 @@ function renderDestinationMarkersOnMap() {
 // -------------------------------------------------------------------------
 // FUNCIONES DEL SELECTOR DE GOOGLE MAPS & GESTION DE PARADAS MULTI-DESTINO
 // -------------------------------------------------------------------------
-function openMapPickerModal() {
+function openMapPickerModal(context = 'agregar') {
+  pickerContext = context;
   const modal = document.getElementById('modal-map-picker');
   if (!modal) return;
   modal.classList.add('active');
 
-  const currentLat = parseFloat(document.getElementById('input-parada-latitud')?.value) || -0.1807;
-  const currentLon = parseFloat(document.getElementById('input-parada-longitud')?.value) || -78.4678;
-  const currentAddress = document.getElementById('input-parada-direccion')?.value || 'Quito, Ecuador';
+  let currentLat, currentLon, currentAddress;
+  if (pickerContext === 'editar') {
+    currentLat = parseFloat(document.getElementById('edit-destino-latitud')?.value) || -0.1807;
+    currentLon = parseFloat(document.getElementById('edit-destino-longitud')?.value) || -78.4678;
+    currentAddress = document.getElementById('edit-destino-direccion')?.value || 'Quito, Ecuador';
+  } else {
+    currentLat = parseFloat(document.getElementById('destino-latitud')?.value) || -0.1807;
+    currentLon = parseFloat(document.getElementById('destino-longitud')?.value) || -78.4678;
+    currentAddress = document.getElementById('destino-direccion')?.value || 'Quito, Ecuador';
+  }
 
   selectedPickerLat = currentLat;
   selectedPickerLon = currentLon;
@@ -439,85 +448,236 @@ function closeMapPickerModal() {
 }
 
 function confirmMapPickerSelection() {
-  const inputDir = document.getElementById('input-parada-direccion');
-  const inputLat = document.getElementById('input-parada-latitud');
-  const inputLon = document.getElementById('input-parada-longitud');
+  if (pickerContext === 'editar') {
+    const inputDir = document.getElementById('edit-destino-direccion');
+    const inputLat = document.getElementById('edit-destino-latitud');
+    const inputLon = document.getElementById('edit-destino-longitud');
+    const badge = document.getElementById('edit-coords-badge');
 
-  if (inputDir) inputDir.value = selectedPickerAddress;
-  if (inputLat) inputLat.value = selectedPickerLat.toFixed(6);
-  if (inputLon) inputLon.value = selectedPickerLon.toFixed(6);
+    if (inputDir) inputDir.value = selectedPickerAddress;
+    if (inputLat) inputLat.value = selectedPickerLat.toFixed(6);
+    if (inputLon) inputLon.value = selectedPickerLon.toFixed(6);
+    if (badge) badge.innerText = `Ubicación: ${selectedPickerLat.toFixed(4)}, ${selectedPickerLon.toFixed(4)}`;
+  } else {
+    const inputDir = document.getElementById('destino-direccion');
+    const inputLat = document.getElementById('destino-latitud');
+    const inputLon = document.getElementById('destino-longitud');
+    const badge = document.getElementById('destino-coordenadas-badge');
+
+    if (inputDir) inputDir.value = selectedPickerAddress;
+    if (inputLat) inputLat.value = selectedPickerLat.toFixed(6);
+    if (inputLon) inputLon.value = selectedPickerLon.toFixed(6);
+    if (badge) {
+      const shortAddr = selectedPickerAddress.length > 35 ? selectedPickerAddress.substring(0, 32) + '...' : selectedPickerAddress;
+      badge.innerText = `Ubicacion: ${selectedPickerLat.toFixed(4)}, ${selectedPickerLon.toFixed(4)} (${shortAddr})`;
+    }
+  }
 
   closeMapPickerModal();
   showToast('Ubicación fijada desde Google Maps.', 'success');
 }
 
-function renderParadasPreparadas() {
-  const tbody = document.getElementById('paradas-preparadas-table-body');
-  const countEl = document.getElementById('count-paradas-agregadas');
-  const btnLimpiar = document.getElementById('btn-limpiar-paradas');
+// -------------------------------------------------------------------------
+// GESTION INTEGRAL DE RUTAS Y N DESTINOS DINAMICOS
+// -------------------------------------------------------------------------
+function renderRutasCards() {
+  const container = document.getElementById('rutas-cards-container');
+  const countBadge = document.getElementById('rutas-count-badge');
+  if (countBadge) countBadge.innerText = allRutas.length;
+  if (!container) return;
 
-  if (countEl) countEl.innerText = paradasPreparadas.length;
-  if (!tbody) return;
-
-  if (paradasPreparadas.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 1.5rem;">
-          No hay destinos agregados a la ruta todavia. Agregue uno o mas destinos arriba usando el selector de mapa.
-        </td>
-      </tr>
+  if (allRutas.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; color: var(--text-dim); padding: 1.5rem; font-size: 0.82rem;">
+        No hay rutas creadas. Cree una nueva ruta arriba.
+      </div>
     `;
-    if (btnLimpiar) btnLimpiar.style.display = 'none';
     return;
   }
 
-  if (btnLimpiar) btnLimpiar.style.display = 'inline-block';
+  container.innerHTML = allRutas.map(r => {
+    const isActive = r.id === activeRutaId;
+    const numParadas = r.paradas ? r.paradas.length : 0;
+    const tagClass = r.estado === 'EN_CURSO' ? 'tag-en-curso' : r.estado === 'FINALIZADA' ? 'tag-delivered' : 'tag-pending';
+    const borderStyle = isActive
+      ? 'border: 2px solid #3b82f6; background: rgba(59, 130, 246, 0.12);'
+      : 'border: 1px solid var(--border-subtle); background: var(--bg-card);';
 
-  tbody.innerHTML = paradasPreparadas.map((p, idx) => `
-    <tr>
-      <td style="font-weight: 700; color: #60a5fa; text-align: center;">#${idx + 1}</td>
-      <td style="font-weight: 700; color: white;">${p.cliente}</td>
-      <td style="color: var(--text-muted); font-size: 0.8rem;">${p.direccionTexto}</td>
-      <td style="font-family: monospace; font-size: 0.75rem; color: #34d399;">${Number(p.latitudDestino).toFixed(4)}, ${Number(p.longitudDestino).toFixed(4)}</td>
-      <td style="text-align: center;">
-        <button type="button" class="btn btn-danger" style="padding: 2px 8px; font-size: 0.72rem;" onclick="eliminarParadaPreparada(${idx})">
-          Quitar
-        </button>
-      </td>
-    </tr>
-  `).join('');
+    return `
+      <div style="${borderStyle} border-radius: 8px; padding: 12px; cursor: pointer; transition: all 0.2s;"
+           onclick="seleccionarRuta('${r.id}')">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <strong style="font-size: 0.95rem; color: white;">${r.codigoRuta}</strong>
+          <span class="tag-status ${tagClass}" style="font-size: 0.68rem;">${r.estado}</span>
+        </div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">
+          Chofer: <span style="color: ${r.choferNombre ? '#cbd5e1' : '#fbbf24'}; font-weight: 600;">
+            ${r.choferNombre || 'Sin asignar'}
+          </span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; color: var(--text-dim);">
+          <span>Destinos: <strong style="color: #60a5fa;">${numParadas}</strong></span>
+          <span>${r.fechaCreacion ? new Date(r.fechaCreacion).toLocaleDateString() : ''}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
-function eliminarParadaPreparada(index) {
-  paradasPreparadas.splice(index, 1);
-  renderParadasPreparadas();
-  showToast('Parada removida de la lista.', 'info');
+function seleccionarRuta(rutaId) {
+  activeRutaId = rutaId;
+  renderRutasCards();
+  renderActiveRuta(rutaId);
+}
+
+function renderActiveRuta(rutaId) {
+  const panelVacio = document.getElementById('panel-ruta-seleccionada-vacio');
+  const panelActivo = document.getElementById('panel-ruta-activa');
+  if (!panelVacio || !panelActivo) return;
+
+  const ruta = allRutas.find(r => r.id === rutaId);
+  if (!ruta) {
+    activeRutaId = null;
+    panelVacio.style.display = 'block';
+    panelActivo.style.display = 'none';
+    return;
+  }
+
+  panelVacio.style.display = 'none';
+  panelActivo.style.display = 'flex';
+
+  // Cabecera de la ruta
+  document.getElementById('activa-codigo-ruta').innerText = ruta.codigoRuta;
+  const tagEstado = document.getElementById('activa-estado-tag');
+  tagEstado.innerText = ruta.estado;
+  tagEstado.className = `tag-status ${ruta.estado === 'EN_CURSO' ? 'tag-en-curso' : ruta.estado === 'FINALIZADA' ? 'tag-delivered' : 'tag-pending'}`;
+
+  const infoChofer = document.getElementById('activa-info-chofer');
+  infoChofer.innerHTML = `Chofer asignado: <strong>${ruta.choferNombre ? `${ruta.choferNombre} (${ruta.choferTelefono || 'Sin tel'})` : '<span style="color: #fbbf24;">Sin asignar</span>'}</strong>`;
+
+  const selectReasignar = document.getElementById('select-reasignar-chofer');
+  if (selectReasignar) {
+    selectReasignar.value = ruta.choferId || '';
+  }
+
+  // Destinos / Paradas
+  const paradas = ruta.paradas || [];
+  document.getElementById('activa-count-paradas').innerText = paradas.length;
+
+  const tbody = document.getElementById('activa-destinos-table-body');
+  if (paradas.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 1.5rem;">
+          No hay destinos agregados a esta ruta. Utilice el formulario superior para añadir paradas.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = paradas.map((p, idx) => {
+    const orden = p.ordenParada != null ? p.ordenParada : idx + 1;
+    const tagClass = p.estado === 'EN_CURSO' ? 'tag-en-curso' : p.estado === 'ENTREGADO' ? 'tag-delivered' : p.estado === 'CANCELADA' ? 'tag-canceled' : 'tag-pending';
+    const lat = p.pedido ? p.pedido.latitudDestino : 0;
+    const lon = p.pedido ? p.pedido.longitudDestino : 0;
+    const cliente = p.pedido ? p.pedido.cliente : 'Cliente';
+    const direccion = p.pedido ? p.pedido.direccionTexto : '';
+
+    return `
+      <tr>
+        <td style="font-weight: 700; color: #60a5fa; text-align: center;">#${orden}</td>
+        <td style="font-weight: 700; color: white;">${cliente}</td>
+        <td>
+          <div style="color: var(--text-muted); font-size: 0.8rem;">${direccion}</div>
+          <div style="font-family: monospace; font-size: 0.72rem; color: #34d399;">${Number(lat).toFixed(4)}, ${Number(lon).toFixed(4)}</div>
+        </td>
+        <td><span class="tag-status ${tagClass}" style="font-size: 0.68rem;">${p.estado}</span></td>
+        <td style="text-align: center;">
+          <button type="button" class="btn btn-outline" style="padding: 2px 8px; font-size: 0.72rem; margin-right: 4px;"
+                  onclick="abrirModalEditarDestino('${p.id}')">
+            Editar
+          </button>
+          <button type="button" class="btn btn-danger" style="padding: 2px 8px; font-size: 0.72rem;"
+                  onclick="eliminarDestinoDeRuta('${p.id}')">
+            Eliminar
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function abrirModalEditarDestino(despachoId) {
+  const ruta = allRutas.find(r => r.id === activeRutaId);
+  if (!ruta || !ruta.paradas) return;
+
+  const p = ruta.paradas.find(x => x.id === despachoId);
+  if (!p) return;
+
+  document.getElementById('edit-despacho-id').value = p.id;
+  document.getElementById('edit-destino-cliente').value = p.pedido.cliente;
+  document.getElementById('edit-destino-direccion').value = p.pedido.direccionTexto;
+  document.getElementById('edit-destino-latitud').value = p.pedido.latitudDestino;
+  document.getElementById('edit-destino-longitud').value = p.pedido.longitudDestino;
+  document.getElementById('edit-destino-comentarios').value = p.comentarios || '';
+
+  const badge = document.getElementById('edit-coords-badge');
+  if (badge) {
+    badge.innerText = `Ubicación: ${Number(p.pedido.latitudDestino).toFixed(4)}, ${Number(p.pedido.longitudDestino).toFixed(4)}`;
+  }
+
+  document.getElementById('modal-editar-destino')?.classList.add('active');
+}
+
+function cerrarModalEditarDestino() {
+  document.getElementById('modal-editar-destino')?.classList.remove('active');
+}
+
+async function eliminarDestinoDeRuta(despachoId) {
+  if (!confirm('¿Confirma que desea eliminar este destino de la hoja de ruta?')) return;
+  try {
+    const res = await fetch(`${LOGISTICA_API}/rutas/${activeRutaId}/destinos/${despachoId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Error al eliminar destino.');
+    showToast('Destino eliminado de la ruta.', 'success');
+    await loadAllData();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
 }
 
 function populateSelects() {
-  // Pedidos pendientes
-  const selectPedido = document.getElementById('select-pedido-disponible');
-  const pedidosPendientes = allPedidos.filter(p => p.estado === 'PENDIENTE');
-  selectPedido.innerHTML = pedidosPendientes.length === 0
-    ? '<option value="">No hay pedidos pendientes de asignacion</option>'
-    : '<option value="">-- Seleccionar pedido --</option>' + pedidosPendientes.map(p => `
-        <option value="${p.id}">[${p.cliente}] ${p.direccionTexto}</option>
-      `).join('');
-
-  // Choferes disponibles para ruta multi-destino
-  const selectChoferRuta = document.getElementById('select-chofer-ruta');
-  if (selectChoferRuta) {
-    selectChoferRuta.innerHTML = '<option value="">-- Seleccionar chofer responsable --</option>' + allChoferes.map(c => `
+  // Choferes para crear ruta
+  const selectChoferCrear = document.getElementById('select-chofer-crear-ruta');
+  if (selectChoferCrear) {
+    const prevVal = selectChoferCrear.value;
+    selectChoferCrear.innerHTML = '<option value="">-- Sin asignar (asignar despues) --</option>' + allChoferes.map(c => `
       <option value="${c.id}">${c.nombre} (${c.estadoDisponibilidad})</option>
     `).join('');
+    if (prevVal) selectChoferCrear.value = prevVal;
+  }
+
+  // Choferes para reasignar en ruta activa
+  const selectReasignar = document.getElementById('select-reasignar-chofer');
+  if (selectReasignar) {
+    const prevVal = selectReasignar.value;
+    selectReasignar.innerHTML = '<option value="">-- Sin chofer asignado --</option>' + allChoferes.map(c => `
+      <option value="${c.id}">${c.nombre} (${c.estadoDisponibilidad})</option>
+    `).join('');
+    if (prevVal) selectReasignar.value = prevVal;
   }
 
   // Choferes en simulador
   const simSelect = document.getElementById('sim-select-chofer');
-  if (simSelect && simSelect.options.length <= 1) {
+  if (simSelect) {
+    const prevVal = simSelect.value;
     simSelect.innerHTML = allChoferes.map(c => `
       <option value="${c.id}">${c.nombre}</option>
     `).join('');
+    if (prevVal) simSelect.value = prevVal;
   }
 }
 
@@ -558,29 +718,36 @@ function renderKanban() {
 }
 
 function renderCardHtml(d, status) {
-  const shortId = d.id.substring(0, 8);
+  const shortId = d.id ? d.id.substring(0, 8) : '--------';
+  const clienteNombre = d.pedido ? d.pedido.cliente : 'Cliente';
+  const direccionDestino = d.pedido ? d.pedido.direccionTexto : 'Destino no especificado';
+  const choferNombre = d.chofer ? d.chofer.nombre : 'Sin asignar';
 
   let statusBadge = '';
   let actions = '';
 
   if (status === 'PENDIENTE') {
     statusBadge = '<span class="tag-status tag-pending">Pendiente Consentimiento</span>';
-    actions = `
-      <button class="btn btn-outline" style="width: 100%; font-size: 0.75rem; padding: 6px;" onclick="openInSimulator('${d.chofer.id}', '${d.id}')">
-        Ver en App del Chofer
-      </button>
-    `;
+    actions = d.chofer
+      ? `
+        <button class="btn btn-outline" style="width: 100%; font-size: 0.75rem; padding: 6px;" onclick="openInSimulator('${d.chofer.id}', '${d.id}')">
+          Ver en App del Chofer
+        </button>
+      `
+      : `<div style="font-size: 0.72rem; color: #fbbf24; text-align: center; padding: 4px;">Chofer pendiente de asignacion</div>`;
   } else if (status === 'EN_CURSO') {
     statusBadge = '<span class="tag-status tag-en-curso">En Transito [GPS ON]</span>';
+    const lat = d.pedido ? d.pedido.latitudDestino : -0.18;
+    const lng = d.pedido ? d.pedido.longitudDestino : -78.46;
     actions = `
-      <button class="btn btn-primary" style="width: 100%; font-size: 0.75rem; padding: 6px;" onclick="trackRouteOnMap('${d.id}', ${d.pedido.latitudDestino}, ${d.pedido.longitudDestino})">
+      <button class="btn btn-primary" style="width: 100%; font-size: 0.75rem; padding: 6px;" onclick="trackRouteOnMap('${d.id}', ${lat}, ${lng})">
         Rastrear en Google Maps
       </button>
     `;
   } else if (status === 'ENTREGADO') {
     statusBadge = d.alertaDesviacion
-      ? `<span class="tag-status tag-canceled">Alerta Desvio: ${Math.round(d.desviacionMetros)}m</span>`
-      : `<span class="tag-status tag-delivered">Verificado (${Math.round(d.desviacionMetros)}m)</span>`;
+      ? `<span class="tag-status tag-canceled">Alerta Desvio: ${Math.round(d.desviacionMetros || 0)}m</span>`
+      : `<span class="tag-status tag-delivered">Verificado (${Math.round(d.desviacionMetros || 0)}m)</span>`;
     actions = `
       <button class="btn btn-outline" style="width: 100%; font-size: 0.75rem; padding: 6px;" onclick="viewEvidenceModal('${d.id}')">
         Auditoria e-PoD
@@ -597,10 +764,10 @@ function renderCardHtml(d, status) {
         <span class="card-order-id">#${shortId}</span>
         ${statusBadge}
       </div>
-      <div class="card-client-name">${d.pedido.cliente}</div>
-      <div class="card-address">Destino: ${d.pedido.direccionTexto}</div>
+      <div class="card-client-name">${clienteNombre}</div>
+      <div class="card-address">Destino: ${direccionDestino}</div>
       <div style="font-size: 0.75rem; color: var(--text-muted);">
-        Chofer: <strong style="color: var(--text-main);">${d.chofer.nombre}</strong>
+        Chofer: <strong style="color: var(--text-main);">${choferNombre}</strong>
       </div>
       <div style="margin-top: 4px;">
         ${actions}
@@ -636,24 +803,38 @@ async function loadUsuarios() {
       return;
     }
 
-    tbody.innerHTML = allUsuarios.map(u => `
-      <tr>
-        <td style="font-weight: 700;">${u.nombre}</td>
-        <td style="font-family: monospace;">${u.email}</td>
-        <td>${u.telefono || '-'}</td>
-        <td><span class="tag-status ${u.rol === 'ROLE_ADMIN' ? 'tag-en-curso' : 'tag-pending'}">${u.rol}</span></td>
-        <td>
-          <span style="font-size: 0.75rem; color: ${u.activo ? '#34d399' : '#fb7185'}; font-weight: 700;">
-            ${u.activo ? 'ACTIVO' : 'SUSPENDIDO'}
-          </span>
-        </td>
-        <td>
-          <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.72rem;" onclick="toggleUserStatus('${u.id}', ${!u.activo})">
-            ${u.activo ? 'Suspender' : 'Activar'}
-          </button>
-        </td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = allUsuarios.map(u => {
+      const isMasterAdmin = u.email === 'admin@glassflow.com';
+      const actionsHtml = isMasterAdmin
+        ? '<span style="font-size: 0.72rem; color: var(--text-dim); font-style: italic;">Cuenta Protegida</span>'
+        : `
+          <div style="display: flex; gap: 6px; justify-content: center;">
+            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleUserStatus('${u.id}', ${!u.activo})">
+              ${u.activo ? 'Suspender' : 'Activar'}
+            </button>
+            <button class="btn btn-danger" style="padding: 3px 8px; font-size: 0.72rem;" onclick="eliminarUsuarioClick('${u.id}', '${u.email}', '${u.rol}')">
+              Eliminar
+            </button>
+          </div>
+        `;
+
+      return `
+        <tr>
+          <td style="font-weight: 700;">${u.nombre}</td>
+          <td style="font-family: monospace;">${u.email}</td>
+          <td>${u.telefono || '-'}</td>
+          <td><span class="tag-status ${u.rol === 'ROLE_ADMIN' ? 'tag-en-curso' : 'tag-pending'}">${u.rol}</span></td>
+          <td>
+            <span style="font-size: 0.75rem; color: ${u.activo ? '#34d399' : '#fb7185'}; font-weight: 700;">
+              ${u.activo ? 'ACTIVO' : 'SUSPENDIDO'}
+            </span>
+          </td>
+          <td style="text-align: center;">
+            ${actionsHtml}
+          </td>
+        </tr>
+      `;
+    }).join('');
   } catch (err) {
     console.error('Error cargando usuarios:', err);
   }
@@ -669,6 +850,38 @@ async function toggleUserStatus(id, newStatus) {
     if (!res.ok) throw new Error('Error al actualizar estado del usuario');
     showToast('Estado de usuario modificado exitosamente.', 'success');
     loadUsuarios();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function eliminarUsuarioClick(id, email, rol) {
+  if (!confirm(`¿Está seguro de eliminar definitivamente al usuario "${email}" del sistema? Esta acción no se puede deshacer.`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`${AUTH_API}/usuarios/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || 'Error al eliminar usuario.');
+    }
+
+    // Si es un chofer, eliminar tambien de logistica para mantener la sincronizacion
+    if (rol === 'ROLE_CHOFER') {
+      await fetch(`${LOGISTICA_API}/choferes/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      }).catch(e => console.warn('Aviso: no se pudo sincronizar eliminacion en logistica:', e));
+    }
+
+    showToast(`Usuario "${email}" eliminado permanentemente.`, 'success');
+    await loadUsuarios();
+    await loadAllData();
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -862,6 +1075,91 @@ function setupSignatureCanvas() {
 // GESTION DE EVENTOS Y FORMULARIOS
 // -------------------------------------------------------------------------
 function setupEventListeners() {
+  // Boton Cerrar Sesion
+  document.getElementById('btn-logout')?.addEventListener('click', () => {
+    localStorage.removeItem('glassflow_token');
+    authToken = null;
+    currentUser = null;
+    document.getElementById('logged-user-email').innerText = 'Sin sesion';
+    showLoginModal();
+    showToast('Sesion cerrada correctamente.', 'info');
+  });
+
+  // Alternar visibilidad de contraseña en modal de login
+  document.getElementById('btn-toggle-login-password')?.addEventListener('click', () => {
+    const pwdInput = document.getElementById('login-admin-password');
+    const eyeIcon = document.getElementById('icon-eye-login-password');
+    if (!pwdInput) return;
+    if (pwdInput.type === 'password') {
+      pwdInput.type = 'text';
+      eyeIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+    } else {
+      pwdInput.type = 'password';
+      eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+    }
+  });
+
+  // Alternar visibilidad de contraseña en creacion de usuarios
+  document.getElementById('btn-toggle-usr-password')?.addEventListener('click', () => {
+    const pwdInput = document.getElementById('input-usr-password');
+    const eyeIcon = document.getElementById('icon-eye-usr-password');
+    if (!pwdInput) return;
+    if (pwdInput.type === 'password') {
+      pwdInput.type = 'text';
+      eyeIcon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+    } else {
+      pwdInput.type = 'password';
+      eyeIcon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+    }
+  });
+
+  // Formulario Iniciar Sesion Modal
+  document.getElementById('form-login-admin')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = document.getElementById('login-admin-email').value.trim();
+    const password = document.getElementById('login-admin-password').value;
+    const errEl = document.getElementById('login-error-msg');
+    if (errEl) errEl.style.display = 'none';
+
+    try {
+      const res = await fetch(`${AUTH_API}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || errData.error || 'Credenciales invalidas');
+      }
+
+      const data = await res.json();
+      if (data.rol !== 'ROLE_ADMIN') {
+        throw new Error('Acceso restringido: requiere permisos de Administrador.');
+      }
+
+      authToken = data.token;
+      localStorage.setItem('glassflow_token', authToken);
+      currentUser = data;
+      document.getElementById('logged-user-email').innerText = data.email;
+      hideLoginModal();
+      showToast('Sesion iniciada exitosamente.', 'success');
+
+      initGoogleMap();
+      connectWebSocket();
+      await loadAllData();
+    } catch (err) {
+      if (errEl) {
+        if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+          errEl.innerText = 'Error de conexion: no se pudo conectar al API Gateway (http://localhost:8080). Asegurese de que los servicios esten activos.';
+        } else {
+          errEl.innerText = err.message;
+        }
+        errEl.style.display = 'block';
+      }
+    }
+  });
+
   // Boton actualizar global
   document.getElementById('btn-refresh-global')?.addEventListener('click', () => {
     loadAllData();
@@ -888,7 +1186,9 @@ function setupEventListeners() {
   // -------------------------------------------------------------------------
   // SELECTOR INTERACTIVO DE UBICACION EN GOOGLE MAPS
   // -------------------------------------------------------------------------
-  document.getElementById('btn-open-map-picker')?.addEventListener('click', openMapPickerModal);
+  document.getElementById('btn-open-map-picker')?.addEventListener('click', () => {
+    openMapPickerModal('agregar');
+  });
   document.getElementById('btn-close-map-picker')?.addEventListener('click', closeMapPickerModal);
   document.getElementById('btn-cancel-map-picker')?.addEventListener('click', closeMapPickerModal);
   document.getElementById('btn-confirm-map-picker')?.addEventListener('click', confirmMapPickerSelection);
@@ -900,85 +1200,201 @@ function setupEventListeners() {
     }
   });
 
-  // -------------------------------------------------------------------------
-  // FORMULARIO: AGREGAR PARADA A LA RUTA
-  // -------------------------------------------------------------------------
-  document.getElementById('form-agregar-parada')?.addEventListener('submit', e => {
-    e.preventDefault();
-    const cliente = document.getElementById('input-parada-cliente').value.trim();
-    const direccionTexto = document.getElementById('input-parada-direccion').value.trim();
-    const latitudDestino = parseFloat(document.getElementById('input-parada-latitud').value);
-    const longitudDestino = parseFloat(document.getElementById('input-parada-longitud').value);
-
-    if (!cliente || !direccionTexto || isNaN(latitudDestino) || isNaN(longitudDestino)) {
-      showToast('Complete todos los campos del destino.', 'warning');
-      return;
-    }
-
-    paradasPreparadas.push({ cliente, direccionTexto, latitudDestino, longitudDestino });
-    renderParadasPreparadas();
-    showToast(`Destino "${cliente}" agregado (${paradasPreparadas.length} paradas en lista).`, 'success');
-
-    // Limpiar campos para la siguiente parada
-    document.getElementById('input-parada-cliente').value = '';
-    document.getElementById('input-parada-direccion').value = '';
-    document.getElementById('input-parada-cliente').focus();
-  });
-
-  // Limpiar lista de paradas
-  document.getElementById('btn-limpiar-paradas')?.addEventListener('click', () => {
-    paradasPreparadas = [];
-    renderParadasPreparadas();
-    showToast('Lista de paradas restablecida.', 'info');
+  // Boton refrescar rutas
+  document.getElementById('btn-refresh-rutas')?.addEventListener('click', async () => {
+    await loadAllData();
+    showToast('Directorio de hojas de ruta actualizado.', 'info');
   });
 
   // -------------------------------------------------------------------------
-  // FORMULARIO: CREAR RUTA CON N DESTINOS Y OPTIMIZACION TSP
+  // PASO 1: CREAR HOJA DE RUTA
   // -------------------------------------------------------------------------
-  document.getElementById('form-crear-ruta-consolidada')?.addEventListener('submit', async e => {
+  document.getElementById('form-crear-ruta-simple')?.addEventListener('submit', async e => {
     e.preventDefault();
-    if (paradasPreparadas.length === 0) {
-      showToast('Debe agregar al menos un destino a la ruta.', 'warning');
-      return;
-    }
-
-    const choferId = document.getElementById('select-chofer-ruta').value;
-    if (!choferId) {
-      showToast('Seleccione un chofer responsable.', 'warning');
-      return;
-    }
-
-    const comentarios = document.getElementById('input-ruta-comentarios')?.value.trim() || null;
+    const codigoRuta = document.getElementById('input-codigo-ruta').value.trim();
+    const choferId = document.getElementById('select-chofer-crear-ruta').value || null;
+    const comentarios = document.getElementById('input-ruta-observaciones').value.trim() || null;
 
     try {
-      const res = await fetch(`${LOGISTICA_API}/rutas/multi-destino`, {
+      const res = await fetch(`${LOGISTICA_API}/rutas/simple`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({
-          choferId,
-          destinos: paradasPreparadas,
-          comentarios
-        })
+        body: JSON.stringify({ codigoRuta, choferId, comentarios })
       });
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || errorData.error || 'Error al generar la ruta.');
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Error al crear la hoja de ruta.');
       }
 
-      const rutaGenerada = await res.json();
-      const numParadas = rutaGenerada.paradas?.length || paradasPreparadas.length;
-      showToast(`Ruta ${rutaGenerada.codigoRuta} creada exitosamente con ${numParadas} paradas optimizadas por proximidad.`, 'success');
+      const ruta = await res.json();
+      activeRutaId = ruta.id;
+      showToast(`Hoja de ruta "${ruta.codigoRuta}" creada exitosamente. Proceda a agregar los destinos.`, 'success');
 
-      paradasPreparadas = [];
-      renderParadasPreparadas();
-      document.getElementById('form-crear-ruta-consolidada').reset();
+      // Proponer siguiente numero incremental
+      const nextMatch = codigoRuta.match(/\d+/);
+      const nextNum = nextMatch ? parseInt(nextMatch[0]) + 1 : 2;
+      document.getElementById('input-codigo-ruta').value = `Ruta ${nextNum}`;
+      document.getElementById('input-ruta-observaciones').value = '';
 
       await loadAllData();
-      document.querySelector('.nav-item[data-tab="tab-kanban"]').click();
+      seleccionarRuta(ruta.id);
     } catch (err) {
       showToast(err.message, 'error');
     }
+  });
+
+  // -------------------------------------------------------------------------
+  // PASO 3: ASIGNAR / REASIGNAR CHOFER A LA RUTA
+  // -------------------------------------------------------------------------
+  document.getElementById('btn-confirmar-asignacion-chofer')?.addEventListener('click', async () => {
+    if (!activeRutaId) {
+      showToast('Seleccione primero una hoja de ruta.', 'warning');
+      return;
+    }
+    const choferId = document.getElementById('select-reasignar-chofer').value || null;
+
+    try {
+      const res = await fetch(`${LOGISTICA_API}/rutas/${activeRutaId}/chofer`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ choferId })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Error al asignar chofer a la ruta.');
+      }
+
+      showToast('Chofer responsable actualizado para la hoja de ruta.', 'success');
+      await loadAllData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // PASO 2: AGREGAR DESTINO A LA RUTA
+  // -------------------------------------------------------------------------
+  document.getElementById('form-agregar-destino-ruta')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!activeRutaId) {
+      showToast('Seleccione primero una hoja de ruta para asociar destinos.', 'warning');
+      return;
+    }
+
+    const cliente = document.getElementById('destino-cliente').value.trim();
+    const direccionTexto = document.getElementById('destino-direccion').value.trim();
+    const latitudDestino = parseFloat(document.getElementById('destino-latitud').value);
+    const longitudDestino = parseFloat(document.getElementById('destino-longitud').value);
+
+    if (!cliente || !direccionTexto || isNaN(latitudDestino) || isNaN(longitudDestino)) {
+      showToast('Complete todos los campos del destino o elija la ubicacion en el mapa.', 'warning');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${LOGISTICA_API}/rutas/${activeRutaId}/destinos`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ cliente, direccionTexto, latitudDestino, longitudDestino })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Error al agregar destino.');
+      }
+
+      showToast(`Destino "${cliente}" agregado exitosamente a la ruta.`, 'success');
+      document.getElementById('destino-cliente').value = '';
+      document.getElementById('destino-direccion').value = '';
+      document.getElementById('destino-cliente').focus();
+
+      await loadAllData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // Optimizar ruta activa
+  document.getElementById('btn-optimizar-ruta-activa')?.addEventListener('click', async () => {
+    if (!activeRutaId) return;
+
+    try {
+      const res = await fetch(`${LOGISTICA_API}/rutas/${activeRutaId}/optimizar`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Error al optimizar ruta.');
+      }
+
+      showToast('Destinos ordenados secuencialmente por cercania geodésica.', 'success');
+      await loadAllData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // Eliminar ruta activa
+  document.getElementById('btn-eliminar-ruta-activa')?.addEventListener('click', async () => {
+    if (!activeRutaId) return;
+    if (!confirm('¿Confirma que desea eliminar esta hoja de ruta completa y todos sus destinos asociados?')) return;
+
+    try {
+      const res = await fetch(`${LOGISTICA_API}/rutas/${activeRutaId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+
+      if (!res.ok) throw new Error('Error al eliminar la ruta.');
+
+      showToast('Hoja de ruta eliminada exitosamente.', 'success');
+      activeRutaId = null;
+      await loadAllData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // Formulario y controles para modificar destino en modal
+  document.getElementById('form-editar-destino')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!activeRutaId) return;
+
+    const despachoId = document.getElementById('edit-despacho-id').value;
+    const cliente = document.getElementById('edit-destino-cliente').value.trim();
+    const direccionTexto = document.getElementById('edit-destino-direccion').value.trim();
+    const latitudDestino = parseFloat(document.getElementById('edit-destino-latitud').value);
+    const longitudDestino = parseFloat(document.getElementById('edit-destino-longitud').value);
+    const comentarios = document.getElementById('edit-destino-comentarios').value.trim() || null;
+
+    try {
+      const res = await fetch(`${LOGISTICA_API}/rutas/${activeRutaId}/destinos/${despachoId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ cliente, direccionTexto, latitudDestino, longitudDestino, comentarios })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Error al modificar destino.');
+      }
+
+      cerrarModalEditarDestino();
+      showToast('Destino modificado exitosamente.', 'success');
+      await loadAllData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  document.getElementById('btn-close-modal-editar-destino')?.addEventListener('click', cerrarModalEditarDestino);
+  document.getElementById('btn-cancelar-editar-destino')?.addEventListener('click', cerrarModalEditarDestino);
+  document.getElementById('btn-mapa-editar-destino')?.addEventListener('click', () => {
+    openMapPickerModal('editar');
   });
 
   // Formulario: Crear Usuario y Credenciales (RBAC)
@@ -1244,3 +1660,18 @@ async function viewEvidenceModal(despachoId) {
     showToast(err.message, 'error');
   }
 }
+
+// Exposicion global para callbacks inline de HTML (onclick)
+window.seleccionarRuta = seleccionarRuta;
+window.abrirModalEditarDestino = abrirModalEditarDestino;
+window.cerrarModalEditarDestino = cerrarModalEditarDestino;
+window.eliminarDestinoDeRuta = eliminarDestinoDeRuta;
+window.toggleUserStatus = toggleUserStatus;
+window.eliminarUsuarioClick = eliminarUsuarioClick;
+window.openMapPickerModal = openMapPickerModal;
+window.confirmMapPickerSelection = confirmMapPickerSelection;
+window.closeMapPickerModal = closeMapPickerModal;
+window.openInSimulator = openInSimulator;
+window.trackRouteOnMap = trackRouteOnMap;
+window.viewEvidenceModal = viewEvidenceModal;
+window.openSimulatorRoute = openSimulatorRoute;

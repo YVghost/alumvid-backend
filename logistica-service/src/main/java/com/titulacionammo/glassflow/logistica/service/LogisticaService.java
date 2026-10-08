@@ -47,4 +47,20 @@ public interface LogisticaService {
     RutaResponse aceptarEIniciarRutaConsolidada(UUID rutaId);
 
     RutaResponse cancelarRutaConsolidada(UUID rutaId, String motivo);
+
+    RutaResponse crearRuta(CrearRutaSimpleRequest request);
+
+    RutaResponse asignarChoferRuta(UUID rutaId, UUID choferId);
+
+    RutaResponse agregarDestinoRuta(UUID rutaId, DestinoRutaRequest request);
+
+    RutaResponse modificarDestinoRuta(UUID rutaId, UUID despachoId, DestinoRutaRequest request);
+
+    RutaResponse eliminarDestinoRuta(UUID rutaId, UUID despachoId);
+
+    RutaResponse optimizarRuta(UUID rutaId);
+
+    void eliminarRuta(UUID rutaId);
+
+    void eliminarChofer(UUID choferId);
 }

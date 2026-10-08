@@ -14,4 +14,5 @@ public interface RutaRepository extends JpaRepository<Ruta, UUID> {
     List<Ruta> findByChoferIdOrderByFechaCreacionDesc(UUID choferId);
     List<Ruta> findByChoferIdAndEstadoIn(UUID choferId, List<EstadoRuta> estados);
     List<Ruta> findByEstado(EstadoRuta estado);
+    boolean existsByCodigoRuta(String codigoRuta);
 }

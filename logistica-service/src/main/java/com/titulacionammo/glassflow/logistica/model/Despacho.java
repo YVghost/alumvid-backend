@@ -29,8 +29,8 @@ public class Despacho {
     @JoinColumn(name = "pedido_id", nullable = false)
     private Pedido pedido;
 
-    @ManyToOne(optional = false, fetch = FetchType.EAGER)
-    @JoinColumn(name = "chofer_id", nullable = false)
+    @ManyToOne(optional = true, fetch = FetchType.EAGER)
+    @JoinColumn(name = "chofer_id", nullable = true)
     private Chofer chofer;
 
     @ManyToOne(fetch = FetchType.LAZY)

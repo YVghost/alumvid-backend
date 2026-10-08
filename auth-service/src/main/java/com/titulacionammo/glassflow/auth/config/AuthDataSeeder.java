@@ -34,24 +34,7 @@ public class AuthDataSeeder implements CommandLineRunner {
                     .rol(RolUsuario.ROLE_ADMIN)
                     .build());
 
-            // 2. Choferes iniciales de prueba
-            authService.crearUsuario(CrearUsuarioRequest.builder()
-                    .email("carlos.chofer@glassflow.com")
-                    .password("ChoferPass2026!")
-                    .nombre("Carlos Mosquera")
-                    .telefono("+593987654321")
-                    .rol(RolUsuario.ROLE_CHOFER)
-                    .build());
-
-            authService.crearUsuario(CrearUsuarioRequest.builder()
-                    .email("mateo.chofer@glassflow.com")
-                    .password("ChoferPass2026!")
-                    .nombre("Mateo Ortega")
-                    .telefono("+593991234567")
-                    .rol(RolUsuario.ROLE_CHOFER)
-                    .build());
-
-            log.info("Cuentas iniciales registradas exitosamente.");
+            log.info("Cuenta de Administrador GlassFlow verificada y creada exitosamente.");
         }
     }
 }

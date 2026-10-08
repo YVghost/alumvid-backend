@@ -116,6 +116,20 @@ public class AuthServiceImpl implements AuthService {
         return mapearAUsuarioResponse(usuario);
     }
 
+    @Override
+    @Transactional
+    public void eliminarUsuario(UUID id) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con ID: " + id));
+
+        if ("admin@glassflow.com".equalsIgnoreCase(usuario.getEmail().trim())) {
+            throw new IllegalArgumentException("La cuenta principal de Administrador no puede ser eliminada.");
+        }
+
+        usuarioRepository.delete(usuario);
+        log.info("Usuario {} ({}) eliminado permanentemente del sistema.", usuario.getEmail(), id);
+    }
+
     private UsuarioResponse mapearAUsuarioResponse(Usuario u) {
         return UsuarioResponse.builder()
                 .id(u.getId())

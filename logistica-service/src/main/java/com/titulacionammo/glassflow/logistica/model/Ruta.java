@@ -30,8 +30,8 @@ public class Ruta {
     @Column(name = "codigo_ruta", nullable = false, unique = true, length = 50)
     private String codigoRuta;
 
-    @ManyToOne(optional = false, fetch = FetchType.EAGER)
-    @JoinColumn(name = "chofer_id", nullable = false)
+    @ManyToOne(optional = true, fetch = FetchType.EAGER)
+    @JoinColumn(name = "chofer_id", nullable = true)
     private Chofer chofer;
 
     @Enumerated(EnumType.STRING)

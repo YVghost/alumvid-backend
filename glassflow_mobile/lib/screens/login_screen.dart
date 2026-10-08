@@ -13,6 +13,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController(text: 'carlos.chofer@glassflow.com');
   final _passwordController = TextEditingController(text: 'ChoferPass2026!');
   bool _cargando = false;
+  bool _mostrarPassword = false;
   String? _errorMensaje;
 
   Future<void> _iniciarSesion() async {
@@ -121,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 16),
               TextField(
                 controller: _passwordController,
-                obscureText: true,
+                obscureText: !_mostrarPassword,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Contrasena',
@@ -131,6 +132,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(color: Color(0xFF334155)),
+                  ),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _mostrarPassword ? Icons.visibility : Icons.visibility_off,
+                      color: const Color(0xFF94A3B8),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _mostrarPassword = !_mostrarPassword;
+                      });
+                    },
                   ),
                 ),
               ),

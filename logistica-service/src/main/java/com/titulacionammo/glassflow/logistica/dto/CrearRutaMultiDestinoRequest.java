@@ -20,6 +20,8 @@ import java.util.UUID;
 @AllArgsConstructor
 public class CrearRutaMultiDestinoRequest {
 
+    private String codigoRuta;
+
     @NotNull(message = "El ID del chofer es obligatorio")
     private UUID choferId;
 

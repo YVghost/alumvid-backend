@@ -3,6 +3,9 @@ import '../services/api_service.dart';
 import 'detalle_ruta_screen.dart';
 import 'login_screen.dart';
 
+/// Pantalla principal de la aplicacion movil del Chofer.
+/// Presenta las Hojas de Ruta asignadas por el Administrador (ej. Ruta 1, Ruta 2).
+/// Al seleccionar una ruta, se despliega el itinerario de paradas para su ejecucion.
 class RutasScreen extends StatefulWidget {
   final Map<String, dynamic> choferData;
 
@@ -13,39 +16,40 @@ class RutasScreen extends StatefulWidget {
 }
 
 class _RutasScreenState extends State<RutasScreen> {
-  List<dynamic> _despachos = [];
+  List<dynamic> _rutas = [];
   bool _cargando = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _cargarRutas();
+    _cargarRutasAsignadas();
   }
 
-  Future<void> _cargarRutas() async {
+  Future<void> _cargarRutasAsignadas() async {
     setState(() {
       _cargando = true;
       _error = null;
     });
 
     try {
-      final choferId = widget.choferData['id'];
-      final List<dynamic> res = await ApiService.obtenerDespachosHoy(choferId);
-      res.sort((a, b) {
-        final ordA = (a['ordenParada'] as num?)?.toInt() ?? 999;
-        final ordB = (b['ordenParada'] as num?)?.toInt() ?? 999;
-        return ordA.compareTo(ordB);
-      });
-      setState(() {
-        _despachos = res;
-      });
+      final choferId = widget.choferData['id']?.toString() ?? '';
+      final List<dynamic> res = await ApiService.obtenerRutasChofer(choferId);
+      if (mounted) {
+        setState(() {
+          _rutas = res;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _error = e.toString().replaceAll('Exception: ', '');
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+        });
+      }
     } finally {
-      setState(() => _cargando = false);
+      if (mounted) {
+        setState(() => _cargando = false);
+      }
     }
   }
 
@@ -65,6 +69,7 @@ class _RutasScreenState extends State<RutasScreen> {
       case 'EN_CURSO':
         return const Color(0xFF60A5FA);
       case 'ENTREGADO':
+      case 'COMPLETADA':
         return const Color(0xFF34D399);
       case 'CANCELADA':
         return const Color(0xFFFB7185);
@@ -75,7 +80,8 @@ class _RutasScreenState extends State<RutasScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final nombreChofer = widget.choferData['nombre'] ?? 'Chofer';
+    final String nombreChofer = widget.choferData['nombre'] ?? 'Chofer';
+    final String emailChofer = widget.choferData['email'] ?? '';
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E17),
@@ -89,20 +95,22 @@ class _RutasScreenState extends State<RutasScreen> {
               nombreChofer,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
             ),
-            const Text(
-              'Rutas de Entrega Asignadas',
-              style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+            Text(
+              emailChofer.isNotEmpty ? emailChofer : 'Chofer de Reparto',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
             ),
           ],
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Color(0xFF94A3B8)),
-            onPressed: _cargarRutas,
+            onPressed: _cargarRutasAsignadas,
+            tooltip: 'Sincronizar rutas',
           ),
           IconButton(
             icon: const Icon(Icons.logout, color: Color(0xFFFB7185)),
             onPressed: _cerrarSesion,
+            tooltip: 'Cerrar Sesion',
           ),
         ],
       ),
@@ -115,109 +123,179 @@ class _RutasScreenState extends State<RutasScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(_error!, style: const TextStyle(color: Color(0xFFFB7185))),
+                        Text(_error!, style: const TextStyle(color: Color(0xFFFB7185)), textAlign: TextAlign.center),
                         const SizedBox(height: 12),
                         ElevatedButton(
-                          onPressed: _cargarRutas,
-                          child: const Text('Reintentar'),
+                          onPressed: _cargarRutasAsignadas,
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                          child: const Text('Reintentar', style: TextStyle(color: Colors.white)),
                         ),
                       ],
                     ),
                   ),
                 )
-              : _despachos.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No posee rutas de despacho programadas para hoy.',
-                        style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+              : _rutas.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(30.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.alt_route, size: 48, color: Color(0xFF334155)),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'No posee Hojas de Ruta asignadas actualmente.',
+                              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontWeight: FontWeight.w600),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'El administrador asignara rutas desde el panel web de control logistico.',
+                              style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 18),
+                            OutlinedButton.icon(
+                              onPressed: _cargarRutasAsignadas,
+                              icon: const Icon(Icons.refresh, size: 16, color: Color(0xFF60A5FA)),
+                              label: const Text('Comprobar Nuevas Asignaciones', style: TextStyle(color: Color(0xFF60A5FA))),
+                              style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFF1E293B))),
+                            ),
+                          ],
+                        ),
                       ),
                     )
                   : RefreshIndicator(
-                      onRefresh: _cargarRutas,
+                      onRefresh: _cargarRutasAsignadas,
+                      color: const Color(0xFF2563EB),
                       child: ListView.builder(
                         padding: const EdgeInsets.all(16),
-                        itemCount: _despachos.length,
+                        itemCount: _rutas.length,
                         itemBuilder: (context, index) {
-                          final d = _despachos[index];
-                          final estado = d['estado'] ?? 'PENDIENTE';
-                          final pedido = d['pedido'] ?? {};
-                          final colorEstado = _obtenerColorEstado(estado);
+                          final r = _rutas[index];
+                          final String codigo = r['codigoRuta'] ?? 'Ruta';
+                          final String estado = r['estado'] ?? 'PENDIENTE';
+                          final List<dynamic> paradas = (r['paradas'] as List<dynamic>?) ?? [];
+                          final int totalParadas = paradas.length;
+                          final int entregadas = paradas.where((p) => p['estado'] == 'ENTREGADO').length;
+                          final Color colorEstado = _obtenerColorEstado(estado);
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             decoration: BoxDecoration(
                               color: const Color(0xFF111827),
                               border: Border.all(color: const Color(0xFF1E293B)),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.all(14),
-                              title: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    d['ordenParada'] != null
-                                        ? 'PARADA #${d['ordenParada']} • #${d['id'].toString().substring(0, 6)}'
-                                        : 'PEDIDO #${d['id'].toString().substring(0, 6)}',
-                                    style: const TextStyle(
-                                      fontFamily: 'monospace',
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF60A5FA),
+                            child: Material(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => DetalleRutaScreen(
+                                        ruta: r,
+                                        choferData: widget.choferData,
+                                      ),
                                     ),
+                                  );
+                                  _cargarRutasAsignadas();
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(8),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: const Icon(Icons.alt_route, color: Color(0xFF60A5FA), size: 20),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Text(
+                                                codigo,
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: colorEstado.withValues(alpha: 0.15),
+                                              border: Border.all(color: colorEstado.withValues(alpha: 0.4)),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              estado,
+                                              style: TextStyle(
+                                                color: colorEstado,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.pin_drop, size: 16, color: Color(0xFF38BDF8)),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            '$totalParadas destinos de entrega programados',
+                                            style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13, fontWeight: FontWeight.w500),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'Progreso: $entregadas de $totalParadas completados',
+                                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                                      ),
+                                      if (r['comentarios'] != null && r['comentarios'].toString().isNotEmpty) ...[
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Nota: ${r['comentarios']}',
+                                          style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontStyle: FontStyle.italic),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            'Abrir Hoja de Ruta',
+                                            style: TextStyle(
+                                              color: const Color(0xFF60A5FA),
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          const Icon(Icons.arrow_forward_ios, size: 12, color: Color(0xFF60A5FA)),
+                                        ],
+                                      ),
+                                    ],
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: colorEstado.withValues(alpha: 0.15),
-                                      border: Border.all(color: colorEstado.withValues(alpha: 0.3)),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      estado,
-                                      style: TextStyle(
-                                        color: colorEstado,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              subtitle: Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      pedido['cliente'] ?? 'Cliente',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Destino: ${pedido['direccionTexto'] ?? '-'}',
-                                      style: const TextStyle(
-                                        color: Color(0xFF94A3B8),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
                                 ),
                               ),
-                              trailing: const Icon(Icons.chevron_right, color: Color(0xFF64748B)),
-                              onTap: () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => DetalleRutaScreen(despacho: d),
-                                  ),
-                                );
-                                _cargarRutas();
-                              },
                             ),
                           );
                         },

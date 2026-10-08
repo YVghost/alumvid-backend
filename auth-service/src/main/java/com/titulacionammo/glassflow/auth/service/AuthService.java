@@ -21,4 +21,6 @@ public interface AuthService {
     UsuarioResponse actualizarEstado(UUID id, boolean activo);
 
     UsuarioResponse obtenerPerfilActual(String email);
+
+    void eliminarUsuario(UUID id);
 }
