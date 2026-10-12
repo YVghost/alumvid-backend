@@ -41,6 +41,7 @@ public class JwtService {
                 : user.identification() + "@alumvid.com";
 
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(user.identification())
                 .claim("userId", user.id().toString())
                 .claim("identification", user.identification())

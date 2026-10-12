@@ -14,7 +14,7 @@ references = set(re.findall(r"\$\('([^']+)'\)", source))
 assert not references - ids, references - ids
 config = dict(line.split("=", 1) for line in (root / ".env").read_text().splitlines()
               if line and not line.startswith("#") and "=" in line)
-base = "http://localhost:" + config.get("INVENTARIO_PORT", "8092")
+base = "http://localhost:" + (config.get("INVENTARIO_SERVICE_PORT") or config.get("INVENTARIO_PORT", "8082"))
 
 def request(path, method="GET", body=None, token=None):
     headers = {"Content-Type": "application/json"}

@@ -73,7 +73,7 @@ public class UserService {
         // Limpiar sesiones expiradas y registrar la sesion en base de datos
         users.db().update("DELETE FROM usuarios.auth_session WHERE expires_at <= CURRENT_TIMESTAMP");
         users.db().update(
-            "INSERT INTO usuarios.auth_session(token_hash, user_id, expires_at) VALUES (?,?,?)",
+            "INSERT INTO usuarios.auth_session(token_hash, user_id, expires_at) VALUES (?,?,?) ON CONFLICT (token_hash) DO UPDATE SET expires_at = EXCLUDED.expires_at",
             Security.hash(jwtToken),
             u.id(),
             Timestamp.from(Instant.now().plusSeconds(jwtService.getExpirationTimeMs() / 1000))

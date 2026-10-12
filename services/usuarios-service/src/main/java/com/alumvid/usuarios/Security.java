@@ -114,8 +114,16 @@ public class Security {
 
                     // 1. Intento validacion JWT
                     if (jwtService.esTokenValido(token)) {
-                        String idStr = jwtService.extraerIdentificacion(token);
-                        user = users.byIdentification(idStr).orElse(null);
+                        String tokenHash = Security.hash(token);
+                        Integer activeSessions = users.db().queryForObject(
+                            "SELECT COUNT(*) FROM usuarios.auth_session WHERE token_hash = ? AND expires_at > CURRENT_TIMESTAMP",
+                            Integer.class,
+                            tokenHash
+                        );
+                        if (activeSessions != null && activeSessions > 0) {
+                            String idStr = jwtService.extraerIdentificacion(token);
+                            user = users.byIdentification(idStr).orElse(null);
+                        }
                     }
 
                     // 2. Intento de respaldo con sesion SHA-256 (para clientes basados en sesion de base de datos)
