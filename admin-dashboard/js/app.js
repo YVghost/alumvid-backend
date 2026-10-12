@@ -1,5 +1,5 @@
 // =========================================================================
-// GLASSFLOW LOGISTICS & FLEET MANAGEMENT PLATFORM - JAVASCRIPT
+// ALUMVID LOGISTICS & FLEET MANAGEMENT PLATFORM - JAVASCRIPT
 // =========================================================================
 
 const API_BASE = (window.location.protocol === 'file:' || (window.location.port !== '8080' && window.location.port !== ''))
@@ -7,10 +7,10 @@ const API_BASE = (window.location.protocol === 'file:' || (window.location.port 
   : '';
 const AUTH_API = `${API_BASE}/api/v1/auth`;
 const LOGISTICA_API = `${API_BASE}/api/v1/logistica`;
-const WS_ENDPOINT = 'http://localhost:8082/ws-logistica';
+const WS_ENDPOINT = 'http://localhost:8083/ws-logistica';
 
 // Estado global de la aplicacion
-let authToken = localStorage.getItem('glassflow_token') || null;
+let authToken = localStorage.getItem('alumvid_token') || null;
 let currentUser = null;
 let allUsuarios = [];
 let allChoferes = [];
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setInterval(updatePhoneClock, 30000);
 
   if (authToken) {
-    document.getElementById('logged-user-email').innerText = 'admin@glassflow.com';
+    document.getElementById('logged-user-email').innerText = 'admin@alumvid.com';
     initGoogleMap();
     connectWebSocket();
     await loadAllData();
@@ -804,7 +804,7 @@ async function loadUsuarios() {
     }
 
     tbody.innerHTML = allUsuarios.map(u => {
-      const isMasterAdmin = u.email === 'admin@glassflow.com';
+      const isMasterAdmin = u.email === 'admin@alumvid.com';
       const actionsHtml = isMasterAdmin
         ? '<span style="font-size: 0.72rem; color: var(--text-dim); font-style: italic;">Cuenta Protegida</span>'
         : `
@@ -1077,7 +1077,7 @@ function setupSignatureCanvas() {
 function setupEventListeners() {
   // Boton Cerrar Sesion
   document.getElementById('btn-logout')?.addEventListener('click', () => {
-    localStorage.removeItem('glassflow_token');
+    localStorage.removeItem('alumvid_token');
     authToken = null;
     currentUser = null;
     document.getElementById('logged-user-email').innerText = 'Sin sesion';
@@ -1125,7 +1125,7 @@ function setupEventListeners() {
       const res = await fetch(`${AUTH_API}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, identification: email, password })
       });
 
       if (!res.ok) {
@@ -1139,7 +1139,7 @@ function setupEventListeners() {
       }
 
       authToken = data.token;
-      localStorage.setItem('glassflow_token', authToken);
+      localStorage.setItem('alumvid_token', authToken);
       currentUser = data;
       document.getElementById('logged-user-email').innerText = data.email;
       hideLoginModal();
@@ -1531,7 +1531,7 @@ function setupEventListeners() {
     ctx.fillText('Material: Vidrio Templado 8mm', 20, 80);
     ctx.fillText(`GPS: ${simCurrentLat.toFixed(5)}, ${simCurrentLon.toFixed(5)}`, 20, 110);
     ctx.fillText(`Fecha: ${new Date().toLocaleString()}`, 20, 140);
-    ctx.fillText('GlassFlow Logistics e-PoD v2.0', 20, 170);
+    ctx.fillText('AlumVid Logistics e-PoD v2.0', 20, 170);
 
     simPhotoBase64 = canvas.toDataURL('image/jpeg', 0.85);
 

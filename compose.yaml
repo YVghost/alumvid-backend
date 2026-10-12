@@ -1,0 +1,101 @@
+name: alumvid-platform
+
+services:
+  postgres-postgis:
+    image: postgis/postgis:16-3.4
+    container_name: alumvid-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-alumvid_db}
+      POSTGRES_USER: ${DB_USER:-alumvid_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-alumvid_secure_2026}
+    ports:
+      - "5433:5432"
+    volumes:
+      - alumvid_pg_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alumvid_admin -d alumvid_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  usuarios-service:
+    build:
+      context: ./services/usuarios-service
+    container_name: alumvid-usuarios
+    restart: on-failure
+    environment:
+      DB_HOST: postgres-postgis
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-alumvid_db}
+      DB_USER: ${DB_USER:-alumvid_admin}
+      DB_PASSWORD: ${DB_PASSWORD:-alumvid_secure_2026}
+      MASTER_IDENTIFICATION: ${MASTER_IDENTIFICATION:-1700000000}
+      MASTER_NAME: ${MASTER_NAME:-Administrador General AlumVid}
+      MASTER_PASSWORD: ${MASTER_PASSWORD:-AlumVidAdmin2026!}
+      JWT_SECRET: ${JWT_SECRET:-c3VwZXJfc2VjcmV0X2tleV9hbHVtdmlkXzIwMjZfand0X3NpZ25hdHVyZV9obWFj=}
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres-postgis:
+        condition: service_healthy
+
+  inventario-service:
+    build:
+      context: ./services/inventario-service
+    container_name: alumvid-inventario
+    restart: on-failure
+    environment:
+      DB_HOST: postgres-postgis
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-alumvid_db}
+      DB_USER: ${DB_USER:-alumvid_admin}
+      DB_PASSWORD: ${DB_PASSWORD:-alumvid_secure_2026}
+      AUTH_URL: http://usuarios-service:8081
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres-postgis:
+        condition: service_healthy
+      usuarios-service:
+        condition: service_started
+
+  logistica-service:
+    build:
+      context: ./services/logistica-service
+    container_name: alumvid-logistica
+    restart: on-failure
+    environment:
+      DB_HOST: postgres-postgis
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-alumvid_db}
+      DB_USER: ${DB_USER:-alumvid_admin}
+      DB_PASSWORD: ${DB_PASSWORD:-alumvid_secure_2026}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-AIzaSyDYqJ2TbM6UD5GIHt6wTDRrhpzdQx2QsmQ}
+      JWT_SECRET: ${JWT_SECRET:-c3VwZXJfc2VjcmV0X2tleV9hbHVtdmlkXzIwMjZfand0X3NpZ25hdHVyZV9obWFj=}
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres-postgis:
+        condition: service_healthy
+
+  gateway-service:
+    build:
+      context: ./services/gateway-service
+    container_name: alumvid-gateway
+    restart: on-failure
+    environment:
+      AUTH_SERVICE_URL: http://usuarios-service:8081
+      INVENTARIO_SERVICE_URL: http://inventario-service:8082
+      LOGISTICA_SERVICE_URL: http://logistica-service:8083
+    ports:
+      - "8080:8080"
+    depends_on:
+      - usuarios-service
+      - inventario-service
+      - logistica-service
+
+volumes:
+  alumvid_pg_data:
+    name: alumvid_pg_data

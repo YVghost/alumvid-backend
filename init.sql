@@ -1,53 +1,18 @@
 -- =========================================================================================
--- PROYECTO DE TITULACION: GLASSFLOW - ARQUITECTURA DE MICROSERVICIOS Y LOGISTICA GEOESPACIAL
--- SCRIPT DE INICIALIZACION DDL Y DATOS BASE: init.sql
+-- PROYECTO DE TITULACION: ALUMVID - PLATAFORMA DE GESTION INTEGRAL, INVENTARIO Y LOGISTICA
+-- SCRIPT DE INICIALIZACION DDL Y POSTGIS: init.sql
 -- =========================================================================================
-
--- -----------------------------------------------------------------------------------------
--- 1. BASE DE DATOS: glassflow_auth_db (MICROSERVICIO DE AUTENTICACION Y RBAC)
--- -----------------------------------------------------------------------------------------
-\connect glassflow_auth_db;
-
-CREATE TABLE IF NOT EXISTS public.usuarios (
-    id UUID NOT NULL,
-    email VARCHAR(150) NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    nombre VARCHAR(150) NOT NULL,
-    telefono VARCHAR(30),
-    rol VARCHAR(30) NOT NULL,
-    activo BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMP(6) WITHOUT TIME ZONE,
-    updated_at TIMESTAMP(6) WITHOUT TIME ZONE,
-    CONSTRAINT usuarios_pkey PRIMARY KEY (id),
-    CONSTRAINT uk_usuarios_email UNIQUE (email),
-    CONSTRAINT usuarios_rol_check CHECK (rol IN ('ROLE_ADMIN', 'ROLE_CHOFER', 'ROLE_OPERARIO'))
-);
-
--- Insercion del unico usuario administrador inicial del sistema
--- Credenciales: admin@glassflow.com / GlassFlowAdmin2026! (BCrypt strength 12)
-INSERT INTO public.usuarios (id, email, password, nombre, telefono, rol, activo, created_at, updated_at)
-VALUES (
-    'd95e831c-7de6-4e75-9e3f-2074a9b97044',
-    'admin@glassflow.com',
-    '$2a$12$Rd/X6s3Y1t7VtBqg9l3RSOsM9OwssuwzJRZNhliGEnkO6KvJpSCtC',
-    'Administrador de Operaciones',
-    '+593999999999',
-    'ROLE_ADMIN',
-    true,
-    NOW(),
-    NOW()
-)
-ON CONFLICT (email) DO NOTHING;
-
--- -----------------------------------------------------------------------------------------
--- 2. BASE DE DATOS: glassflow_logistica_db (MICROSERVICIO DE LOGISTICA Y POSTGIS)
--- -----------------------------------------------------------------------------------------
-\connect glassflow_logistica_db;
 
 -- Habilitar extension espacial PostGIS para computo de geocercas y metricas cartograficas
 CREATE EXTENSION IF NOT EXISTS postgis;
 
-CREATE TABLE IF NOT EXISTS public.choferes (
+-- Creacion de esquemas por microservicio para arquitectura desacoplada
+CREATE SCHEMA IF NOT EXISTS usuarios;
+CREATE SCHEMA IF NOT EXISTS inventario;
+CREATE SCHEMA IF NOT EXISTS logistica;
+
+-- Tabla de logistica: choferes, pedidos, rutas, despachos dentro del esquema logistica
+CREATE TABLE IF NOT EXISTS logistica.choferes (
     id UUID NOT NULL,
     email VARCHAR(150) NOT NULL,
     nombre VARCHAR(150) NOT NULL,
@@ -60,7 +25,7 @@ CREATE TABLE IF NOT EXISTS public.choferes (
     CONSTRAINT choferes_estado_disponibilidad_check CHECK (estado_disponibilidad IN ('DISPONIBLE', 'EN_RUTA', 'INACTIVO'))
 );
 
-CREATE TABLE IF NOT EXISTS public.pedidos (
+CREATE TABLE IF NOT EXISTS logistica.pedidos (
     id UUID NOT NULL,
     cliente VARCHAR(150) NOT NULL,
     direccion_texto VARCHAR(255) NOT NULL,
@@ -72,9 +37,9 @@ CREATE TABLE IF NOT EXISTS public.pedidos (
     CONSTRAINT pedidos_estado_check CHECK (estado IN ('PENDIENTE', 'EN_RUTA', 'ENTREGADO', 'CANCELADO'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_pedidos_coordenada_destino ON public.pedidos USING GIST (coordenada_destino);
+CREATE INDEX IF NOT EXISTS idx_pedidos_coordenada_destino ON logistica.pedidos USING GIST (coordenada_destino);
 
-CREATE TABLE IF NOT EXISTS public.rutas (
+CREATE TABLE IF NOT EXISTS logistica.rutas (
     id UUID NOT NULL,
     codigo_ruta VARCHAR(50) NOT NULL,
     chofer_id UUID,
@@ -87,11 +52,11 @@ CREATE TABLE IF NOT EXISTS public.rutas (
     updated_at TIMESTAMP(6) WITHOUT TIME ZONE,
     CONSTRAINT rutas_pkey PRIMARY KEY (id),
     CONSTRAINT uk_rutas_codigo_ruta UNIQUE (codigo_ruta),
-    CONSTRAINT fk_rutas_chofer FOREIGN KEY (chofer_id) REFERENCES public.choferes(id),
+    CONSTRAINT fk_rutas_chofer FOREIGN KEY (chofer_id) REFERENCES logistica.choferes(id),
     CONSTRAINT rutas_estado_check CHECK (estado IN ('PENDIENTE', 'EN_CURSO', 'COMPLETADA', 'CANCELADA'))
 );
 
-CREATE TABLE IF NOT EXISTS public.despachos (
+CREATE TABLE IF NOT EXISTS logistica.despachos (
     id UUID NOT NULL,
     ruta_id UUID,
     orden_parada INTEGER,
@@ -110,10 +75,10 @@ CREATE TABLE IF NOT EXISTS public.despachos (
     created_at TIMESTAMP(6) WITHOUT TIME ZONE,
     updated_at TIMESTAMP(6) WITHOUT TIME ZONE,
     CONSTRAINT despachos_pkey PRIMARY KEY (id),
-    CONSTRAINT fk_despachos_ruta FOREIGN KEY (ruta_id) REFERENCES public.rutas(id),
-    CONSTRAINT fk_despachos_chofer FOREIGN KEY (chofer_id) REFERENCES public.choferes(id),
-    CONSTRAINT fk_despachos_pedido FOREIGN KEY (pedido_id) REFERENCES public.pedidos(id),
+    CONSTRAINT fk_despachos_ruta FOREIGN KEY (ruta_id) REFERENCES logistica.rutas(id),
+    CONSTRAINT fk_despachos_chofer FOREIGN KEY (chofer_id) REFERENCES logistica.choferes(id),
+    CONSTRAINT fk_despachos_pedido FOREIGN KEY (pedido_id) REFERENCES logistica.pedidos(id),
     CONSTRAINT despachos_estado_check CHECK (estado IN ('PENDIENTE', 'EN_CURSO', 'ENTREGADO', 'CANCELADA'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_despachos_coordenada_entrega ON public.despachos USING GIST (coordenada_entrega);
+CREATE INDEX IF NOT EXISTS idx_despachos_coordenada_entrega ON logistica.despachos USING GIST (coordenada_entrega);
