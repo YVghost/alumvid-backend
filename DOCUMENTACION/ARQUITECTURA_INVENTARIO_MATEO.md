@@ -1,0 +1,109 @@
+# Plataforma de inventario
+
+Servicios independientes de usuarios en `services/usuarios-service` e inventario en `services/inventario-service`, con APIs y portales administrativos.
+
+## Organización del repositorio
+
+```text
+services/
+├── usuarios-service/       # API y portal administrativo implementados
+└── inventario-service/     # Catálogo, existencias y movimientos
+compose.yaml               # PostgreSQL, usuarios e inventario
+documentos/                # Documentos de referencia
+scripts/                   # Verificaciones locales
+mvnw / mvnw.cmd            # Maven Wrapper compartido
+.mvn/                      # Configuración del wrapper
+```
+
+Cada servicio tiene su propio `pom.xml` y `src`. La raíz no contiene una aplicación Spring Boot ni un POM agregador. Ejecuta Maven desde la raíz indicando el servicio mediante `-f`; por ejemplo:
+
+```powershell
+.\mvnw.cmd -f services/inventario-service/pom.xml package -DskipTests
+```
+
+El comando anterior compila y empaqueta inventario como JAR independiente sin ejecutar pruebas. Para probarlo con PostgreSQL, usa el script indicado más adelante.
+
+## Iniciar con Docker
+
+1. Abre Docker Desktop.
+2. Copia `.env.example` a `.env` si todavía no existe y configura las claves. Durante la implementación se generó un `.env` local con claves aleatorias, excluido de Git. Puedes consultarlo localmente; no lo publiques.
+3. Configura `MASTER_IDENTIFICATION`, `MASTER_NAME` y `MASTER_PASSWORD`. La contraseña temporal debe tener al menos 12 caracteres y no exceder 72 bytes UTF-8.
+4. Ejecuta `docker compose up -d --build`.
+5. Abre **http://localhost:8091** e ingresa con las credenciales del principal definidas en `.env`. Debes cambiar la contraseña antes de acceder al equipo. `USUARIOS_PORT` permite cambiar el puerto externo; dentro del contenedor el servicio usa 8081.
+6. Abre **http://localhost:8092** para administrar inventario con la misma cuenta. `INVENTARIO_PORT` permite cambiar el puerto externo; dentro del contenedor inventario usa 8082. Cada portal mantiene su propia sesión en memoria.
+
+PostgreSQL queda accesible en `localhost:5433`, base `inventario`. Los datos persisten en el volumen `postgres_data`. `docker compose down` detiene los contenedores conservando los datos. Evita `down -v` si quieres conservarlos. Los cambios de contraseña de PostgreSQL en `.env` no alteran las credenciales de un volumen ya inicializado.
+
+La primera inicialización crea un único principal. Cambiar sus variables después no reemplaza ni restablece su cuenta. Los demás administradores se delegan desde el portal.
+
+## Reglas de acceso
+
+- Identificación única como texto; conserva ceros iniciales. Se admite identificación alfanumérica de 3 a 30 caracteres, sin validar aún el dígito verificador ecuatoriano.
+- Roles múltiples: `ADMINISTRADOR`, `VENDEDOR`, `BODEGUERO`, `CHOFER`.
+- Solo administradores pueden usar el portal o administrar usuarios.
+- El principal puede delegar administración a usuarios existentes, retirar roles, desactivar y reactivar cuentas, restablecer claves y consultar la auditoría. No puede desactivarse ni perder su rol administrativo.
+- Los delegados pueden crear empleados y agregar roles operativos; no pueden retirar roles, desactivar usuarios ni editar otros administradores. El restablecimiento de claves se reserva al principal para impedir suplantación de cuentas con mayor autoridad.
+- Cada cuenta nueva/restablecida cambia su contraseña temporal antes de operar. El cambio cierra todas sus sesiones; debe iniciar sesión nuevamente.
+- Desactivar preserva usuario e historial. No existe borrado de cuentas. Cambiar roles o estado revoca sus sesiones.
+- Contraseñas con BCrypt. En esta entrega se usan tokens Bearer aleatorios, válidos por 8 horas, cuyo hash SHA-256 se almacena en PostgreSQL; **no son JWT**. La API móvil puede usar el mismo mecanismo. La web conserva el token solo en memoria, por lo que recargar exige ingresar nuevamente.
+- La auditoría guarda responsables, usuarios afectados, cambios de nombre/roles/estado, inicios de sesión y cambios de contraseña. No almacena contraseñas ni tokens. No es una bitácora criptográficamente inmutable.
+
+## Base compartida y futuros servicios
+
+Se usa una sola instancia y base PostgreSQL, con los esquemas `usuarios` e `inventario`, creados y versionados con Flyway por cada servicio. Cada servicio tiene su proyecto y puerto. Inventario no lee tablas de usuarios: valida los tokens contra `/api/auth/me` de usuarios, con límites de conexión y lectura de 2 y 3 segundos. Si usuarios falla, las operaciones autenticadas de inventario responden 503; inventario sigue ejecutándose. La base compartida sí es una dependencia común.
+
+La integración con el inventario empresarial, ventas/cancelaciones, retazos y geolocalización quedan para entregas posteriores. El servicio de autenticación no requiere ninguno de ellos. Las webs usan HTML/CSS/JavaScript y cada servicio sirve su propio portal.
+
+## API para Postman y app móvil
+
+Base con Docker: `http://localhost:8091/api`. Envía JSON con `Content-Type: application/json`. Después del login agrega `Authorization: Bearer <accessToken>`.
+
+| Método | Ruta | Uso |
+|---|---|---|
+| POST | `/auth/login` | `{ "identification": "0000000000", "password": "..." }` |
+| GET | `/auth/me` | Identidad y roles actuales |
+| POST | `/auth/password` | `{ "currentPassword": "...", "newPassword": "..." }` |
+| POST | `/auth/logout` | Revoca la sesión actual |
+| GET | `/admin/users` | Lista usuarios, incluidos inactivos |
+| POST | `/admin/users` | Crea cuenta con identificación, nombre, roles y clave temporal |
+| PUT | `/admin/users/{id}` | Actualiza nombre, roles y estado |
+| POST | `/admin/users/{id}/password` | Restablece contraseña temporal; solo principal |
+| GET | `/admin/audit` | Últimos 200 eventos; solo principal |
+
+Ejemplo de creación:
+
+```json
+{
+  "identification": "0123456789",
+  "fullName": "Empleado de bodega",
+  "roles": ["BODEGUERO", "CHOFER"],
+  "temporaryPassword": "Una-temporal-de-12-o-mas"
+}
+```
+
+Ejemplo de actualización (identificación y condición de principal no se modifican):
+
+```json
+{ "fullName": "Empleado de bodega", "roles": ["BODEGUERO"], "active": true }
+```
+
+Errores: 400 datos inválidos, 401 credenciales/sesión inválidas, 403 permisos o cambio de clave pendiente, 404 usuario inexistente, 409 duplicados o protección del principal. Las claves solo se entregan durante creación/restablecimiento y nunca aparecen en las respuestas.
+
+## Verificación
+
+Con Java 17 o superior configurado en `JAVA_HOME` y PostgreSQL iniciado:
+
+```powershell
+docker compose up -d postgres
+.\scripts\test-usuarios.ps1
+```
+
+Las pruebas usan PostgreSQL real y revierten sus cambios. Ejecutarlas antes de cambiar manualmente la contraseña inicial del principal: la preparación utiliza `MASTER_PASSWORD` de `.env`. Se cubren permisos, cambio obligatorio, revocación, protección del principal, desactivación con historial y validaciones.
+
+Para compilar sin ejecutar las pruebas de integración:
+
+```powershell
+.\mvnw.cmd -f services/usuarios-service/pom.xml package -DskipTests
+```
+
+Esta configuración es para desarrollo local: puertos vinculados a loopback y HTTP local. Para publicar se necesita TLS, protección frente a intentos repetidos de login, paginación y una política de respaldo/retención de datos.

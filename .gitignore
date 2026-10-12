@@ -36,6 +36,3 @@ build/
 .env
 *.env
 
-### Backup temporal de avance Mateo ###
-AvanceMateo/
-
