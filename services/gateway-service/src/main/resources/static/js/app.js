@@ -6,6 +6,8 @@ const API_BASE = (window.location.protocol === 'file:' || (window.location.port 
   ? 'http://localhost:8080'
   : '';
 const AUTH_API = `${API_BASE}/api/v1/auth`;
+const ADMIN_USERS_API = `${API_BASE}/api/admin/users`;
+const INVENTARIO_API = `${API_BASE}/api/products`;
 const LOGISTICA_API = `${API_BASE}/api/v1/logistica`;
 const WS_ENDPOINT = 'http://localhost:8083/ws-logistica';
 
@@ -19,6 +21,22 @@ let allDespachos = [];
 let allRutas = [];
 let activeRutaId = null;
 let pickerContext = 'agregar'; // 'agregar' o 'editar'
+
+// Estado global de Inventario (Mateo)
+let allProductos = [];
+let invPage = 0;
+const invPageSize = 15;
+let invTotal = 0;
+let editingProductId = null;
+let activeMovementProductId = null;
+let movementRequestId = null;
+let historyProductId = null;
+let historyPage = 0;
+
+// Estado global de Usuarios & RBAC (Mateo)
+let allUsuariosMateo = [];
+let editingUserId = null;
+let resettingUserId = null;
 
 // Google Maps & Telemetria
 let googleMap = null;
@@ -129,10 +147,15 @@ function setupNavigation() {
       } else if (targetTab === 'tab-despachos') {
         viewTitle.innerText = 'Planificacion y Asignacion de Rutas';
         viewSubtitle.innerText = 'Georreferenciacion de clientes y asignacion de choferes responsables';
+      } else if (targetTab === 'tab-inventario') {
+        viewTitle.innerText = 'Control de Inventario, Existencias y Retazos (Bodega)';
+        viewSubtitle.innerText = 'Supervisión de productos, existencias en tiempo real, registro de mermas y kardex de almacén';
+        loadInventario();
       } else if (targetTab === 'tab-usuarios') {
-        viewTitle.innerText = 'Gestion Centralizada de Usuarios (RBAC)';
-        viewSubtitle.innerText = 'Creacion de cuentas y asignacion de credenciales para personal y choferes';
-        loadUsuarios();
+        viewTitle.innerText = 'Gestion Centralizada de Usuarios (Cédula & RBAC)';
+        viewSubtitle.innerText = 'Validación de identidad ecuatoriana, roles operativos, cuentas protegidas y auditoría';
+        loadUsuariosMateo();
+        loadAuditoria();
       } else if (targetTab === 'tab-simulator') {
         viewTitle.innerText = 'Simulador de Smartphone del Chofer';
         viewSubtitle.innerText = 'Entorno de pruebas para consentimiento de viaje, telemetria y cierre documentado';
@@ -288,6 +311,13 @@ async function loadAllData() {
     if (activeRutaId) {
       renderActiveRuta(activeRutaId);
     }
+
+    // Cargar en paralelo los modulos de Inventario, Usuarios RBAC y Auditoria
+    await Promise.allSettled([
+      loadInventario(),
+      loadUsuariosMateo(),
+      loadAuditoria()
+    ]);
   } catch (error) {
     console.error('Error cargando datos logisticos:', error);
   }
@@ -786,104 +816,402 @@ function trackRouteOnMap(despachoId, destLat, destLng) {
 }
 
 // -------------------------------------------------------------------------
-// GESTION CENTRALIZADA DE USUARIOS (AUTH SERVICE & RBAC)
+// GESTION INTEGRAL DE INVENTARIO Y BODEGA (MODULO MATEO)
 // -------------------------------------------------------------------------
-async function loadUsuarios() {
+async function loadInventario() {
+  const q = document.getElementById('filtro-inv-q')?.value?.trim() || '';
+  const category = document.getElementById('filtro-inv-categoria')?.value || '';
+  const lowStock = document.getElementById('filtro-inv-low-stock')?.checked || false;
+  const includeInactive = document.getElementById('filtro-inv-inactivos')?.checked || false;
+
+  const params = new URLSearchParams({
+    q,
+    category,
+    lowStock: String(lowStock),
+    includeInactive: String(includeInactive),
+    page: String(invPage),
+    size: String(invPageSize)
+  });
+
   try {
-    const res = await fetch(`${AUTH_API}/usuarios`, {
+    const res = await fetch(`${INVENTARIO_API}?${params}`, {
       headers: getAuthHeaders()
     });
-    if (!res.ok) throw new Error('No autorizado');
+    if (!res.ok) throw new Error('Error al consultar inventario');
 
-    allUsuarios = await res.json();
-    const tbody = document.getElementById('usuarios-table-body');
+    const data = await res.json();
+    allProductos = data.items || [];
+    invTotal = data.total || 0;
 
-    if (allUsuarios.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No hay usuarios registrados</td></tr>';
+    const tbody = document.getElementById('inventario-table-body');
+    if (!tbody) return;
+
+    if (allProductos.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-dim);">No se encontraron productos para los criterios seleccionados.</td></tr>';
+    } else {
+      tbody.innerHTML = allProductos.map(p => {
+        const stockNum = Number(p.stock);
+        const minNum = Number(p.minStock);
+        let stockClass = 'normal';
+        let stockLabel = 'STOCK NORMAL';
+        if (stockNum <= 0) {
+          stockClass = 'zero';
+          stockLabel = 'AGOTADO';
+        } else if (stockNum <= minNum) {
+          stockClass = 'low';
+          stockLabel = 'STOCK MÍNIMO';
+        }
+
+        return `
+          <tr>
+            <td style="font-family: monospace; font-weight: 700; color: #38bdf8;">${p.code}</td>
+            <td>
+              <div style="font-weight: 700;">${p.name}</div>
+              ${p.description ? `<div style="font-size: 0.73rem; color: var(--text-dim);">${p.description}</div>` : ''}
+              ${!p.active ? `<span style="font-size: 0.68rem; color: #fb7185;">[INACTIVO]</span>` : ''}
+            </td>
+            <td><span class="tag-category">${p.category}</span></td>
+            <td>
+              <div class="stock-badge ${stockClass}">
+                ${p.stock} ${p.unit}
+              </div>
+              <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 2px;">
+                Mínimo: ${p.minStock} · <span style="font-weight: 600;">${stockLabel}</span>
+              </div>
+            </td>
+            <td>${p.location || '—'}</td>
+            <td style="font-size: 0.78rem;">${p.supplier || '—'}</td>
+            <td style="text-align: center;">
+              <div style="display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
+                <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.72rem;" onclick="editProducto('${p.id}')">
+                  Editar
+                </button>
+                ${p.active ? `
+                  <button class="btn btn-primary" style="padding: 3px 8px; font-size: 0.72rem;" onclick="abrirModalMovimiento('${p.id}')">
+                    + Movimiento
+                  </button>
+                ` : ''}
+                <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.72rem; color: #94a3b8;" onclick="abrirHistorialProducto('${p.id}')">
+                  Historial
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Actualizar paginación
+    const infoEl = document.getElementById('inv-paginacion-info');
+    if (infoEl) infoEl.innerText = `${invTotal} productos · Página ${invPage + 1}`;
+    const prevBtn = document.getElementById('btn-inv-prev');
+    const nextBtn = document.getElementById('btn-inv-next');
+    if (prevBtn) prevBtn.disabled = invPage === 0;
+    if (nextBtn) nextBtn.disabled = (invPage + 1) * invPageSize >= invTotal;
+
+    // Actualizar contador en stats
+    const statProd = document.getElementById('stat-total-productos');
+    if (statProd) statProd.innerText = invTotal;
+
+  } catch (err) {
+    console.error('Error al cargar inventario:', err);
+  }
+}
+
+function editProducto(prodId) {
+  const prod = allProductos.find(p => p.id === prodId);
+  if (!prod) return;
+
+  editingProductId = prod.id;
+  document.getElementById('editor-producto-titulo').innerText = `Editar Producto: ${prod.name}`;
+  document.getElementById('prod-codigo').value = prod.code;
+  document.getElementById('prod-codigo').disabled = true;
+  document.getElementById('prod-nombre').value = prod.name;
+  document.getElementById('prod-categoria').value = prod.category;
+  document.getElementById('prod-unidad').value = prod.unit;
+  document.getElementById('prod-min-stock').value = prod.minStock;
+  document.getElementById('prod-ubicacion').value = prod.location || '';
+  document.getElementById('prod-proveedor').value = prod.supplier || '';
+  document.getElementById('prod-codigo-ext').value = prod.externalCode || '';
+  document.getElementById('prod-descripcion').value = prod.description || '';
+  document.getElementById('prod-activo').checked = prod.active;
+  document.getElementById('prod-active-container').style.display = 'block';
+
+  document.getElementById('panel-editor-producto').style.display = 'block';
+  document.getElementById('prod-nombre').focus();
+}
+
+function cancelarEdicionProducto() {
+  editingProductId = null;
+  document.getElementById('form-producto').reset();
+  document.getElementById('prod-codigo').disabled = false;
+  document.getElementById('editor-producto-titulo').innerText = 'Nuevo Producto para Catálogo de Bodega';
+  document.getElementById('prod-active-container').style.display = 'none';
+  document.getElementById('panel-editor-producto').style.display = 'none';
+}
+
+function abrirModalMovimiento(prodId) {
+  const prod = allProductos.find(p => p.id === prodId);
+  if (!prod) return;
+
+  activeMovementProductId = prod.id;
+  movementRequestId = crypto.randomUUID();
+
+  document.getElementById('form-movimiento-bodega').reset();
+  document.getElementById('mov-modal-titulo').innerText = `Registrar Movimiento: ${prod.name}`;
+  document.getElementById('mov-modal-stock').innerText = `Saldo actual en bodega: ${prod.stock} ${prod.unit}`;
+  actualizarLabelsMovimiento();
+  document.getElementById('modal-movimiento').classList.add('active');
+}
+
+function cerrarModalMovimiento() {
+  activeMovementProductId = null;
+  movementRequestId = null;
+  document.getElementById('modal-movimiento').classList.remove('active');
+}
+
+function actualizarLabelsMovimiento() {
+  const tipo = document.getElementById('mov-tipo').value;
+  const isAjuste = tipo === 'AJUSTE';
+  document.getElementById('mov-cantidad-label').innerText = isAjuste ? 'Saldo Total Físico Contado' : 'Cantidad a Mover';
+  document.getElementById('mov-cantidad').min = isAjuste ? '0' : '0.0001';
+  document.getElementById('mov-ajuste-help').style.display = isAjuste ? 'block' : 'none';
+}
+
+async function abrirHistorialProducto(prodId) {
+  const prod = allProductos.find(p => p.id === prodId);
+  if (!prod) return;
+
+  historyProductId = prod.id;
+  historyPage = 0;
+  document.getElementById('historial-prod-titulo').innerText = `Historial & Kardex: ${prod.name} (${prod.code})`;
+  await loadHistorialProducto();
+  document.getElementById('modal-historial-producto').classList.add('active');
+}
+
+function cerrarModalHistorial() {
+  historyProductId = null;
+  document.getElementById('modal-historial-producto').classList.remove('active');
+}
+
+async function loadHistorialProducto() {
+  if (!historyProductId) return;
+  try {
+    const res = await fetch(`${INVENTARIO_API}/${historyProductId}/movements?page=${historyPage}&size=15`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Error al consultar historial');
+
+    const data = await res.json();
+    const tbody = document.getElementById('historial-movements-body');
+
+    if (!data.items || data.items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-dim);">Sin movimientos registrados todavía.</td></tr>';
+    } else {
+      tbody.innerHTML = data.items.map(m => `
+        <tr>
+          <td style="font-size: 0.75rem;">${new Date(m.occurredAt).toLocaleString('es-EC')}</td>
+          <td><span class="tag-category">${m.type}</span></td>
+          <td style="font-family: monospace; font-weight: 700; color: ${m.delta >= 0 ? '#34d399' : '#fb7185'};">
+            ${m.delta > 0 ? '+' : ''}${m.delta}
+          </td>
+          <td style="font-family: monospace; font-size: 0.78rem;">${m.stockBefore} → ${m.stockAfter}</td>
+          <td>
+            <strong>${m.actorName || 'Operador'}</strong>
+            <div style="font-size: 0.72rem; color: var(--text-dim);">${m.reason}${m.reference ? ` · Ref: ${m.reference}` : ''}</div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('historial-page-info').innerText = `${data.total} movimientos · Página ${historyPage + 1}`;
+    document.getElementById('btn-hist-prev').disabled = historyPage === 0;
+    document.getElementById('btn-hist-next').disabled = (historyPage + 1) * 15 >= data.total;
+  } catch (err) {
+    console.error('Error al cargar historial de movimientos:', err);
+  }
+}
+
+// -------------------------------------------------------------------------
+// GESTION CENTRALIZADA DE USUARIOS, CEDULAS Y AUDITORIA (MODULO MATEO)
+// -------------------------------------------------------------------------
+function validarCedulaEcuatoriana(cedula) {
+  if (!/^\d{10}$/.test(cedula)) return false;
+  const prov = parseInt(cedula.substring(0, 2), 10);
+  if (prov < 1 || prov > 24) return false;
+  const tercerDigito = parseInt(cedula[2], 10);
+  if (tercerDigito >= 6) return false;
+  const coeficientes = [2, 1, 2, 1, 2, 1, 2, 1, 2];
+  let suma = 0;
+  for (let i = 0; i < 9; i++) {
+    let val = parseInt(cedula[i], 10) * coeficientes[i];
+    if (val >= 10) val -= 9;
+    suma += val;
+  }
+  const digitoVerificador = parseInt(cedula[9], 10);
+  const decenaSuperior = Math.ceil(suma / 10) * 10;
+  let validador = decenaSuperior - suma;
+  if (validador === 10) validador = 0;
+  return validador === digitoVerificador;
+}
+
+async function loadUsuariosMateo() {
+  try {
+    const res = await fetch(ADMIN_USERS_API, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('No autorizado para ver usuarios');
+
+    allUsuariosMateo = await res.json();
+    const tbody = document.getElementById('usuarios-mateo-table-body');
+    if (!tbody) return;
+
+    if (allUsuariosMateo.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-dim);">No hay colaboradores registrados</td></tr>';
       return;
     }
 
-    tbody.innerHTML = allUsuarios.map(u => {
-      const isMasterAdmin = u.email === 'admin@alumvid.com';
-      const actionsHtml = isMasterAdmin
-        ? '<span style="font-size: 0.72rem; color: var(--text-dim); font-style: italic;">Cuenta Protegida</span>'
-        : `
-          <div style="display: flex; gap: 6px; justify-content: center;">
-            <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.72rem;" onclick="toggleUserStatus('${u.id}', ${!u.activo})">
-              ${u.activo ? 'Suspender' : 'Activar'}
-            </button>
-            <button class="btn btn-danger" style="padding: 3px 8px; font-size: 0.72rem;" onclick="eliminarUsuarioClick('${u.id}', '${u.email}', '${u.rol}')">
-              Eliminar
-            </button>
-          </div>
-        `;
+    tbody.innerHTML = allUsuariosMateo.map(u => {
+      const isMasterAdmin = u.master === true;
+      const roleBadges = (u.roles || []).map(r => {
+        const cls = r === 'ADMINISTRADOR' ? 'role-admin' : r === 'BODEGUERO' ? 'role-bodeguero' : r === 'CHOFER' ? 'role-chofer' : 'role-vendedor';
+        return `<span class="badge-role ${cls}">${r}</span>`;
+      }).join(' ');
+
+      let estadoText = 'ACTIVO';
+      let estadoColor = '#34d399';
+      if (!u.active) {
+        estadoText = 'SUSPENDIDO';
+        estadoColor = '#fb7185';
+      } else if (u.mustChangePassword) {
+        estadoText = 'CLAVE PENDIENTE';
+        estadoColor = '#fbbf24';
+      }
 
       return `
         <tr>
-          <td style="font-weight: 700;">${u.nombre}</td>
-          <td style="font-family: monospace;">${u.email}</td>
-          <td>${u.telefono || '-'}</td>
-          <td><span class="tag-status ${u.rol === 'ROLE_ADMIN' ? 'tag-en-curso' : 'tag-pending'}">${u.rol}</span></td>
-          <td>
-            <span style="font-size: 0.75rem; color: ${u.activo ? '#34d399' : '#fb7185'}; font-weight: 700;">
-              ${u.activo ? 'ACTIVO' : 'SUSPENDIDO'}
-            </span>
+          <td style="font-family: monospace; font-weight: 700;">
+            ${u.identification}
+            ${isMasterAdmin ? '<span class="badge-role role-admin" style="font-size: 0.65rem; margin-left: 4px;">PRINCIPAL</span>' : ''}
           </td>
+          <td><strong>${u.fullName}</strong></td>
+          <td style="font-size: 0.78rem;">
+            <div>${u.email || '—'}</div>
+            <div style="color: var(--text-dim);">${u.telefono || '—'}</div>
+          </td>
+          <td><div style="display: flex; gap: 4px; flex-wrap: wrap;">${roleBadges}</div></td>
+          <td><span style="font-size: 0.75rem; font-weight: 700; color: ${estadoColor};">${estadoText}</span></td>
           <td style="text-align: center;">
-            ${actionsHtml}
+            <div style="display: flex; gap: 6px; justify-content: center;">
+              <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.72rem;" onclick="editUsuarioMateo('${u.id}')">
+                Editar
+              </button>
+              ${u.active ? `
+                <button class="btn btn-outline" style="padding: 3px 8px; font-size: 0.72rem; color: #fbbf24;" onclick="abrirResetPassword('${u.id}')">
+                  Restablecer
+                </button>
+              ` : ''}
+            </div>
           </td>
         </tr>
       `;
     }).join('');
+
+    // Sincronizar select de choferes en el simulador
+    const choferes = allUsuariosMateo.filter(u => u.roles && u.roles.includes('CHOFER'));
+    const simSelect = document.getElementById('sim-select-chofer');
+    if (simSelect && choferes.length > 0) {
+      simSelect.innerHTML = choferes.map(c => `<option value="${c.id}">${c.fullName} (${c.identification})</option>`).join('');
+    }
+
   } catch (err) {
     console.error('Error cargando usuarios:', err);
   }
 }
 
-async function toggleUserStatus(id, newStatus) {
-  try {
-    const res = await fetch(`${AUTH_API}/usuarios/${id}/estado`, {
-      method: 'PATCH',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ activo: newStatus })
-    });
-    if (!res.ok) throw new Error('Error al actualizar estado del usuario');
-    showToast('Estado de usuario modificado exitosamente.', 'success');
-    loadUsuarios();
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
+function editUsuarioMateo(userId) {
+  const u = allUsuariosMateo.find(x => x.id === userId);
+  if (!u) return;
+
+  editingUserId = u.id;
+  document.getElementById('editor-usuario-titulo').innerText = `Editar Colaborador: ${u.fullName}`;
+  document.getElementById('usr-identificacion').value = u.identification;
+  document.getElementById('usr-identificacion').disabled = true;
+  document.getElementById('usr-nombre').value = u.fullName;
+  document.getElementById('usr-email').value = u.email || '';
+  document.getElementById('usr-telefono').value = u.telefono || '';
+  document.getElementById('container-usr-password').style.display = 'none';
+  document.getElementById('usr-temp-password').required = false;
+
+  const checkBoxes = document.querySelectorAll('input[name="usr-roles-check"]');
+  checkBoxes.forEach(cb => {
+    cb.checked = u.roles && u.roles.includes(cb.value);
+  });
+
+  document.getElementById('usr-activo').checked = u.active;
+  document.getElementById('usr-active-container').style.display = 'block';
+  document.getElementById('panel-editor-usuario').style.display = 'block';
+  document.getElementById('usr-nombre').focus();
 }
 
-async function eliminarUsuarioClick(id, email, rol) {
-  if (!confirm(`¿Está seguro de eliminar definitivamente al usuario "${email}" del sistema? Esta acción no se puede deshacer.`)) {
-    return;
-  }
+function cancelarEdicionUsuario() {
+  editingUserId = null;
+  document.getElementById('form-usuario-mateo').reset();
+  document.getElementById('usr-identificacion').disabled = false;
+  document.getElementById('editor-usuario-titulo').innerText = 'Registrar Nuevo Colaborador / Usuario';
+  document.getElementById('container-usr-password').style.display = 'block';
+  document.getElementById('usr-temp-password').required = true;
+  document.getElementById('usr-active-container').style.display = 'none';
+  document.getElementById('panel-editor-usuario').style.display = 'none';
+  document.getElementById('cedula-validacion-msg').innerText = '';
+}
 
+function abrirResetPassword(userId) {
+  const u = allUsuariosMateo.find(x => x.id === userId);
+  if (!u) return;
+
+  resettingUserId = u.id;
+  document.getElementById('form-reset-password-dialog').reset();
+  document.getElementById('reset-user-name').innerText = `Colaborador: ${u.fullName} (Cédula: ${u.identification})`;
+  document.getElementById('modal-reset-password').classList.add('active');
+}
+
+function cerrarResetPassword() {
+  resettingUserId = null;
+  document.getElementById('modal-reset-password').classList.remove('active');
+}
+
+async function loadAuditoria() {
   try {
-    const res = await fetch(`${AUTH_API}/usuarios/${id}`, {
-      method: 'DELETE',
+    const res = await fetch(`${API_BASE}/api/admin/audit`, {
       headers: getAuthHeaders()
     });
-
+    const panel = document.getElementById('panel-auditoria-sistema');
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || errorData.message || 'Error al eliminar usuario.');
+      if (panel) panel.style.display = 'none';
+      return;
     }
 
-    // Si es un chofer, eliminar tambien de logistica para mantener la sincronizacion
-    if (rol === 'ROLE_CHOFER') {
-      await fetch(`${LOGISTICA_API}/choferes/${id}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      }).catch(e => console.warn('Aviso: no se pudo sincronizar eliminacion en logistica:', e));
-    }
+    const events = await res.json();
+    if (panel) panel.style.display = 'block';
+    const tbody = document.getElementById('auditoria-table-body');
+    if (!tbody) return;
 
-    showToast(`Usuario "${email}" eliminado permanentemente.`, 'success');
-    await loadUsuarios();
-    await loadAllData();
+    if (!events || events.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-dim);">Sin eventos de auditoría registrados.</td></tr>';
+    } else {
+      tbody.innerHTML = events.map(e => `
+        <tr>
+          <td style="font-size: 0.75rem;">${new Date(e.occurred_at).toLocaleString('es-EC')}</td>
+          <td style="font-family: monospace; font-weight: 700; color: #38bdf8;">${e.actor || 'SISTEMA'}</td>
+          <td style="font-family: monospace;">${e.target || '—'}</td>
+          <td><span class="tag-category">${e.action}</span></td>
+          <td style="font-size: 0.78rem;">${e.detail || '—'}</td>
+        </tr>
+      `).join('');
+    }
   } catch (err) {
-    showToast(err.message, 'error');
+    console.warn('Auditoría restringida:', err);
   }
 }
 
@@ -1134,16 +1462,22 @@ function setupEventListeners() {
       }
 
       const data = await res.json();
-      if (data.rol !== 'ROLE_ADMIN') {
+      const isAdmin = data.rol === 'ROLE_ADMIN' || (data.roles && data.roles.includes('ADMINISTRADOR'));
+      if (!isAdmin) {
         throw new Error('Acceso restringido: requiere permisos de Administrador.');
       }
 
-      authToken = data.token;
+      authToken = data.token || data.accessToken;
       localStorage.setItem('alumvid_token', authToken);
       currentUser = data;
-      document.getElementById('logged-user-email').innerText = data.email;
+      document.getElementById('logged-user-email').innerText = data.email || data.fullName || 'admin@alumvid.com';
       hideLoginModal();
-      showToast('Sesion iniciada exitosamente.', 'success');
+      showToast('Sesión iniciada exitosamente.', 'success');
+
+      if (data.mustChangePassword) {
+        document.getElementById('modal-cambiar-password-obligatorio')?.classList.add('active');
+        showToast('Atención: Debe actualizar su contraseña temporal asignada.', 'warning');
+      }
 
       initGoogleMap();
       connectWebSocket();
@@ -1608,6 +1942,437 @@ function setupEventListeners() {
   document.getElementById('btn-close-modal')?.addEventListener('click', () => {
     document.getElementById('modal-evidence').classList.remove('active');
   });
+
+  // -------------------------------------------------------------------------
+  // MODULO DE INVENTARIO Y BODEGA (MATEO)
+  // -------------------------------------------------------------------------
+  document.getElementById('btn-toggle-nuevo-producto')?.addEventListener('click', () => {
+    const panel = document.getElementById('panel-editor-producto');
+    if (!panel) return;
+    if (panel.style.display === 'none' || panel.style.display === '') {
+      cancelarEdicionProducto();
+      panel.style.display = 'block';
+      document.getElementById('prod-codigo')?.focus();
+    } else {
+      panel.style.display = 'none';
+      cancelarEdicionProducto();
+    }
+  });
+
+  document.getElementById('btn-cancelar-producto')?.addEventListener('click', cancelarEdicionProducto);
+
+  // Guardar / Actualizar Producto en Inventario
+  document.getElementById('form-producto')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const code = document.getElementById('prod-codigo').value.trim().toUpperCase();
+    const name = document.getElementById('prod-nombre').value.trim();
+    const category = document.getElementById('prod-categoria').value;
+    const unit = document.getElementById('prod-unidad').value;
+    const minStock = parseFloat(document.getElementById('prod-min-stock').value) || 0;
+    const location = document.getElementById('prod-ubicacion').value.trim() || null;
+    const supplier = document.getElementById('prod-proveedor').value.trim() || null;
+    const externalCode = document.getElementById('prod-codigo-ext').value.trim() || null;
+    const description = document.getElementById('prod-descripcion').value.trim() || null;
+    const active = document.getElementById('prod-activo').checked;
+
+    const payload = {
+      code,
+      name,
+      category,
+      unit,
+      minStock,
+      location,
+      supplier,
+      externalCode,
+      description,
+      active
+    };
+
+    try {
+      let res;
+      if (editingProductId) {
+        res = await fetch(`${INVENTARIO_API}/${editingProductId}`, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload)
+        });
+      } else {
+        res = await fetch(INVENTARIO_API, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload)
+        });
+      }
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || errData.error || 'Error al guardar el producto');
+      }
+
+      showToast(editingProductId ? 'Producto actualizado en bodega correctamente.' : 'Producto registrado en catálogo de bodega.', 'success');
+      cancelarEdicionProducto();
+      await loadInventario();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // Filtros de inventario
+  document.getElementById('btn-buscar-inventario')?.addEventListener('click', () => {
+    invPage = 0;
+    loadInventario();
+  });
+
+  document.getElementById('filtro-inv-q')?.addEventListener('keypress', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      invPage = 0;
+      loadInventario();
+    }
+  });
+
+  document.getElementById('filtro-inv-categoria')?.addEventListener('change', () => {
+    invPage = 0;
+    loadInventario();
+  });
+
+  document.getElementById('filtro-inv-low-stock')?.addEventListener('change', () => {
+    invPage = 0;
+    loadInventario();
+  });
+
+  document.getElementById('filtro-inv-inactivos')?.addEventListener('change', () => {
+    invPage = 0;
+    loadInventario();
+  });
+
+  document.getElementById('btn-refresh-inventario')?.addEventListener('click', () => {
+    loadInventario();
+    showToast('Inventario y existencias sincronizados.', 'info');
+  });
+
+  // Paginación inventario
+  document.getElementById('btn-inv-prev')?.addEventListener('click', () => {
+    if (invPage > 0) {
+      invPage--;
+      loadInventario();
+    }
+  });
+
+  document.getElementById('btn-inv-next')?.addEventListener('click', () => {
+    if ((invPage + 1) * invPageSize < invTotal) {
+      invPage++;
+      loadInventario();
+    }
+  });
+
+  // Modal Movimiento de Bodega
+  document.getElementById('mov-tipo')?.addEventListener('change', actualizarLabelsMovimiento);
+  document.getElementById('btn-cerrar-movimiento')?.addEventListener('click', cerrarModalMovimiento);
+  document.getElementById('btn-cancelar-movimiento')?.addEventListener('click', cerrarModalMovimiento);
+
+  document.getElementById('form-movimiento-bodega')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!activeMovementProductId) return;
+
+    const type = document.getElementById('mov-tipo').value;
+    const quantity = parseFloat(document.getElementById('mov-cantidad').value);
+    const reason = document.getElementById('mov-motivo').value.trim();
+    const reference = document.getElementById('mov-referencia').value.trim() || null;
+
+    if (isNaN(quantity) || quantity < 0) {
+      showToast('Cantidad inválida para el movimiento.', 'error');
+      return;
+    }
+
+    try {
+      const headers = getAuthHeaders();
+      headers['Idempotency-Key'] = movementRequestId || crypto.randomUUID();
+
+      const res = await fetch(`${INVENTARIO_API}/${activeMovementProductId}/movements`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          requestId: movementRequestId || crypto.randomUUID(),
+          type,
+          quantity,
+          reason,
+          reference
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || errData.error || 'Error al registrar movimiento');
+      }
+
+      showToast(`Movimiento de bodega registrado exitosamente (${type}).`, 'success');
+      cerrarModalMovimiento();
+      await loadInventario();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // Modal Historial / Kardex
+  document.getElementById('btn-cerrar-historial')?.addEventListener('click', cerrarModalHistorial);
+  document.getElementById('btn-cerrar-historial-btn')?.addEventListener('click', cerrarModalHistorial);
+
+  document.getElementById('btn-hist-prev')?.addEventListener('click', () => {
+    if (historyPage > 0) {
+      historyPage--;
+      loadHistorialProducto();
+    }
+  });
+
+  document.getElementById('btn-hist-next')?.addEventListener('click', () => {
+    historyPage++;
+    loadHistorialProducto();
+  });
+
+  // -------------------------------------------------------------------------
+  // MODULO DE USUARIOS, CEDULAS Y AUDITORIA (MATEO)
+  // -------------------------------------------------------------------------
+  document.getElementById('btn-toggle-nuevo-usuario')?.addEventListener('click', () => {
+    const panel = document.getElementById('panel-editor-usuario');
+    if (!panel) return;
+    if (panel.style.display === 'none' || panel.style.display === '') {
+      cancelarEdicionUsuario();
+      panel.style.display = 'block';
+      document.getElementById('usr-identificacion')?.focus();
+    } else {
+      panel.style.display = 'none';
+      cancelarEdicionUsuario();
+    }
+  });
+
+  document.getElementById('btn-cancelar-usuario')?.addEventListener('click', cancelarEdicionUsuario);
+
+  // Validación en tiempo real de cédula ecuatoriana (Módulo 10)
+  document.getElementById('usr-identificacion')?.addEventListener('input', e => {
+    const val = e.target.value.trim();
+    const msg = document.getElementById('cedula-validacion-msg');
+    if (!msg) return;
+
+    if (!val) {
+      msg.innerText = '';
+      return;
+    }
+
+    if (val.length === 10) {
+      if (validarCedulaEcuatoriana(val)) {
+        msg.innerText = 'Cédula ecuatoriana válida (Algoritmo Módulo 10).';
+        msg.style.color = '#34d399';
+      } else {
+        msg.innerText = 'Cédula no válida según el algoritmo de Registro Civil de Ecuador.';
+        msg.style.color = '#fb7185';
+      }
+    } else {
+      msg.innerText = `Ingresados ${val.length} de 10 dígitos.`;
+      msg.style.color = 'var(--text-muted)';
+    }
+  });
+
+  // Guardar / Actualizar Colaborador
+  document.getElementById('form-usuario-mateo')?.addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const identification = document.getElementById('usr-identificacion').value.trim();
+    const fullName = document.getElementById('usr-nombre').value.trim();
+    const email = document.getElementById('usr-email').value.trim() || null;
+    const telefono = document.getElementById('usr-telefono').value.trim() || null;
+
+    const checkedRoles = Array.from(document.querySelectorAll('input[name="usr-roles-check"]:checked'))
+      .map(cb => cb.value);
+
+    if (checkedRoles.length === 0) {
+      showToast('Debe asignar al menos un rol operativo al colaborador.', 'error');
+      return;
+    }
+
+    try {
+      if (editingUserId) {
+        const active = document.getElementById('usr-activo').checked;
+        const res = await fetch(`${ADMIN_USERS_API}/${editingUserId}`, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            fullName,
+            email,
+            telefono,
+            roles: checkedRoles,
+            active
+          })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || errData.error || 'Error al actualizar usuario');
+        }
+
+        const updatedUser = await res.json();
+        // Si tiene rol CHOFER, sincronizar en el servicio de logistica
+        if (checkedRoles.includes('CHOFER')) {
+          await fetch(`${LOGISTICA_API}/choferes/sincronizar`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              id: updatedUser.id,
+              nombre: updatedUser.fullName,
+              email: updatedUser.email || `${identification}@alumvid.com`,
+              telefono: updatedUser.telefono || ''
+            })
+          }).catch(err => console.warn('Aviso sincronización logística:', err));
+        }
+
+        showToast('Colaborador actualizado correctamente.', 'success');
+      } else {
+        // Creación de nuevo usuario con validación estricta de cédula ecuatoriana
+        if (!validarCedulaEcuatoriana(identification)) {
+          showToast('La cédula ingresada no es válida según el Registro Civil de Ecuador.', 'error');
+          return;
+        }
+
+        const temporaryPassword = document.getElementById('usr-temp-password').value;
+        if (!temporaryPassword || temporaryPassword.length < 12) {
+          showToast('La contraseña temporal debe contener al menos 12 caracteres.', 'error');
+          return;
+        }
+
+        const res = await fetch(ADMIN_USERS_API, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            identification,
+            fullName,
+            email,
+            telefono,
+            roles: checkedRoles,
+            temporaryPassword
+          })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || errData.error || 'Error al crear usuario');
+        }
+
+        const createdUser = await res.json();
+
+        // Sincronizar con el servicio de logística si es Chofer
+        if (checkedRoles.includes('CHOFER')) {
+          await fetch(`${LOGISTICA_API}/choferes/sincronizar`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              id: createdUser.id,
+              nombre: createdUser.fullName,
+              email: createdUser.email || `${identification}@alumvid.com`,
+              telefono: createdUser.telefono || ''
+            })
+          }).catch(err => console.warn('Aviso sincronización logística:', err));
+        }
+
+        showToast('Colaborador registrado con cédula ecuatoriana y clave temporal.', 'success');
+      }
+
+      cancelarEdicionUsuario();
+      await loadUsuariosMateo();
+      await loadAuditoria();
+      await loadAllData();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // Modal Reset Password
+  document.getElementById('btn-cerrar-reset-pass')?.addEventListener('click', cerrarResetPassword);
+  document.getElementById('btn-cancelar-reset-pass')?.addEventListener('click', cerrarResetPassword);
+
+  document.getElementById('form-reset-password-dialog')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!resettingUserId) return;
+
+    const temporaryPassword = document.getElementById('input-new-temp-password').value;
+    if (!temporaryPassword || temporaryPassword.length < 12) {
+      showToast('La contraseña temporal debe tener al menos 12 caracteres.', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${ADMIN_USERS_API}/${resettingUserId}/password`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ temporaryPassword })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || errData.error || 'Error al restablecer contraseña');
+      }
+
+      showToast('Contraseña temporal reasignada exitosamente.', 'success');
+      cerrarResetPassword();
+      await loadUsuariosMateo();
+      await loadAuditoria();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // Modal Cambio Obligatorio de Contraseña
+  document.getElementById('form-cambio-password-obligatorio')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    const currentPassword = document.getElementById('change-pwd-current').value;
+    const newPassword = document.getElementById('change-pwd-new').value;
+    const confirmPassword = document.getElementById('change-pwd-confirm').value;
+    const errEl = document.getElementById('change-pwd-error');
+
+    if (errEl) errEl.style.display = 'none';
+
+    if (newPassword !== confirmPassword) {
+      if (errEl) {
+        errEl.innerText = 'Las contraseñas no coinciden.';
+        errEl.style.display = 'block';
+      }
+      return;
+    }
+
+    if (newPassword.length < 12) {
+      if (errEl) {
+        errEl.innerText = 'La nueva contraseña debe tener al menos 12 caracteres.';
+        errEl.style.display = 'block';
+      }
+      return;
+    }
+
+    try {
+      const res = await fetch(`${AUTH_API}/password`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || errData.error || 'Error al cambiar contraseña');
+      }
+
+      showToast('Contraseña definitiva actualizada con éxito.', 'success');
+      document.getElementById('modal-cambiar-password-obligatorio').classList.remove('active');
+    } catch (err) {
+      if (errEl) {
+        errEl.innerText = err.message;
+        errEl.style.display = 'block';
+      }
+    }
+  });
+
+  // Botón refrescar auditoría
+  document.getElementById('btn-refresh-auditoria')?.addEventListener('click', () => {
+    loadAuditoria();
+    showToast('Bitácora de auditoría actualizada.', 'info');
+  });
 }
 
 // -------------------------------------------------------------------------
@@ -1666,8 +2431,6 @@ window.seleccionarRuta = seleccionarRuta;
 window.abrirModalEditarDestino = abrirModalEditarDestino;
 window.cerrarModalEditarDestino = cerrarModalEditarDestino;
 window.eliminarDestinoDeRuta = eliminarDestinoDeRuta;
-window.toggleUserStatus = toggleUserStatus;
-window.eliminarUsuarioClick = eliminarUsuarioClick;
 window.openMapPickerModal = openMapPickerModal;
 window.confirmMapPickerSelection = confirmMapPickerSelection;
 window.closeMapPickerModal = closeMapPickerModal;
@@ -1675,3 +2438,18 @@ window.openInSimulator = openInSimulator;
 window.trackRouteOnMap = trackRouteOnMap;
 window.viewEvidenceModal = viewEvidenceModal;
 window.openSimulatorRoute = openSimulatorRoute;
+
+// Modulos unificados de Inventario, Usuarios RBAC y Auditoria (Mateo)
+window.editProducto = editProducto;
+window.cancelarEdicionProducto = cancelarEdicionProducto;
+window.abrirModalMovimiento = abrirModalMovimiento;
+window.cerrarModalMovimiento = cerrarModalMovimiento;
+window.actualizarLabelsMovimiento = actualizarLabelsMovimiento;
+window.abrirHistorialProducto = abrirHistorialProducto;
+window.cerrarModalHistorial = cerrarModalHistorial;
+window.loadHistorialProducto = loadHistorialProducto;
+window.editUsuarioMateo = editUsuarioMateo;
+window.cancelarEdicionUsuario = cancelarEdicionUsuario;
+window.abrirResetPassword = abrirResetPassword;
+window.cerrarResetPassword = cerrarResetPassword;
+window.loadAuditoria = loadAuditoria;

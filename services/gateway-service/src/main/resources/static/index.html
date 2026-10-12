@@ -44,9 +44,14 @@
           <span>[RUT]</span> Planificar Rutas
         </button>
       </li>
+      <li class="nav-item" data-tab="tab-inventario">
+        <button id="nav-btn-inventario">
+          <span>[INV]</span> Inventario & Bodega
+        </button>
+      </li>
       <li class="nav-item" data-tab="tab-usuarios">
         <button id="nav-btn-usuarios">
-          <span>[USR]</span> Usuarios & RBAC
+          <span>[USR]</span> Usuarios & Cédulas
         </button>
       </li>
       <li class="nav-item" data-tab="tab-simulator">
@@ -63,11 +68,15 @@
       </div>
       <div class="sys-tag">
         <span class="dot-online"></span>
-        <span>Auth: 8081</span>
+        <span>Usuarios & Auth: 8081</span>
       </div>
       <div class="sys-tag">
         <span class="dot-online"></span>
-        <span>Logistica: 8082</span>
+        <span>Inventario: 8082</span>
+      </div>
+      <div class="sys-tag">
+        <span class="dot-online"></span>
+        <span>Logística: 8083</span>
       </div>
       <div class="sys-tag">
         <span class="dot-online"></span>
@@ -120,9 +129,15 @@
           </div>
           <div class="stat-value" id="stat-entregados">0</div>
         </div>
+        <div class="stat-card cyan">
+          <div class="stat-header">
+            <span class="stat-title">Productos en Bodega</span>
+          </div>
+          <div class="stat-value" id="stat-total-productos">0</div>
+        </div>
         <div class="stat-card rose">
           <div class="stat-header">
-            <span class="stat-title">Alertas Desviacion (>150m)</span>
+            <span class="stat-title">Alertas Stock / Desvío</span>
           </div>
           <div class="stat-value" id="stat-alertas">0</div>
         </div>
@@ -426,68 +441,303 @@
         </div>
       </section>
 
-      <!-- PESTAÑA 4: GESTION CENTRALIZADA DE USUARIOS (AUTH SERVICE) -->
-      <section id="tab-usuarios" class="tab-view">
+      <!-- PESTAÑA 4: INVENTARIO, EXISTENCIAS Y RETAZOS (MÓDULO MATEO) -->
+      <section id="tab-inventario" class="tab-view">
         <div class="card-section">
-          <h3 class="section-title">Crear Nuevo Usuario y Credenciales (Control de Acceso RBAC)</h3>
-          <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1.25rem;">
-            Los usuarios del sistema unicamente existen mediante creacion administrativa. La creacion de un chofer sincroniza automaticamente su perfil en el servicio logistico.
-          </p>
-          <form id="form-crear-usuario">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="input-usr-email">Correo Electronico Institucional</label>
-                <input type="email" id="input-usr-email" class="form-control" placeholder="usuario@alumvid.com" required>
-              </div>
-              <div class="form-group">
-                <label for="input-usr-password">Contrasena Asignada</label>
-                <div style="position: relative;">
-                  <input type="password" id="input-usr-password" class="form-control" placeholder="Minimo 6 caracteres" minlength="6" required style="padding-right: 42px;">
-                  <button type="button" id="btn-toggle-usr-password" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94a3b8; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center;" title="Mostrar u ocultar contrasena">
-                    <svg id="icon-eye-usr-password" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                      <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                  </button>
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+            <div>
+              <h3 class="section-title">Control de Inventario, Existencias y Retazos de Vidrio / Aluminio</h3>
+              <p style="font-size: 0.82rem; color: var(--text-muted);">
+                Gestión integral de bodega, catálogo de perfiles y cristales, registro de mermas y auditoría de movimientos.
+              </p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-outline" id="btn-refresh-inventario">
+                Actualizar Bodega
+              </button>
+              <button class="btn btn-primary" id="btn-toggle-nuevo-producto">
+                + Nuevo Producto
+              </button>
+            </div>
+          </div>
+
+          <!-- FORMULARIO DE REGISTRO / EDICION DE PRODUCTO -->
+          <div id="panel-editor-producto" style="display: none; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-accent); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <h4 id="editor-producto-titulo" style="font-size: 0.95rem; font-weight: 700; color: #38bdf8;">
+                Nuevo Producto para Catálogo de Bodega
+              </h4>
+              <button type="button" class="btn btn-outline" id="btn-cancelar-producto" style="padding: 4px 10px; font-size: 0.75rem;">
+                Cancelar
+              </button>
+            </div>
+            <form id="form-producto">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="prod-codigo">Código Identificador (SKU)</label>
+                  <input type="text" id="prod-codigo" class="form-control" placeholder="Ej. VID-CL-4MM o ALUM-PER-01" required maxlength="40" pattern="[A-Za-z0-9._-]{1,40}">
+                </div>
+                <div class="form-group">
+                  <label for="prod-nombre">Nombre Comercial del Material</label>
+                  <input type="text" id="prod-nombre" class="form-control" placeholder="Ej. Vidrio Claro Flotado 4mm" required maxlength="150">
+                </div>
+                <div class="form-group">
+                  <label for="prod-categoria">Categoría</label>
+                  <select id="prod-categoria" class="form-control" required>
+                    <option value="VIDRIO">VIDRIO</option>
+                    <option value="ALUMINIO">ALUMINIO</option>
+                    <option value="ACCESORIOS">ACCESORIOS</option>
+                    <option value="VYNIL">VYNIL</option>
+                    <option value="ACRILICO">ACRILICO</option>
+                    <option value="ACERO INOXIDABLE">ACERO INOXIDABLE</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="prod-unidad">Unidad de Medida</label>
+                  <select id="prod-unidad" class="form-control" required>
+                    <option value="UNIDAD">UNIDAD</option>
+                    <option value="METRO">METRO LINEAL (m)</option>
+                    <option value="METRO_CUADRADO">METRO CUADRADO (m²)</option>
+                    <option value="ROLLO">ROLLO</option>
+                    <option value="KILOGRAMO">KILOGRAMO (kg)</option>
+                    <option value="LITRO">LITRO (L)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="prod-min-stock">Stock Mínimo de Alerta</label>
+                  <input type="number" id="prod-min-stock" class="form-control" min="0" step="0.0001" value="5" required>
+                </div>
+                <div class="form-group">
+                  <label for="prod-ubicacion">Ubicación en Bodega</label>
+                  <input type="text" id="prod-ubicacion" class="form-control" placeholder="Ej. Caballete Central A-1" maxlength="100">
+                </div>
+                <div class="form-group">
+                  <label for="prod-proveedor">Proveedor Principal</label>
+                  <input type="text" id="prod-proveedor" class="form-control" placeholder="Ej. Corporación Vidriera del Ecuador" maxlength="150">
+                </div>
+                <div class="form-group">
+                  <label for="prod-codigo-ext">Código Externo / Referencia</label>
+                  <input type="text" id="prod-codigo-ext" class="form-control" placeholder="Código de fábrica o importación" maxlength="60">
                 </div>
               </div>
-              <div class="form-group">
-                <label for="input-usr-nombre">Nombre y Apellido</label>
-                <input type="text" id="input-usr-nombre" class="form-control" placeholder="Ej. Patricio Lopez" required>
+              <div class="form-group" style="margin-top: 10px;">
+                <label for="prod-descripcion">Descripción Técnica y Observaciones de Retazos / Cortes</label>
+                <textarea id="prod-descripcion" class="form-control" rows="2" placeholder="Especificaciones de dimensiones, tolerancia al corte y retazos reutilizables..." maxlength="500"></textarea>
               </div>
-              <div class="form-group">
-                <label for="input-usr-telefono">Numero Telefonico</label>
-                <input type="text" id="input-usr-telefono" class="form-control" placeholder="+5939XXXXXXXX">
+              <div id="prod-active-container" style="display: none; margin-top: 10px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer;">
+                  <input type="checkbox" id="prod-activo" checked>
+                  <span>Producto Habilitado y Activo en Catálogo</span>
+                </label>
               </div>
-              <div class="form-group">
-                <label for="select-usr-rol">Rol del Sistema (RBAC)</label>
-                <select id="select-usr-rol" class="form-control" required>
-                  <option value="ROLE_CHOFER">Chofer de Distribucion (ROLE_CHOFER)</option>
-                  <option value="ROLE_ADMIN">Administrador de Operaciones (ROLE_ADMIN)</option>
-                  <option value="ROLE_OPERARIO">Operario de Taller (ROLE_OPERARIO)</option>
-                </select>
+              <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <button type="submit" class="btn btn-primary" id="btn-guardar-producto">
+                  Guardar en Bodega
+                </button>
               </div>
-            </div>
-            <button type="submit" class="btn btn-primary" id="btn-submit-usuario">Crear Usuario y Emitir Credenciales</button>
-          </form>
-        </div>
+            </form>
+          </div>
 
-        <div class="card-section">
-          <h3 class="section-title">Directorio de Cuentas Registradas</h3>
+          <!-- BARRA DE FILTROS Y BÚSQUEDA -->
+          <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; background: rgba(255, 255, 255, 0.02); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+            <div style="flex: 1; min-width: 220px;">
+              <input type="search" id="filtro-inv-q" class="form-control" placeholder="Buscar por nombre, código o proveedor...">
+            </div>
+            <div style="width: 180px;">
+              <select id="filtro-inv-categoria" class="form-control">
+                <option value="">Todas las categorías</option>
+                <option value="VIDRIO">VIDRIO</option>
+                <option value="ALUMINIO">ALUMINIO</option>
+                <option value="ACCESORIOS">ACCESORIOS</option>
+                <option value="VYNIL">VYNIL</option>
+                <option value="ACRILICO">ACRILICO</option>
+                <option value="ACERO INOXIDABLE">ACERO INOXIDABLE</option>
+              </select>
+            </div>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-muted); cursor: pointer;">
+              <input type="checkbox" id="filtro-inv-low-stock">
+              <span>Solo stock bajo / mínimo</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-muted); cursor: pointer;">
+              <input type="checkbox" id="filtro-inv-inactivos">
+              <span>Incluir inactivos</span>
+            </label>
+            <button class="btn btn-outline" id="btn-buscar-inventario" style="padding: 7px 14px; font-size: 0.8rem;">
+              Buscar
+            </button>
+          </div>
+
+          <!-- TABLA DE PRODUCTOS Y EXISTENCIAS -->
           <div class="table-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Nombre</th>
-                  <th>Correo Electronico</th>
-                  <th>Telefono</th>
-                  <th>Rol Asignado</th>
-                  <th>Estado</th>
-                  <th>Accion</th>
+                  <th>Código</th>
+                  <th>Material / Producto</th>
+                  <th>Categoría</th>
+                  <th>Existencias (Stock)</th>
+                  <th>Ubicación</th>
+                  <th>Proveedor</th>
+                  <th style="text-align: center;">Acciones Operativas</th>
                 </tr>
               </thead>
-              <tbody id="usuarios-table-body">
-                <tr><td colspan="6" style="text-align: center; color: var(--text-dim);">Cargando usuarios...</td></tr>
+              <tbody id="inventario-table-body">
+                <tr><td colspan="7" style="text-align: center; color: var(--text-dim);">Cargando catálogo de inventario...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- PAGINACIÓN -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted);">
+            <span id="inv-paginacion-info">0 productos</span>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-outline" id="btn-inv-prev" disabled style="padding: 4px 10px;">Anterior</button>
+              <button class="btn btn-outline" id="btn-inv-next" disabled style="padding: 4px 10px;">Siguiente</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PESTAÑA 5: GESTIÓN DE USUARIOS Y CÉDULAS ECUATORIANAS (MÓDULO MATEO) -->
+      <section id="tab-usuarios" class="tab-view">
+        <div class="card-section">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+            <div>
+              <h3 class="section-title">Control de Acceso y Gestión de Personal (Módulo de Cédulas y RBAC)</h3>
+              <p style="font-size: 0.82rem; color: var(--text-muted);">
+                Validación de documento de identidad ecuatoriano (Cédula / Módulo 10), roles de seguridad, cuentas protegidas y auditoría.
+              </p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-outline" id="btn-refresh-usuarios">
+                Actualizar Directorio
+              </button>
+              <button class="btn btn-primary" id="btn-toggle-nuevo-usuario">
+                + Registrar Personal
+              </button>
+            </div>
+          </div>
+
+          <!-- FORMULARIO DE REGISTRO / EDICIÓN DE USUARIO -->
+          <div id="panel-editor-usuario" style="display: none; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-accent); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <h4 id="editor-usuario-titulo" style="font-size: 0.95rem; font-weight: 700; color: #38bdf8;">
+                Registrar Nuevo Colaborador / Usuario
+              </h4>
+              <button type="button" class="btn btn-outline" id="btn-cancelar-usuario" style="padding: 4px 10px; font-size: 0.75rem;">
+                Cancelar
+              </button>
+            </div>
+            <form id="form-usuario-mateo">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="usr-identificacion">Cédula de Identidad Ecuatoriana</label>
+                  <input type="text" id="usr-identificacion" class="form-control" placeholder="10 dígitos numéricos (ej. 1700000000)" required maxlength="30" pattern="[A-Za-z0-9-]{3,30}">
+                  <span id="cedula-validacion-msg" style="font-size: 0.72rem; color: var(--text-dim); display: block; margin-top: 3px;"></span>
+                </div>
+                <div class="form-group">
+                  <label for="usr-nombre">Nombres y Apellidos Completos</label>
+                  <input type="text" id="usr-nombre" class="form-control" placeholder="Ej. Mateo Ortega / Patricio Gómez" required maxlength="120">
+                </div>
+                <div class="form-group">
+                  <label for="usr-email">Correo Electrónico Institucional</label>
+                  <input type="email" id="usr-email" class="form-control" placeholder="colaborador@alumvid.com">
+                </div>
+                <div class="form-group">
+                  <label for="usr-telefono">Teléfono Celular de Contacto</label>
+                  <input type="text" id="usr-telefono" class="form-control" placeholder="+593 9XXXXXXXX">
+                </div>
+                <div class="form-group" id="container-usr-password">
+                  <label for="usr-temp-password">Contraseña Temporal Inicial</label>
+                  <input type="password" id="usr-temp-password" class="form-control" placeholder="Mínimo 12 caracteres" minlength="12" maxlength="72">
+                  <small style="font-size: 0.72rem; color: var(--text-dim);">El usuario deberá cambiarla obligatoriamente en su primer ingreso.</small>
+                </div>
+              </div>
+
+              <!-- SELECCIÓN DE ROLES RBAC -->
+              <div class="form-group" style="margin-top: 15px;">
+                <label style="font-weight: 700; margin-bottom: 8px; display: block;">Roles del Sistema (RBAC - Selección Múltiple)</label>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                  <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer;">
+                    <input type="checkbox" name="usr-roles-check" value="ADMINISTRADOR">
+                    <span class="badge-role role-admin">ADMINISTRADOR</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer;">
+                    <input type="checkbox" name="usr-roles-check" value="BODEGUERO">
+                    <span class="badge-role role-bodeguero">BODEGUERO</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer;">
+                    <input type="checkbox" name="usr-roles-check" value="CHOFER" checked>
+                    <span class="badge-role role-chofer">CHOFER</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer;">
+                    <input type="checkbox" name="usr-roles-check" value="VENDEDOR">
+                    <span class="badge-role role-vendedor">VENDEDOR</span>
+                  </label>
+                </div>
+              </div>
+
+              <div id="usr-active-container" style="display: none; margin-top: 12px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer;">
+                  <input type="checkbox" id="usr-activo" checked>
+                  <span>Cuenta Activa y Habilitada para Iniciar Sesión</span>
+                </label>
+              </div>
+
+              <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <button type="submit" class="btn btn-primary" id="btn-guardar-usuario">
+                  Guardar Usuario
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- TABLA DE USUARIOS REGISTRADOS -->
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Identificación (Cédula)</th>
+                  <th>Colaborador</th>
+                  <th>Correo / Teléfono</th>
+                  <th>Roles RBAC</th>
+                  <th>Estado</th>
+                  <th style="text-align: center;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="usuarios-mateo-table-body">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-dim);">Cargando directorio de personal...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- BITÁCORA DE AUDITORÍA DEL SISTEMA -->
+        <div class="card-section" id="panel-auditoria-sistema" style="margin-top: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+              <h3 class="section-title">Registro de Eventos y Trazabilidad de Auditoría</h3>
+              <p style="font-size: 0.82rem; color: var(--text-muted);">
+                Registro inmutable de inicio de sesión, cambios de credenciales y creación de usuarios.
+              </p>
+            </div>
+            <button class="btn btn-outline" id="btn-refresh-auditoria" style="padding: 4px 10px; font-size: 0.75rem;">
+              Actualizar Auditoría
+            </button>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Fecha y Hora</th>
+                  <th>Actor (Cédula)</th>
+                  <th>Objetivo</th>
+                  <th>Acción</th>
+                  <th>Detalle del Evento</th>
+                </tr>
+              </thead>
+              <tbody id="auditoria-table-body">
+                <tr><td colspan="5" style="text-align: center; color: var(--text-dim);">Cargando bitácora de auditoría...</td></tr>
               </tbody>
             </table>
           </div>
@@ -768,6 +1018,131 @@
         <div id="login-error-msg" style="color: #fb7185; font-size: 0.8rem; margin-bottom: 1rem; display: none; background: rgba(251, 113, 133, 0.1); border: 1px solid rgba(251, 113, 133, 0.3); border-radius: 6px; padding: 8px 12px;"></div>
         <button type="submit" class="btn btn-primary" id="btn-submit-login" style="width: 100%; padding: 10px; font-weight: 700; font-size: 0.9rem;">
           Iniciar Sesion
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL PARA REGISTRO DE MOVIMIENTO DE BODEGA (MATEO) -->
+  <div class="modal-overlay" id="modal-movimiento">
+    <div class="modal-content" style="max-width: 520px; width: 90%;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="mov-modal-titulo">Registrar Movimiento de Material</h3>
+        <button type="button" class="close-btn" id="btn-cerrar-movimiento">&times;</button>
+      </div>
+      <p id="mov-modal-stock" style="font-size: 0.85rem; color: #38bdf8; margin-bottom: 12px; font-weight: 600;"></p>
+      <form id="form-movimiento-bodega">
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label for="mov-tipo">Tipo de Operación de Bodega</label>
+          <select id="mov-tipo" class="form-control" required>
+            <option value="INGRESO">Entrada de Material (INGRESO)</option>
+            <option value="SALIDA">Salida para Producción / Venta (SALIDA)</option>
+            <option value="AJUSTE">Ajuste por Conteo Físico / Retazo (AJUSTE)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label id="mov-cantidad-label" for="mov-cantidad">Cantidad a Mover</label>
+          <input type="number" id="mov-cantidad" class="form-control" step="0.0001" min="0.0001" required>
+          <small id="mov-ajuste-help" style="font-size: 0.72rem; color: var(--text-muted); display: none;">
+            En modo AJUSTE, ingresa el stock total físico contado, no la diferencia.
+          </small>
+        </div>
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label for="mov-motivo">Motivo de la Operación</label>
+          <textarea id="mov-motivo" class="form-control" rows="2" placeholder="Ej. Corte de plancha para ventana / Retazo utilizable / Compra" required maxlength="500"></textarea>
+        </div>
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label for="mov-referencia">Referencia / Factura / Pedido</label>
+          <input type="text" id="mov-referencia" class="form-control" placeholder="Ej. Factura #8920 o Despacho AlumVid" maxlength="100">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="btn btn-outline" id="btn-cancelar-movimiento">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-confirmar-movimiento">Registrar Movimiento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DE HISTORIAL Y AUDITORÍA DE PRODUCTO (MATEO) -->
+  <div class="modal-overlay" id="modal-historial-producto">
+    <div class="modal-content" style="max-width: 820px; width: 95%;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="historial-prod-titulo">Historial de Movimientos y Trazabilidad</h3>
+        <button type="button" class="close-btn" id="btn-cerrar-historial">&times;</button>
+      </div>
+      <div class="table-wrapper" style="max-height: 380px; overflow-y: auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Fecha y Hora</th>
+              <th>Tipo</th>
+              <th>Variación</th>
+              <th>Saldo (Antes → Después)</th>
+              <th>Responsable y Motivo</th>
+            </tr>
+          </thead>
+          <tbody id="historial-movements-body">
+            <tr><td colspan="5" style="text-align: center;">Sin movimientos registrados</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
+        <span id="historial-page-info" style="font-size: 0.78rem; color: var(--text-muted);">Página 1</span>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-outline" id="btn-hist-prev" style="padding: 3px 8px; font-size: 0.75rem;">Anterior</button>
+          <button class="btn btn-outline" id="btn-hist-next" style="padding: 3px 8px; font-size: 0.75rem;">Siguiente</button>
+          <button class="btn btn-secondary" id="btn-cerrar-historial-btn" style="padding: 3px 12px; font-size: 0.75rem;">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PARA RESTABLECER CONTRASEÑA TEMPORAL (MATEO) -->
+  <div class="modal-overlay" id="modal-reset-password">
+    <div class="modal-content" style="max-width: 440px; width: 90%;">
+      <div class="modal-header">
+        <h3 class="modal-title">Restablecer Contraseña Temporal</h3>
+        <button type="button" class="close-btn" id="btn-cerrar-reset-pass">&times;</button>
+      </div>
+      <p id="reset-user-name" style="font-size: 0.85rem; color: #38bdf8; margin-bottom: 12px; font-weight: 600;"></p>
+      <form id="form-reset-password-dialog">
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label for="input-new-temp-password">Nueva Contraseña Temporal</label>
+          <input type="password" id="input-new-temp-password" class="form-control" placeholder="Mínimo 12 caracteres" minlength="12" maxlength="72" required>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="btn btn-outline" id="btn-cancelar-reset-pass">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Asignar Clave Temporal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL CAMBIO DE CONTRASEÑA OBLIGATORIO (MATEO) -->
+  <div class="modal-overlay" id="modal-cambiar-password-obligatorio">
+    <div class="modal-content" style="max-width: 460px; width: 90%;">
+      <div style="text-align: center; margin-bottom: 1rem;">
+        <h3 style="font-size: 1.15rem; font-weight: 800; color: #fbbf24;">Cambio Obligatorio de Contraseña</h3>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+          Tu cuenta tiene una contraseña temporal asignada. Para continuar, establece tu nueva contraseña definitiva.
+        </p>
+      </div>
+      <form id="form-cambio-password-obligatorio">
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label for="change-pwd-current">Contraseña Temporal Actual</label>
+          <input type="password" id="change-pwd-current" class="form-control" required maxlength="72">
+        </div>
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label for="change-pwd-new">Nueva Contraseña Definitiva</label>
+          <input type="password" id="change-pwd-new" class="form-control" required minlength="12" maxlength="72" placeholder="Mínimo 12 caracteres">
+        </div>
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label for="change-pwd-confirm">Confirmar Nueva Contraseña</label>
+          <input type="password" id="change-pwd-confirm" class="form-control" required minlength="12" maxlength="72" placeholder="Repite la contraseña">
+        </div>
+        <div id="change-pwd-error" style="color: #fb7185; font-size: 0.8rem; margin-bottom: 1rem; display: none;"></div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 9px; font-weight: 700;">
+          Actualizar y Continuar
         </button>
       </form>
     </div>
