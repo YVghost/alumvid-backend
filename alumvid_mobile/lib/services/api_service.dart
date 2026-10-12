@@ -4,9 +4,9 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // Deteccion automatica de entorno: Web usa localhost, emulador Android usa 10.0.2.2
+  // Deteccion automatica de entorno: Web o Desktop usa localhost, emulador Android usa 10.0.2.2
   static String get baseUrl {
-    if (kIsWeb) {
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.linux || defaultTargetPlatform == TargetPlatform.macOS) {
       return 'http://localhost:8080/api/v1';
     }
     return 'http://10.0.2.2:8080/api/v1';
