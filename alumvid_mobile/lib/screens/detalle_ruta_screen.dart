@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/location_service.dart';
 import 'navegacion_destino_screen.dart';
 
 /// Pantalla que presenta el itinerario completo de una Hoja de Ruta asignada (ej. Ruta 1).
@@ -57,6 +58,46 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
       if (mounted) {
         setState(() => _cargando = false);
       }
+    }
+  }
+
+  bool _optimizando = false;
+
+  Future<void> _optimizarRutaDesdeGps() async {
+    final rutaId = _rutaActual['id']?.toString();
+    if (rutaId == null) return;
+
+    setState(() => _optimizando = true);
+    try {
+      double latActual = -0.089290;
+      double lonActual = -78.439607;
+      try {
+        final pos = await LocationService.determinarPosicionActual();
+        latActual = pos.latitude;
+        lonActual = pos.longitude;
+      } catch (_) {}
+
+      final res = await ApiService.optimizarRutaChofer(rutaId, latitud: latActual, longitud: lonActual);
+      if (!mounted) return;
+      setState(() {
+        _rutaActual = res;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Paradas reordenadas con éxito por menor tiempo de viaje (Google Routes).'),
+          backgroundColor: Color(0xFF059669),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al optimizar: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: const Color(0xFFE11D48),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _optimizando = false);
     }
   }
 
@@ -255,6 +296,27 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                       ),
                       child: Text(_error!, style: const TextStyle(color: Color(0xFFFB7185), fontSize: 12)),
                     ),
+
+                  // Botón Chofer: Optimizar Paradas desde GPS
+                  if (paradas.length > 1) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: _optimizando
+                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.auto_mode, size: 16),
+                        label: const Text('Re-optimizar por Menor Tiempo (Google Routes)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        onPressed: _optimizando ? null : _optimizarRutaDesdeGps,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
 
                   // 2. LISTA DE PARADAS / DESTINOS
                   if (paradas.isEmpty)

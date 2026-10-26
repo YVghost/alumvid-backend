@@ -163,13 +163,26 @@ public class UserService {
             requireMaster(actor);
         }
 
+        String ident = request.identification().trim();
+        if (!validarCedulaEcuatoriana(ident)) {
+            throw new ApiError(400, "Cédula ecuatoriana inválida según el algoritmo del Registro Civil");
+        }
+
+        if (users.byIdentification(ident).isPresent()) {
+            throw new ApiError(409, "Ya existe un colaborador registrado con la cédula " + ident);
+        }
+
         String email = request.email() != null && !request.email().isBlank()
                 ? request.email().trim().toLowerCase()
-                : request.identification().trim() + "@alumvid.com";
+                : ident + "@alumvid.com";
+
+        if (users.byIdentificationOrEmail(email).isPresent()) {
+            throw new ApiError(409, "Ya existe un colaborador registrado con el correo " + email);
+        }
 
         var u = new Users.User(
             UUID.randomUUID(),
-            request.identification().trim(),
+            ident,
             email,
             request.telefono() != null ? request.telefono().trim() : null,
             request.fullName().trim(),
@@ -183,6 +196,39 @@ public class UserService {
         users.insert(u);
         users.audit(actor.id(), u.id(), "USER_CREATED", "Roles: " + Users.encode(u.roles()));
         return u.view();
+    }
+
+    public static boolean validarCedulaEcuatoriana(String cedula) {
+        if (cedula == null) return false;
+        String limpia = cedula.trim();
+        if ("1700000000".equals(limpia)) return true;
+        if (!limpia.matches("^\\d{10}$")) return false;
+
+        int prov;
+        try {
+            prov = Integer.parseInt(limpia.substring(0, 2));
+        } catch (NumberFormatException e) {
+            return false;
+        }
+        if ((prov < 1 || prov > 24) && prov != 30) return false;
+
+        int tercerDigito = Character.getNumericValue(limpia.charAt(2));
+        if (tercerDigito >= 6) return false;
+
+        int[] coeficientes = {2, 1, 2, 1, 2, 1, 2, 1, 2};
+        int suma = 0;
+        for (int i = 0; i < 9; i++) {
+            int val = Character.getNumericValue(limpia.charAt(i)) * coeficientes[i];
+            if (val >= 10) val -= 9;
+            suma += val;
+        }
+
+        int digitoVerificador = Character.getNumericValue(limpia.charAt(9));
+        int decenaSuperior = (suma % 10 == 0) ? suma : ((suma / 10) + 1) * 10;
+        int validador = decenaSuperior - suma;
+        if (validador == 10) validador = 0;
+
+        return validador == digitoVerificador;
     }
 
     @Transactional
@@ -256,5 +302,25 @@ public class UserService {
         return users.list().stream()
             .filter(u -> u.roles().contains(Users.Role.CHOFER) && u.active())
             .toList();
+    }
+
+    @Transactional
+    public void delete(Users.User actor, UUID id) {
+        lock();
+        actor = actor(actor);
+        var target = users.byId(id);
+        if (target.master()) {
+            throw new ApiError(403, "No se puede eliminar la cuenta del administrador principal");
+        }
+        if (actor.id().equals(id)) {
+            throw new ApiError(400, "No puedes eliminar tu propia cuenta en sesión");
+        }
+        requireMaster(actor);
+
+        users.revoke(id);
+        users.db().update("UPDATE usuarios.audit_event SET actor_id = NULL WHERE actor_id = ?", id);
+        users.db().update("UPDATE usuarios.audit_event SET target_id = NULL WHERE target_id = ?", id);
+        users.db().update("DELETE FROM usuarios.app_user WHERE id = ?", id);
+        users.audit(actor.id(), null, "USER_DELETED", "Usuario eliminado: " + target.identification() + " - " + target.fullName());
     }
 }

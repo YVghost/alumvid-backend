@@ -65,8 +65,8 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
       _rumboActual = pos.heading;
       _velocidadKmh = (pos.speed * 3.6).clamp(0.0, 120.0);
     } catch (_) {
-      // Coordenadas base de partida en Quito (Bodega Central Amazonas)
-      posInicial = const LatLng(-0.1807, -78.4678);
+      // Coordenadas base de partida en Quito (Bodega Central Arq-AlumVid)
+      posInicial = const LatLng(-0.089290, -78.439607);
     }
 
     if (!mounted) return;

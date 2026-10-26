@@ -90,7 +90,7 @@ services:
       INVENTARIO_SERVICE_URL: http://inventario-service:8082
       LOGISTICA_SERVICE_URL: http://logistica-service:8083
     ports:
-      - "8080:8080"
+      - "${GATEWAY_PORT:-8085}:8080"
     depends_on:
       - usuarios-service
       - inventario-service

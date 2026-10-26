@@ -20,11 +20,11 @@ def do_request(path, method="GET", body=None, token=None):
         content = e.read().decode("utf-8")
         return e.code, content
 
-print("[1/5] Verificando acceso a frontend web a través del Gateway...")
+print("[1/5] Verificando estado del API Gateway en puerto 8080...")
 status, body = do_request("/")
-assert status == 200, f"Error cargando dashboard web: {status}"
-assert "AlumVid" in body, "El frontend no contiene el branding AlumVid"
-print(" -> OK: Dashboard web AlumVid servido correctamente en puerto 8080.")
+assert status == 200, f"Error respondiendo Gateway: {status}"
+assert "AlumVid" in body, "El Gateway no contiene la identidad AlumVid"
+print(" -> OK: API Gateway AlumVid respondiendo correctamente en puerto 8080.")
 
 print("[2/5] Probando autenticación JWT unificada (Master Admin por cédula)...")
 status, resp_str = do_request("/api/v1/auth/login", method="POST", body={

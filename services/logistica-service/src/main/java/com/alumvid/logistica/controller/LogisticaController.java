@@ -135,9 +135,12 @@ public class LogisticaController {
         return ResponseEntity.ok(logisticaService.eliminarDestinoRuta(rutaId, despachoId));
     }
 
-    @PostMapping("/rutas/{id}/optimizar")
-    public ResponseEntity<RutaResponse> optimizarRuta(@PathVariable UUID id) {
-        return ResponseEntity.ok(logisticaService.optimizarRuta(id));
+    @PostMapping("/rutas/{id}/optimizar-chofer")
+    public ResponseEntity<RutaResponse> optimizarRutaChofer(
+            @PathVariable UUID id,
+            @RequestParam(required = false) Double latitud,
+            @RequestParam(required = false) Double longitud) {
+        return ResponseEntity.ok(logisticaService.optimizarRutaPorChofer(id, latitud, longitud));
     }
 
     @DeleteMapping("/rutas/{id}")
@@ -185,6 +188,11 @@ public class LogisticaController {
         return ResponseEntity.ok(logisticaService.cancelarRutaConsolidada(id, motivo));
     }
 
+    @PostMapping("/rutas/{id}/completar")
+    public ResponseEntity<RutaResponse> completarRutaConsolidada(@PathVariable UUID id) {
+        return ResponseEntity.ok(logisticaService.completarRutaConsolidada(id));
+    }
+
     @PostMapping("/telemetria")
     public ResponseEntity<Map<String, Object>> recibirTelemetriaHttp(@RequestBody TelemetriaGpsPayload payload) {
         if (payload != null) {
@@ -197,5 +205,17 @@ public class LogisticaController {
             messagingTemplate.convertAndSend("/topic/choferes-activos", payload);
         }
         return ResponseEntity.ok(Map.of("status", "RECEIVED", "timestamp", System.currentTimeMillis()));
+    }
+
+    @PostMapping("/notificaciones/sesion-revocada")
+    public ResponseEntity<Map<String, Object>> notificarSesionRevocada(@RequestBody(required = false) Map<String, String> body) {
+        String userId = body != null ? body.get("userId") : null;
+        if (userId != null && !userId.isBlank()) {
+            messagingTemplate.convertAndSend("/topic/choferes/" + userId + "/sesion-revocada",
+                    Map.of("tipo", "SESION_REVOCADA", "userId", userId, "mensaje", "Sesion revocada por el administrador"));
+        }
+        messagingTemplate.convertAndSend("/topic/sesiones-revocadas",
+                Map.of("tipo", "SESION_REVOCADA", "userId", userId != null ? userId : ""));
+        return ResponseEntity.ok(Map.of("success", true));
     }
 }

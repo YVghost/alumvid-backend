@@ -7,9 +7,9 @@ class ApiService {
   // Deteccion automatica de entorno: Web o Desktop usa localhost, emulador Android usa 10.0.2.2
   static String get baseUrl {
     if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.linux || defaultTargetPlatform == TargetPlatform.macOS) {
-      return 'http://localhost:8080/api/v1';
+      return 'http://localhost:8085/api/v1';
     }
-    return 'http://10.0.2.2:8080/api/v1';
+    return 'http://10.0.2.2:8085/api/v1';
   }
 
   static Future<String?> getToken() async {
@@ -119,6 +119,25 @@ class ApiService {
       return jsonDecode(response.body);
     } else {
       throw Exception('Error al consultar detalle de la ruta');
+    }
+  }
+
+  static Future<Map<String, dynamic>> optimizarRutaChofer(String rutaId, {required double latitud, required double longitud}) async {
+    final token = await getToken();
+    final url = Uri.parse('$baseUrl/logistica/rutas/$rutaId/optimizar-chofer?latitud=$latitud&longitud=$longitud');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      final err = jsonDecode(response.body);
+      throw Exception(err['message'] ?? 'Error al optimizar paradas desde GPS');
     }
   }
 
@@ -261,7 +280,64 @@ class ApiService {
     }
   }
 
+  static Future<void> cambiarPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final token = await getToken();
+    final url = Uri.parse('$baseUrl/auth/password');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      }),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      try {
+        final err = jsonDecode(response.body);
+        throw Exception(err['message'] ?? 'Error al actualizar contraseña');
+      } catch (e) {
+        if (e is Exception) rethrow;
+        throw Exception('Error al actualizar contraseña');
+      }
+    }
+  }
+
+  static Future<bool> verificarSesionActiva() async {
+    final token = await getToken();
+    if (token == null || token.isEmpty) return false;
+
+    try {
+      final url = Uri.parse('$baseUrl/auth/me');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 4));
+
+      return response.statusCode == 200;
+    } catch (_) {
+      // Si hay error de red temporal, no expulsamos
+      return true;
+    }
+  }
+
   static Future<void> logout() async {
+    final token = await getToken();
+    if (token != null && token.isNotEmpty) {
+      try {
+        final url = Uri.parse('$baseUrl/auth/logout');
+        await http.post(url, headers: {'Authorization': 'Bearer $token'}).timeout(const Duration(seconds: 3));
+      } catch (_) {}
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
   }

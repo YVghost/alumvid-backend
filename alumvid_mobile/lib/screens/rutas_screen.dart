@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/websocket_mobile_service.dart';
 import 'detalle_ruta_screen.dart';
 import 'login_screen.dart';
 
@@ -19,11 +21,90 @@ class _RutasScreenState extends State<RutasScreen> {
   List<dynamic> _rutas = [];
   bool _cargando = true;
   String? _error;
+  WebSocketMobileService? _wsMobileService;
+  Timer? _sesionCheckTimer;
+  bool _expulsando = false;
 
   @override
   void initState() {
     super.initState();
+    _iniciarMonitoreoSesion();
     _cargarRutasAsignadas();
+  }
+
+  @override
+  void dispose() {
+    _sesionCheckTimer?.cancel();
+    _wsMobileService?.dispose();
+    super.dispose();
+  }
+
+  void _iniciarMonitoreoSesion() {
+    final choferId = widget.choferData['id']?.toString() ?? '';
+    _wsMobileService = WebSocketMobileService(
+      choferId: choferId,
+      onSesionRevocada: _expulsarPorSesionRevocada,
+    );
+    _wsMobileService?.connect();
+
+    // Verificación periódica HTTP como salvaguarda complementaria cada 8 segundos
+    _sesionCheckTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      _verificarSesionHttp();
+    });
+  }
+
+  void _verificarSesionHttp() async {
+    if (_expulsando) return;
+    final activa = await ApiService.verificarSesionActiva();
+    if (!activa && mounted && !_expulsando) {
+      _expulsarPorSesionRevocada();
+    }
+  }
+
+  void _expulsarPorSesionRevocada() async {
+    if (_expulsando) return;
+    _expulsando = true;
+    _sesionCheckTimer?.cancel();
+    _wsMobileService?.dispose();
+    await ApiService.logout();
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFFB7185)),
+            SizedBox(width: 8),
+            Text('Sesión Finalizada', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Text(
+          'Su sesión ha sido revocada por el administrador o la contraseña fue restablecida.\n\nPor favor inicie sesión nuevamente.',
+          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            child: const Text('Iniciar Sesión'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _cargarRutasAsignadas() async {

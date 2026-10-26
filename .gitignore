@@ -36,3 +36,9 @@ build/
 .env
 *.env
 
+### Office Temporary Files ###
+~$*.docx
+~$*.xlsx
+~$*.pptx
+
+

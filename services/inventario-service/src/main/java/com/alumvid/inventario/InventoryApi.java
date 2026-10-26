@@ -42,4 +42,38 @@ class InventoryApi {
         if(!actor.has("ADMINISTRADOR"))throw new InventoryError(403,"Solo administradores pueden consultar cambios del catálogo");
         products.get(id,false);return products.history(id);
     }
+    @GetMapping({"/inventario/movements", "/products/movements"})
+    InventoryRepository.Page<InventoryRepository.GlobalMovement> movements(
+        @RequestParam(required=false) String from,
+        @RequestParam(required=false) String to,
+        @RequestParam(defaultValue="") String type,
+        @RequestParam(defaultValue="") String q,
+        @RequestParam(defaultValue="0") int page,
+        @RequestParam(defaultValue="100") int size) {
+        if (page < 0 || size < 1 || size > 500) throw new InventoryError(400, "Página >= 0 y tamaño entre 1 y 500");
+        java.time.ZoneId ecuadorZone = java.time.ZoneId.of("America/Guayaquil");
+        java.time.OffsetDateTime fromDate = parseEcuadorDateTime(from, ecuadorZone, true);
+        java.time.OffsetDateTime toDate = parseEcuadorDateTime(to, ecuadorZone, false);
+        return products.allMovements(fromDate, toDate, type, q, page, size);
+    }
+
+    private static java.time.OffsetDateTime parseEcuadorDateTime(String s, java.time.ZoneId zone, boolean isStart) {
+        if (s == null || s.isBlank()) return null;
+        String val = s.trim();
+        try {
+            return java.time.OffsetDateTime.parse(val);
+        } catch (Exception ignored) {}
+        try {
+            return java.time.Instant.parse(val).atZone(zone).toOffsetDateTime();
+        } catch (Exception ignored) {}
+        try {
+            return java.time.LocalDateTime.parse(val).atZone(zone).toOffsetDateTime();
+        } catch (Exception ignored) {}
+        try {
+            java.time.LocalDate d = java.time.LocalDate.parse(val);
+            return isStart ? d.atStartOfDay(zone).toOffsetDateTime()
+                           : d.atTime(23, 59, 59, 999000000).atZone(zone).toOffsetDateTime();
+        } catch (Exception ignored) {}
+        return null;
+    }
 }

@@ -18,11 +18,19 @@ class InventoryRepository {
         @JsonFormat(shape=JsonFormat.Shape.STRING) BigDecimal quantity,@JsonFormat(shape=JsonFormat.Shape.STRING) BigDecimal delta,
         @JsonFormat(shape=JsonFormat.Shape.STRING) BigDecimal stockBefore,@JsonFormat(shape=JsonFormat.Shape.STRING) BigDecimal stockAfter,
         String reason,String reference,UUID actorId,String actorName,OffsetDateTime occurredAt) {}
+    record GlobalMovement(UUID id,UUID requestId,UUID productId,String productCode,String productName,String unit,
+        MovementType type,
+        @JsonFormat(shape=JsonFormat.Shape.STRING) BigDecimal quantity,
+        @JsonFormat(shape=JsonFormat.Shape.STRING) BigDecimal delta,
+        @JsonFormat(shape=JsonFormat.Shape.STRING) BigDecimal stockBefore,
+        @JsonFormat(shape=JsonFormat.Shape.STRING) BigDecimal stockAfter,
+        String reason,String reference,UUID actorId,String actorName,OffsetDateTime occurredAt) {}
     record Page<T>(List<T> items,long total,int page,int size) {}
     private final JdbcTemplate db;
     InventoryRepository(JdbcTemplate db) { this.db=db; }
     private final RowMapper<Product> productMapper=(r,n)->new Product(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("category"),Unit.valueOf(r.getString("unit")),r.getString("description"),r.getString("supplier"),r.getString("external_code"),r.getString("location"),r.getBigDecimal("min_stock"),r.getBigDecimal("stock"),r.getBoolean("active"),r.getObject("created_at",OffsetDateTime.class),r.getObject("updated_at",OffsetDateTime.class));
     private final RowMapper<Movement> movementMapper=(r,n)->new Movement(r.getObject("id",UUID.class),r.getObject("request_id",UUID.class),r.getObject("product_id",UUID.class),MovementType.valueOf(r.getString("type")),r.getBigDecimal("quantity"),r.getBigDecimal("delta"),r.getBigDecimal("stock_before"),r.getBigDecimal("stock_after"),r.getString("reason"),r.getString("reference"),r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getObject("occurred_at",OffsetDateTime.class));
+    private final RowMapper<GlobalMovement> globalMovementMapper=(r,n)->new GlobalMovement(r.getObject("id",UUID.class),r.getObject("request_id",UUID.class),r.getObject("product_id",UUID.class),r.getString("product_code"),r.getString("product_name"),r.getString("product_unit"),MovementType.valueOf(r.getString("type")),r.getBigDecimal("quantity"),r.getBigDecimal("delta"),r.getBigDecimal("stock_before"),r.getBigDecimal("stock_after"),r.getString("reason"),r.getString("reference"),r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getObject("occurred_at",OffsetDateTime.class));
     Product get(UUID id,boolean lock) {
         return db.query("SELECT * FROM inventario.product WHERE id=?"+(lock?" FOR UPDATE":""),productMapper,id).stream().findFirst().orElseThrow(()->new InventoryError(404,"Producto no encontrado"));
     }
@@ -60,4 +68,37 @@ class InventoryRepository {
         db.update("INSERT INTO inventario.catalog_event(id,product_id,actor_id,actor_name,action,detail) VALUES (?,?,?,?,?,?)",UUID.randomUUID(),id,actor.id(),actor.fullName(),action,detail);
     }
     List<Map<String,Object>> history(UUID id) { return db.queryForList("SELECT id,actor_id,actor_name,action,detail,occurred_at FROM inventario.catalog_event WHERE product_id=? ORDER BY occurred_at DESC,id DESC LIMIT 200",id); }
+    Page<GlobalMovement> allMovements(OffsetDateTime from, OffsetDateTime to, String type, String q, int page, int size) {
+        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        List<Object> args = new ArrayList<>();
+        if (from != null) {
+            where.append(" AND m.occurred_at >= ? ");
+            args.add(from);
+        }
+        if (to != null) {
+            where.append(" AND m.occurred_at <= ? ");
+            args.add(to);
+        }
+        if (type != null && !type.isBlank()) {
+            where.append(" AND m.type = ? ");
+            args.add(type.trim().toUpperCase(Locale.ROOT));
+        }
+        if (q != null && !q.isBlank()) {
+            where.append(" AND POSITION(? IN LOWER(p.code || ' ' || p.name || ' ' || COALESCE(m.actor_name, '') || ' ' || COALESCE(m.reason, '') || ' ' || COALESCE(m.reference, ''))) > 0 ");
+            args.add(q.trim().toLowerCase(Locale.ROOT));
+        }
+
+        String countSql = "SELECT count(*) FROM inventario.movement m JOIN inventario.product p ON m.product_id = p.id " + where;
+        long total = db.queryForObject(countSql, Long.class, args.toArray());
+
+        String sql = "SELECT m.*, p.code as product_code, p.name as product_name, p.unit as product_unit " +
+                     "FROM inventario.movement m JOIN inventario.product p ON m.product_id = p.id " +
+                     where + " ORDER BY m.occurred_at DESC, m.id DESC LIMIT ? OFFSET ?";
+        List<Object> queryArgs = new ArrayList<>(args);
+        queryArgs.add(size);
+        queryArgs.add((long) page * size);
+
+        List<GlobalMovement> items = db.query(sql, globalMovementMapper, queryArgs.toArray());
+        return new Page<>(items, total, page, size);
+    }
 }

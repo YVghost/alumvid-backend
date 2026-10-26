@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'cambiar_password_screen.dart';
 import 'rutas_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -29,10 +30,26 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => RutasScreen(choferData: res)),
-      );
+
+      final bool mustChange = res['mustChangePassword'] == true ||
+          (res['user'] != null && res['user']['mustChangePassword'] == true);
+
+      if (mustChange) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CambiarPasswordScreen(
+              tempPassword: _passwordController.text,
+              choferData: res,
+            ),
+          ),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => RutasScreen(choferData: res)),
+        );
+      }
     } catch (e) {
       setState(() {
         _errorMensaje = e.toString().replaceAll('Exception: ', '');

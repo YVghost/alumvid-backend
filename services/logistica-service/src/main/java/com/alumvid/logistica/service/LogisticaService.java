@@ -58,7 +58,9 @@ public interface LogisticaService {
 
     RutaResponse eliminarDestinoRuta(UUID rutaId, UUID despachoId);
 
-    RutaResponse optimizarRuta(UUID rutaId);
+    RutaResponse optimizarRutaPorChofer(UUID rutaId, Double latitudChofer, Double longitudChofer);
+
+    RutaResponse completarRutaConsolidada(UUID rutaId);
 
     void eliminarRuta(UUID rutaId);
 

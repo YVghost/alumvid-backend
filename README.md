@@ -13,7 +13,7 @@ El ecosistema de software está estructurado bajo una **arquitectura de microser
 ```text
                                   ┌─────────────────────────────┐
                                   │      Clientes / Frontend     │
-                                  │  - admin-dashboard (Web)    │
+                                  │  - alumvid_admin_desktop    │
                                   │  - alumvid_mobile (Flutter) │
                                   └──────────────┬──────────────┘
                                                  │ HTTP / REST / WebSocket
@@ -56,7 +56,7 @@ El ecosistema de software está estructurado bajo una **arquitectura de microser
 │   ├── usuarios-service/      # RBAC, autenticacion JWT/Bearer, auditoria y portal (puerto 8081)
 │   ├── inventario-service/    # Catalogo de productos, existencias y movimientos (puerto 8082)
 │   └── logistica-service/     # Rutas multi-destino, PostGIS, telemetria y e-PoD (puerto 8083)
-├── admin-dashboard/           # Panel web del administrador (Google Maps, Kanban, Telemetria)
+├── alumvid_admin_desktop/     # Panel administrativo nativo Desktop (Windows) y Móvil (Android)
 ├── alumvid_mobile/            # Aplicacion movil Flutter para choferes (Camara PoD, Firma, GPS)
 ├── DOCUMENTACION/             # Tesis Mosquera-Ortega (.docx, .pptx) y Catalogo AlumVid (.xls)
 ├── scripts/                   # Scripts de prueba y verificacion automatizada
