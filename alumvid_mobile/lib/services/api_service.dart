@@ -4,12 +4,16 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // Deteccion automatica de entorno: Web o Desktop usa localhost, emulador Android usa 10.0.2.2
+  // --dart-define=API_BASE_URL=http://IP-del-servidor:8085/api/v1
   static String get baseUrl {
-    if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.linux || defaultTargetPlatform == TargetPlatform.macOS) {
-      return 'http://localhost:8085/api/v1';
+    const configured = String.fromEnvironment('API_BASE_URL');
+    if (configured.isNotEmpty) {
+      return configured.replaceFirst(RegExp(r'/+$'), '');
     }
-    return 'http://10.0.2.2:8085/api/v1';
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8085/api/v1';
+    }
+    return 'http://localhost:8085/api/v1';
   }
 
   static Future<String?> getToken() async {
@@ -363,14 +367,20 @@ class ApiService {
   }
 
   static Future<void> logout() async {
-    final token = await getToken();
-    if (token != null && token.isNotEmpty) {
-      try {
-        final url = Uri.parse('$baseUrl/auth/logout');
-        await http.post(url, headers: {'Authorization': 'Bearer $token'}).timeout(const Duration(seconds: 3));
-      } catch (_) {}
-    }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    final token = prefs.getString('auth_token');
+    try {
+      if (token != null && token.isNotEmpty) {
+        await http.post(
+          Uri.parse('$baseUrl/auth/logout'),
+          headers: {'Authorization': 'Bearer $token'},
+        ).timeout(const Duration(seconds: 4));
+      }
+    } catch (_) {
+      // Sin red se cierra la sesion local; el servidor conserva su vencimiento.
+      debugPrint('No se pudo revocar la sesion remota; se borro la sesion local.');
+    } finally {
+      await prefs.clear();
+    }
   }
 }

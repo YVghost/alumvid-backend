@@ -41,4 +41,6 @@ build/
 ~$*.xlsx
 ~$*.pptx
 
-
+# Herramientas y entornos temporales de validación
+.cache/
+*.log

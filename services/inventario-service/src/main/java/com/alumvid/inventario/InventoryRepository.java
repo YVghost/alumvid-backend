@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.springframework.jdbc.core.*;
 import org.springframework.stereotype.Repository;
 
@@ -12,11 +13,11 @@ class InventoryRepository {
     enum Unit { UNIDAD, METRO, METRO_CUADRADO, ROLLO, KILOGRAMO, LITRO }
     enum MovementType { INGRESO, SALIDA, AJUSTE }
     record Product(UUID id,String code,String name,String category,Unit unit,String description,String supplier,
-        String externalCode,String location,@JsonFormat(shape=JsonFormat.Shape.STRING) BigDecimal minStock,
-        @JsonFormat(shape=JsonFormat.Shape.STRING) BigDecimal stock,boolean active,OffsetDateTime createdAt,OffsetDateTime updatedAt) {}
+        String externalCode,String location,@JsonSerialize(using=PlainDecimalSerializer.class) BigDecimal minStock,
+        @JsonSerialize(using=PlainDecimalSerializer.class) BigDecimal stock,boolean active,boolean piecesManaged,OffsetDateTime createdAt,OffsetDateTime updatedAt) {}
     record Movement(UUID id,UUID requestId,UUID productId,MovementType type,
-        @JsonFormat(shape=JsonFormat.Shape.STRING) BigDecimal quantity,@JsonFormat(shape=JsonFormat.Shape.STRING) BigDecimal delta,
-        @JsonFormat(shape=JsonFormat.Shape.STRING) BigDecimal stockBefore,@JsonFormat(shape=JsonFormat.Shape.STRING) BigDecimal stockAfter,
+        @JsonSerialize(using=PlainDecimalSerializer.class) BigDecimal quantity,@JsonSerialize(using=PlainDecimalSerializer.class) BigDecimal delta,
+        @JsonSerialize(using=PlainDecimalSerializer.class) BigDecimal stockBefore,@JsonSerialize(using=PlainDecimalSerializer.class) BigDecimal stockAfter,
         String reason,String reference,UUID actorId,String actorName,OffsetDateTime occurredAt) {}
     record GlobalMovement(UUID id,UUID requestId,UUID productId,String productCode,String productName,String unit,
         MovementType type,
@@ -28,9 +29,10 @@ class InventoryRepository {
     record Page<T>(List<T> items,long total,int page,int size) {}
     private final JdbcTemplate db;
     InventoryRepository(JdbcTemplate db) { this.db=db; }
-    private final RowMapper<Product> productMapper=(r,n)->new Product(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("category"),Unit.valueOf(r.getString("unit")),r.getString("description"),r.getString("supplier"),r.getString("external_code"),r.getString("location"),r.getBigDecimal("min_stock"),r.getBigDecimal("stock"),r.getBoolean("active"),r.getObject("created_at",OffsetDateTime.class),r.getObject("updated_at",OffsetDateTime.class));
+    private final RowMapper<Product> productMapper=(r,n)->new Product(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("category"),Unit.valueOf(r.getString("unit")),r.getString("description"),r.getString("supplier"),r.getString("external_code"),r.getString("location"),r.getBigDecimal("min_stock"),r.getBigDecimal("stock"),r.getBoolean("active"),r.getBoolean("pieces_managed"),r.getObject("created_at",OffsetDateTime.class),r.getObject("updated_at",OffsetDateTime.class));
     private final RowMapper<Movement> movementMapper=(r,n)->new Movement(r.getObject("id",UUID.class),r.getObject("request_id",UUID.class),r.getObject("product_id",UUID.class),MovementType.valueOf(r.getString("type")),r.getBigDecimal("quantity"),r.getBigDecimal("delta"),r.getBigDecimal("stock_before"),r.getBigDecimal("stock_after"),r.getString("reason"),r.getString("reference"),r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getObject("occurred_at",OffsetDateTime.class));
     private final RowMapper<GlobalMovement> globalMovementMapper=(r,n)->new GlobalMovement(r.getObject("id",UUID.class),r.getObject("request_id",UUID.class),r.getObject("product_id",UUID.class),r.getString("product_code"),r.getString("product_name"),r.getString("product_unit"),MovementType.valueOf(r.getString("type")),r.getBigDecimal("quantity"),r.getBigDecimal("delta"),r.getBigDecimal("stock_before"),r.getBigDecimal("stock_after"),r.getString("reason"),r.getString("reference"),r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getObject("occurred_at",OffsetDateTime.class));
+    BigDecimal reserved(UUID id) { return db.queryForObject("SELECT COALESCE(SUM(quantity),0) FROM inventario.stock_reservation WHERE product_id=? AND state='ACTIVA'",BigDecimal.class,id); }
     Product get(UUID id,boolean lock) {
         return db.query("SELECT * FROM inventario.product WHERE id=?"+(lock?" FOR UPDATE":""),productMapper,id).stream().findFirst().orElseThrow(()->new InventoryError(404,"Producto no encontrado"));
     }

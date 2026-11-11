@@ -45,13 +45,22 @@ class InventoryIntegrationTest {
         var p=product();
         mvc.perform(get("/api/products")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/products").header("Authorization","Bearer seller")).andExpect(status().isOk());
-        mvc.perform(get("/api/products/"+p.id()).header("Authorization","Bearer seller")).andExpect(jsonPath("$.stock").value("0.0000"));
+        mvc.perform(get("/api/products/"+p.id()).header("Authorization","Bearer seller")).andExpect(jsonPath("$.stock").value("0.000000000000"));
         mvc.perform(post("/api/products").header("Authorization","Bearer warehouse").contentType("application/json").content("{}"))
             .andExpect(status().isForbidden());
         String body="{\"requestId\":\""+UUID.randomUUID()+"\",\"type\":\"INGRESO\",\"quantity\":5,\"reason\":\"Recepción\"}";
         mvc.perform(post("/api/products/"+p.id()+"/movements").header("Authorization","Bearer seller").contentType("application/json").content(body)).andExpect(status().isForbidden());
         mvc.perform(post("/api/products/"+p.id()+"/movements").header("Authorization","Bearer warehouse").contentType("application/json").content(body)).andExpect(status().isOk());
         mvc.perform(post("/api/products/"+p.id()+"/movements").header("Authorization","Bearer warehouse").contentType("application/json").content(body.replace("INGRESO","AJUSTE"))).andExpect(status().isForbidden());
+    }
+    @Test void pieceManagedProductsRejectGenericMovements() throws Exception {
+        var p=product();
+        db.update("UPDATE inventario.product SET pieces_managed=TRUE WHERE id=?",p.id());
+        mvc.perform(post("/api/products/"+p.id()+"/movements").header("Authorization","Bearer admin").contentType("application/json")
+            .content("{\"requestId\":\""+UUID.randomUUID()+"\",\"type\":\"INGRESO\",\"quantity\":1,\"reason\":\"Ingreso manual\"}"))
+            .andExpect(status().isConflict());
+        assertEquals(0,new BigDecimal("0").compareTo(products.get(p.id(),false).stock()));
+        assertThrows(InventoryError.class,()->service.update(p.id(),input(p.code(),InventoryRepository.Unit.METRO,true),admin));
     }
     @Test void preservesDecimalStockAndLedger() {
         var p=product();
@@ -118,4 +127,14 @@ class InventoryIntegrationTest {
             db.update("DELETE FROM inventario.product WHERE id=?",p.id());
         }
     }
+    @Test void withdrawalsAndAdjustmentsCannotConsumeReservedStock() throws Exception {
+        var p=product();
+        db.update("UPDATE inventario.product SET stock=5 WHERE id=?",p.id());
+        db.update("INSERT INTO inventario.stock_reservation(id,order_id,product_id,quantity) VALUES (?,?,?,4)",UUID.randomUUID(),UUID.randomUUID(),p.id());
+        for(String type:List.of("SALIDA","AJUSTE"))mvc.perform(post("/api/products/"+p.id()+"/movements").header("Authorization","Bearer admin").contentType("application/json")
+            .content("{\"requestId\":\""+UUID.randomUUID()+"\",\"type\":\""+type+"\",\"quantity\":2,\"reason\":\"Verificacion de reservas\"}"))
+            .andExpect(status().isConflict());
+        assertEquals(0,new BigDecimal("5").compareTo(products.get(p.id(),false).stock()));
+    }
+
 }

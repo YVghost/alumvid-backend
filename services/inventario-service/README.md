@@ -6,7 +6,7 @@ Portal administrativo: **http://localhost:8092**. API para web y futura app: `ht
 
 Catálogo manual para todas las familias de productos. Cada producto tiene código único, nombre, categoría libre, unidad, descripción, proveedor, código externo opcional, ubicación en bodega, stock mínimo, estado y existencias. Se crea con stock cero; las existencias iniciales se registran mediante una entrada con motivo "Carga inicial".
 
-Las cantidades se guardan en decimal exacto con hasta 4 decimales y 15 dígitos enteros. `62.83 UNIDAD` se conserva tal como se registra; todavía no se interpreta como planchas o retazos ni se convierte en dimensiones. Registra la unidad que puedas confirmar. Las piezas físicas y dimensiones de vidrio/aluminio se abordarán en el servicio de retazos. No se importó el Excel ni se implementó sincronización externa.
+Las existencias y movimientos se almacenan en decimal exacto con 12 decimales y 15 dígitos enteros. Los movimientos manuales de productos generales aceptan hasta 4 decimales. Para vidrio y aluminio gestionados por piezas, el servicio de retazos calcula las unidades equivalentes a partir de las medidas y conserva el detalle físico; inventario muestra su acumulado. El stock previo se mantiene sin deducir dimensiones automáticamente. No se importó el Excel ni se implementó sincronización externa.
 
 Las respuestas de la API devuelven las cantidades como cadenas decimales (por ejemplo `"62.8300"`) para preservar precisión en JavaScript. En las solicitudes puedes enviar números o cadenas decimales.
 
@@ -32,7 +32,7 @@ La API acepta los mismos tokens Bearer del servicio de usuarios. El portal enví
 - `SALIDA`: resta una cantidad positiva; no permite stock negativo.
 - `AJUSTE`: la cantidad representa el **total contado**, no la diferencia. Por ejemplo, stock 10 y conteo 4 genera delta -6 y saldo 4. Puede ajustarse a cero y exige motivo. Un ajuste sin diferencia se rechaza.
 
-Cada operación guarda saldo anterior, saldo posterior, diferencia, motivo, referencia opcional, fecha y responsable. Un bloqueo transaccional por producto evita descontar dos veces el mismo saldo ante operaciones concurrentes. No hay todavía reservas, pedidos, ventas, compras ni múltiples bodegas con saldos separados; ubicación es un campo descriptivo.
+Cada operación guarda saldo anterior, saldo posterior, diferencia, motivo, referencia opcional, fecha y responsable. Un bloqueo transaccional por producto evita descontar dos veces el mismo saldo ante operaciones concurrentes. Pedidos administra reservas protegidas y entregas; Ubicaciones administra espacios compartidos y distribucion fisica. No se implementan compras ni multiples bodegas con inventarios independientes.
 
 `requestId` es un UUID que el cliente genera por operación. Si una respuesta se pierde, reenvía **el mismo UUID y los mismos datos**: se devuelve el movimiento original sin repetir el descuento. Reutilizarlo con datos diferentes o desde otro usuario devuelve 409. La web conserva el UUID al reintentar en el mismo formulario; cerrarlo o recargarlo pierde esa referencia, por lo que primero debes consultar el historial si el resultado quedó incierto.
 
@@ -100,3 +100,10 @@ docker compose up -d --build
 Las pruebas usan PostgreSQL real; simulan usuarios para comprobar permisos, y prueban también un cliente de usuarios sin conexión. Revierten sus cambios, salvo la prueba de concurrencia que crea y elimina exclusivamente su producto de prueba. Cubren stock decimal, idempotencia, saldo insuficiente, ajustes, historial, validaciones, indisponibilidad de usuarios y salidas simultáneas.
 
 Fuera de Docker: configura `DB_URL`, `DB_USER`, `DB_PASSWORD` y `AUTH_URL` (por defecto `http://localhost:8091`) antes de ejecutar `mvnw.cmd -f services/inventario-service/pom.xml spring-boot:run`. Dentro de Docker `AUTH_URL=http://usuarios:8081`; cada servicio puede arrancar aunque el otro esté detenido.
+
+
+## Integración con retazos
+
+Ya existe [retazos-service](../retazos-service/README.md). Para los productos configurados allí, 1 UNIDAD representa un perfil o una plancha completos. Retazos registra las medidas y actualiza atómicamente el total equivalente de este servicio, conservando código y nombre. Los movimientos genéricos se bloquean para esos productos: sus ingresos, cortes, descartes y ajustes deben pasar por retazos.
+
+La migración V2 amplía stock y movimientos a doce decimales, preservando las cantidades anteriores. Los demás productos mantienen su operación habitual. Las secciones anteriores describen la entrega inicial; la equivalencia física, antes pendiente, se implementa ahora en el nuevo servicio. El stock existente se desglosa mediante el modo EXISTENTE, no como un ingreso nuevo.

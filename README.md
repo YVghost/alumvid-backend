@@ -154,3 +154,30 @@ Desarrollada en Flutter para dispositivos Android / iOS de los choferes:
 - **Rutas del día:** Lista de despachos asignados en orden óptimo.
 - **Navegación en vivo:** Brújula y mapa interactivo hacia la ubicación del cliente.
 - **Captura e-PoD:** Obliga a tomar fotografía en vivo del material, registrar firma digital y audita la coordenada GPS frente a la geocerca de PostGIS.
+
+
+## Servicio de retazos y piezas físicas
+
+`services/retazos-service` incorpora el desglose físico del inventario. Una unidad equivale a un perfil completo por longitud (m) o a una plancha completa por área (cm²). El vidrio se corta solo por ancho y conserva su alto. Dos retazos de medio perfil suman una unidad, pero siguen siendo dos piezas diferentes.
+
+Portal: **http://localhost:8084/** o **http://localhost:8080/retazos/** a través del gateway. La referencia completa de cada producto se configura conservando su código y nombre. El modo EXISTENTE desglosa stock ya contabilizado sin volver a sumarlo. La migración V2 de inventario amplía precisión y protege el saldo de productos gestionados por piezas.
+
+Reglas, arquitectura de base compartida, endpoints, despliegue y pruebas: [services/retazos-service/README.md](services/retazos-service/README.md). Antes de desplegar, configura DB_PASSWORD en .env; no se usa la contraseña de otra variable implícitamente.
+
+```powershell
+.\scripts\test-retazos.ps1
+```
+
+## Pedidos y ventas operativas
+
+Portal: **http://localhost:8080/pedidos/**. Permite consultar disponibilidad sin vender, registrar cliente/productos/precios/entrega, confirmar y reservar, revisar faltantes, preparar material y documentar cancelaciones, retrasos y entregas. Retazos compatibles tienen prioridad sobre material completo.
+
+Todos los Dockerfiles ahora compilan con Java 21 dentro de Docker: `docker compose -f compose.yaml up -d --build` levanta la plataforma sin preparar JARs en el host. Configurar `.env` con `DB_NAME`, `DB_USER`, `DB_PASSWORD` y `JWT_SECRET`, ademas del administrador inicial. Las reservas requieren Inventario V3, aplicado automaticamente al arrancar antes de Retazos/Pedidos.
+
+Consulta [el flujo y pendientes actuales](FLUJO_ACTUAL.md) y [la API de Pedidos](services/pedidos-service/README.md). La entrega operativa se registra administrativamente; la sincronizacion automatica con rutas/evidencias de Logistica sigue pendiente.
+
+## Clientes, entregas parciales y ubicaciones
+
+Los pedidos nuevos se registran confirmados y pagados externamente. El catalogo de clientes, los lotes de preparacion/retiro/entrega y el plazo renovable de 72 horas se gestionan en http://localhost:8080/pedidos/. Cada retiro o entrega parcial y cada retraso reinician el plazo. Al cancelar o vencer, vuelve lo no entregado con sus medidas actuales; lo que esta en reparto espera recepcion fisica. Pagos y facturacion estan fuera del alcance.
+
+http://localhost:8080/ubicaciones/ permite compartir espacios como A3/B3 entre productos y trasladar piezas/cantidades sin cambiar stock. Detalle actualizado en [FLUJO_ACTUAL.md](FLUJO_ACTUAL.md). El entorno completo tiene siete servicios de aplicacion y PostgreSQL/PostGIS.

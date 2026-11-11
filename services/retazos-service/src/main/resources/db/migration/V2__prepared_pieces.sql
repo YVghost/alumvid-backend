@@ -1,0 +1,2 @@
+ALTER TABLE retazos.piece DROP CONSTRAINT piece_state_check;
+ALTER TABLE retazos.piece ADD CONSTRAINT piece_state_check CHECK(state IN ('DISPONIBLE','TRANSFORMADO','CONSUMIDO','DESCARTADO','PREPARADO','ENTREGADO'));

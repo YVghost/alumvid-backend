@@ -11,13 +11,24 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController(text: 'carlos.chofer@alumvid.com');
-  final _passwordController = TextEditingController(text: 'ChoferPass2026!');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _cargando = false;
   bool _mostrarPassword = false;
   String? _errorMensaje;
 
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   Future<void> _iniciarSesion() async {
+    if (_emailController.text.trim().isEmpty || _passwordController.text.isEmpty) {
+      setState(() => _errorMensaje = 'Ingresa tu identificación y contraseña.');
+      return;
+    }
     setState(() {
       _cargando = true;
       _errorMensaje = null;
@@ -51,6 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMensaje = e.toString().replaceAll('Exception: ', '');
       });
