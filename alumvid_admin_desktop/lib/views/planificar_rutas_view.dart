@@ -75,7 +75,18 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
       final act = widget.rutas.where((r) => r.id == _rutaSeleccionada!.id).toList();
       if (act.isNotEmpty) {
         _rutaSeleccionada = act.first;
+        _choferReasignarId = _rutaSeleccionada?.choferId;
+      } else if (widget.rutas.isNotEmpty) {
+        _rutaSeleccionada = widget.rutas.first;
+        _choferReasignarId = _rutaSeleccionada?.choferId;
+      } else {
+        _rutaSeleccionada = null;
+        _choferReasignarId = null;
       }
+    } else if (widget.rutas.isNotEmpty) {
+      _rutaSeleccionada = widget.rutas.first;
+      _choferReasignarId = _rutaSeleccionada?.choferId;
+      _proponerSiguienteCodigo();
     }
   }
 
@@ -459,6 +470,11 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
   }
 
   Widget _buildCardCrearRuta() {
+    final Set<String> idsVistos = {};
+    final choferesUnicos = widget.choferes.where((c) => idsVistos.add(c.id)).toList();
+    final bool choferCrearValido = _choferCrearRutaId == null || choferesUnicos.any((c) => c.id == _choferCrearRutaId);
+    final String? valorChoferCrear = choferCrearValido ? _choferCrearRutaId : null;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -479,17 +495,17 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
             decoration: const InputDecoration(labelText: 'Nombre / Código de la Ruta', hintText: 'Ej. Ruta 1, Ruta Norte Express'),
           ),
           const SizedBox(height: 10),
-          DropdownButtonFormField<String>(
+          DropdownButtonFormField<String?>(
             isExpanded: true,
-            initialValue: _choferCrearRutaId,
+            initialValue: valorChoferCrear,
             decoration: const InputDecoration(labelText: 'Chofer Asignado (Opcional)'),
             dropdownColor: AppTheme.surfaceCard,
             items: [
-              const DropdownMenuItem(
+              const DropdownMenuItem<String?>(
                 value: null,
                 child: Text('-- Sin asignar (asignar después) --', overflow: TextOverflow.ellipsis),
               ),
-              ...widget.choferes.map((c) => DropdownMenuItem(
+              ...choferesUnicos.map((c) => DropdownMenuItem<String?>(
                 value: c.id,
                 child: Text(c.nombre, overflow: TextOverflow.ellipsis),
               )),
@@ -702,43 +718,67 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
           const Divider(color: AppTheme.border, height: 20),
 
           // Paso 3: Asignar / Cambiar Chofer Responsable
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF131D2E),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _choferReasignarId,
-                    decoration: const InputDecoration(
-                      labelText: '3. Asignar / Cambiar Chofer Responsable',
-                      isDense: true,
+          Builder(
+            builder: (context) {
+              final Set<String> idsVistos = {};
+              final choferesUnicos = widget.choferes.where((c) => idsVistos.add(c.id)).toList();
+              final bool choferExiste = _choferReasignarId == null || choferesUnicos.any((c) => c.id == _choferReasignarId);
+
+              final List<DropdownMenuItem<String?>> itemsReasignar = [
+                const DropdownMenuItem<String?>(value: null, child: Text('-- Sin chofer asignado --')),
+                if (_choferReasignarId != null && !choferExiste)
+                  DropdownMenuItem<String?>(
+                    value: _choferReasignarId,
+                    child: Text(
+                      _rutaSeleccionada?.choferNombre != null && _rutaSeleccionada!.choferNombre!.isNotEmpty
+                          ? '${_rutaSeleccionada!.choferNombre} (Asignado previamente)'
+                          : 'Chofer Asignado (${_choferReasignarId!.substring(0, 8)}...)',
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    dropdownColor: AppTheme.surfaceCard,
-                    items: [
-                      const DropdownMenuItem(value: null, child: Text('-- Seleccionar chofer --')),
-                      ...widget.choferes.map((c) => DropdownMenuItem(value: c.id, child: Text('${c.nombre} (${c.estadoDisponibilidad})'))),
-                    ],
-                    onChanged: (val) => setState(() => _choferReasignarId = val),
                   ),
+                ...choferesUnicos.map((c) => DropdownMenuItem<String?>(
+                  value: c.id,
+                  child: Text('${c.nombre} (${c.estadoDisponibilidad})', overflow: TextOverflow.ellipsis),
+                )),
+              ];
+
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131D2E),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.border),
                 ),
-                const SizedBox(width: 10),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  ),
-                  onPressed: _guardandoChofer ? null : _actualizarChoferRuta,
-                  child: _guardandoChofer
-                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Actualizar Chofer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String?>(
+                        key: ValueKey('dropdown_chofer_${_rutaSeleccionada?.id}_$_choferReasignarId'),
+                        initialValue: _choferReasignarId,
+                        decoration: const InputDecoration(
+                          labelText: '3. Asignar / Cambiar Chofer Responsable',
+                          isDense: true,
+                        ),
+                        dropdownColor: AppTheme.surfaceCard,
+                        items: itemsReasignar,
+                        onChanged: (val) => setState(() => _choferReasignarId = val),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      onPressed: _guardandoChofer ? null : _actualizarChoferRuta,
+                      child: _guardandoChofer
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Actualizar Chofer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ],
       ),

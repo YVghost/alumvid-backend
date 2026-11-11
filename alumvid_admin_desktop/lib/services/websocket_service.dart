@@ -42,9 +42,8 @@ class WebSocketService {
     try {
       final host = await ApiService.getBaseHost();
       String baseWs = host.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
-      if (baseWs.contains(':8080')) {
-        baseWs = baseWs.replaceAll(':8080', ':8083');
-      }
+      // Redirigir hacia el microservicio de logistica que aloja el broker WebSocket (puerto 8083)
+      baseWs = baseWs.replaceAll(RegExp(r':(8080|8085)'), ':8083');
       final wsUri = Uri.parse('$baseWs/ws-logistica');
 
       _channel = WebSocketChannel.connect(wsUri);
@@ -94,12 +93,13 @@ class WebSocketService {
     if (message.startsWith('CONNECTED')) {
       _isConnected = true;
       _subscribeTopics();
+      _notifyTableroUpdate();
       return;
     }
 
     if (message.startsWith('MESSAGE')) {
-      // Extraer payload JSON del body de STOMP
-      final split = message.split('\n\n');
+      // Extraer payload JSON del body de STOMP soportando CRLF o LF
+      final split = message.split(RegExp(r'\r?\n\r?\n'));
       if (split.length >= 2) {
         String body = split.sublist(1).join('\n\n');
         if (body.endsWith('\x00')) {
@@ -133,15 +133,23 @@ class WebSocketService {
   void _onDisconnected() {
     _isConnected = false;
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 8), () {
+    _reconnectTimer = Timer(const Duration(seconds: 5), () {
       connect();
     });
   }
 
   void _iniciarPollingFallback() {
     _pollingFallbackTimer?.cancel();
-    // Dispara actualizacion periodica para que la interfaz este 100% al dia
-    _pollingFallbackTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+    // Consulta periodica dual: telemetria GPS activa de choferes + actualizacion de rutas
+    _pollingFallbackTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+      try {
+        final activas = await ApiService.obtenerTelemetriaActiva();
+        for (final tel in activas) {
+          for (final listener in _telemetriaListeners) {
+            listener(tel);
+          }
+        }
+      } catch (_) {}
       _notifyTableroUpdate();
     });
   }

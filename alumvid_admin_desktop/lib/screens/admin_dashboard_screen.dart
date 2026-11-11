@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
@@ -45,6 +46,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Ruta? _rutaSeleccionada;
   final Map<String, TelemetriaGps> _telemetriaChoferes = {};
   List<LatLng> _puntosPolilinea = [];
+  Timer? _telemetriaPollingTimer;
+  bool _recalculandoPolilinea = false;
+
+  bool _esCoordenadaQuito(double lat, double lon) {
+    return lat > -0.5 && lat < 0.2 && lon > -78.8 && lon < -78.2;
+  }
 
   int _totalProductosBodega = 0;
   String _filtroEstado = 'EN_CURSO';
@@ -64,7 +71,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   List<Ruta> get _rutasDelPeriodo {
-    return _rutas.where((r) => _estaEnRango(r.fechaCreacion, _rangoFiltro)).toList();
+    final bool esFiltroHoy = _rangoFiltro.start.year == DateTime.now().year &&
+        _rangoFiltro.start.month == DateTime.now().month &&
+        _rangoFiltro.start.day == DateTime.now().day &&
+        _rangoFiltro.end.year == DateTime.now().year &&
+        _rangoFiltro.end.month == DateTime.now().month &&
+        _rangoFiltro.end.day == DateTime.now().day;
+
+    return _rutas.where((r) {
+      // Rutas operativas en curso o pendientes siempre están vigentes en el día a día
+      if (esFiltroHoy && (r.isEnCurso || r.isPendiente)) return true;
+      // Para rangos históricos o rutas finalizadas/canceladas, filtrar por fecha
+      return _estaEnRango(r.fechaCreacion, _rangoFiltro) ||
+          _estaEnRango(r.fechaInicio, _rangoFiltro) ||
+          _estaEnRango(r.fechaFin, _rangoFiltro);
+    }).toList();
   }
 
   List<Ruta> get _rutasDelDia => _rutasDelPeriodo;
@@ -103,6 +124,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   void dispose() {
+    _telemetriaPollingTimer?.cancel();
     _wsService.dispose();
     super.dispose();
   }
@@ -110,10 +132,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void _iniciarSuscripcionWebSocket() {
     _wsService.addTelemetriaListener((telemetria) {
       if (!mounted) return;
+      if (!_esCoordenadaQuito(telemetria.latitud, telemetria.longitud)) return;
       setState(() {
-        final key = telemetria.choferId ?? telemetria.choferNombre ?? 'chofer';
+        final key = (telemetria.choferId != null && telemetria.choferId!.isNotEmpty)
+            ? telemetria.choferId!
+            : (telemetria.choferNombre ?? 'chofer');
         _telemetriaChoferes[key] = telemetria;
+        if (telemetria.choferNombre != null && telemetria.choferNombre!.isNotEmpty) {
+          _telemetriaChoferes[telemetria.choferNombre!] = telemetria;
+        }
       });
+      _actualizarPolilineaEnVivo(telemetria);
     });
 
     _wsService.addTableroListener(() {
@@ -125,12 +154,48 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Future<void> _inicializarDatos() async {
     setState(() => _cargando = true);
+    // 1. Cargar telemetría GPS primero para tener coordenadas reales del chofer en memoria
+    await _cargarTelemetriaActiva();
+    // 2. Cargar rutas y demás datos operativos
     await Future.wait([
       _cargarRutas(),
       _cargarChoferes(),
       _cargarEstadisticasInventario(),
     ]);
-    if (mounted) setState(() => _cargando = false);
+    if (mounted) {
+      setState(() => _cargando = false);
+      _telemetriaPollingTimer?.cancel();
+      _telemetriaPollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+        if (mounted) _cargarTelemetriaActiva();
+      });
+    }
+  }
+
+  Future<void> _cargarTelemetriaActiva() async {
+    try {
+      final list = await ApiService.obtenerTelemetriaActiva();
+      if (!mounted) return;
+      setState(() {
+        for (final tel in list) {
+          if (!_esCoordenadaQuito(tel.latitud, tel.longitud)) continue;
+          final key = (tel.choferId != null && tel.choferId!.isNotEmpty)
+              ? tel.choferId!
+              : (tel.choferNombre ?? 'chofer');
+          _telemetriaChoferes[key] = tel;
+          if (tel.choferNombre != null && tel.choferNombre!.isNotEmpty) {
+            _telemetriaChoferes[tel.choferNombre!] = tel;
+          }
+        }
+      });
+
+      if (_rutaSeleccionada != null && list.isNotEmpty) {
+        for (final tel in list) {
+          if (_esCoordenadaQuito(tel.latitud, tel.longitud)) {
+            _actualizarPolilineaEnVivo(tel);
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _cargarRutas() async {
@@ -198,6 +263,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         }
       });
     } catch (_) {}
+    _cargarTelemetriaActiva();
   }
 
   Future<void> _seleccionarRuta(Ruta ruta) async {
@@ -207,26 +273,78 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     });
 
     if (ruta.paradas.isNotEmpty) {
-      List<LatLng> coordsRuta = [];
-      double origLat = -0.089290;
-      double origLon = -78.439607;
-
-      for (final p in ruta.paradas) {
-        if (p.pedido != null) {
-          final destLat = p.pedido!.latitudDestino;
-          final destLon = p.pedido!.longitudDestino;
-          final tramo = await ApiService.trazarRutaVial(origLat, origLon, destLat, destLon);
-          for (final c in tramo) {
-            coordsRuta.add(LatLng(c[0], c[1]));
+      // Buscar telemetría activa del chofer asignado en la zona de Quito
+      TelemetriaGps? telChofer;
+      if (ruta.choferId != null && _telemetriaChoferes.containsKey(ruta.choferId)) {
+        telChofer = _telemetriaChoferes[ruta.choferId];
+      } else if (ruta.choferNombre != null && _telemetriaChoferes.containsKey(ruta.choferNombre)) {
+        telChofer = _telemetriaChoferes[ruta.choferNombre];
+      } else {
+        for (final t in _telemetriaChoferes.values) {
+          if (_esCoordenadaQuito(t.latitud, t.longitud)) {
+            telChofer = t;
+            break;
           }
-          origLat = destLat;
-          origLon = destLon;
         }
       }
 
-      if (mounted) {
-        setState(() => _puntosPolilinea = coordsRuta);
+      // La polilínea NACE ÚNICA Y EXCLUSIVAMENTE EN EL CHOFER.
+      // Jamás debe nacer en la bodega ni conectar la bodega a la ruta.
+      if (telChofer != null && _esCoordenadaQuito(telChofer.latitud, telChofer.longitud)) {
+        await _recalcularTrazoDesdeChofer(LatLng(telChofer.latitud, telChofer.longitud));
+      } else {
+        // Si aún no hay señal GPS del chofer, no se dibuja línea desde bodega
+        if (mounted) setState(() => _puntosPolilinea = []);
       }
+    }
+  }
+
+  void _actualizarPolilineaEnVivo(TelemetriaGps telemetria) {
+    if (_rutaSeleccionada == null) return;
+    final ruta = _rutaSeleccionada!;
+
+    final bool coincideChofer = (ruta.choferId != null && ruta.choferId == telemetria.choferId) ||
+        (ruta.choferNombre != null && ruta.choferNombre == telemetria.choferNombre) ||
+        (ruta.isEnCurso && _telemetriaChoferes.length <= 2);
+
+    if (!coincideChofer) return;
+
+    final posChofer = LatLng(telemetria.latitud, telemetria.longitud);
+
+    // Recalcular el trazo desde el chofer hacia las paradas pendientes con OSRM
+    _recalcularTrazoDesdeChofer(posChofer);
+  }
+
+  Future<void> _recalcularTrazoDesdeChofer(LatLng posChofer) async {
+    if (_recalculandoPolilinea || _rutaSeleccionada == null) return;
+    _recalculandoPolilinea = true;
+    try {
+      final paradasPendientes = _rutaSeleccionada!.paradas
+          .where((p) => p.pedido != null && !p.isEntregado && p.estado != 'CANCELADA')
+          .toList();
+      if (paradasPendientes.isEmpty) return;
+
+      List<LatLng> nuevosPuntos = [];
+      double origLat = posChofer.latitude;
+      double origLon = posChofer.longitude;
+
+      for (final p in paradasPendientes) {
+        final destLat = p.pedido!.latitudDestino;
+        final destLon = p.pedido!.longitudDestino;
+        final tramo = await ApiService.trazarRutaVial(origLat, origLon, destLat, destLon);
+        for (final c in tramo) {
+          nuevosPuntos.add(LatLng(c[0], c[1]));
+        }
+        origLat = destLat;
+        origLon = destLon;
+      }
+
+      if (mounted && nuevosPuntos.isNotEmpty) {
+        setState(() => _puntosPolilinea = nuevosPuntos);
+      }
+    } catch (_) {
+    } finally {
+      _recalculandoPolilinea = false;
     }
   }
 
@@ -1212,7 +1330,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         );
       case 2:
         return PlanificarRutasView(
-          rutas: _rutasDelDia,
+          rutas: _rutas,
           choferes: _choferes,
           onRefresh: _inicializarDatos,
         );
@@ -1527,8 +1645,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
           const SizedBox(height: 12),
 
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
             children: [
               Text(
                 'Itinerario de Paradas (${ruta.paradas.length}):',

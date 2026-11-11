@@ -28,7 +28,11 @@ class WebSocketMobileService {
       final baseUrl = ApiService.baseUrl;
       final uri = Uri.parse(baseUrl);
       final wsScheme = uri.scheme == 'https' ? 'wss' : 'ws';
-      final wsUri = Uri.parse('$wsScheme://${uri.host}:${uri.port}/ws-logistica/websocket');
+      int wsPort = uri.port;
+      if (wsPort == 8085 || wsPort == 8080) {
+        wsPort = 8083; // Conexión directa a logistica-service para STOMP WebSocket
+      }
+      final wsUri = Uri.parse('$wsScheme://${uri.host}:$wsPort/ws-logistica/websocket');
 
       _channel = WebSocketChannel.connect(wsUri);
       _isConnected = true;

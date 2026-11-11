@@ -9,6 +9,7 @@ import '../models/movimiento.dart';
 import '../models/pedido.dart';
 import '../models/producto.dart';
 import '../models/ruta.dart';
+import '../models/telemetria.dart';
 import '../models/user.dart';
 
 class ApiService {
@@ -516,6 +517,20 @@ class ApiService {
           }),
         )
         .timeout(const Duration(seconds: 4));
+  }
+
+  static Future<List<TelemetriaGps>> obtenerTelemetriaActiva() async {
+    try {
+      final apiBase = await getApiBase();
+      final url = Uri.parse('$apiBase/logistica/telemetria/activa');
+      final headers = await _headers();
+      final response = await http.get(url, headers: headers).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final List<dynamic> list = jsonDecode(response.body);
+        return list.map((item) => TelemetriaGps.fromJson(item as Map<String, dynamic>)).toList();
+      }
+    } catch (_) {}
+    return [];
   }
 
   // Trazar ruta real con OSRM

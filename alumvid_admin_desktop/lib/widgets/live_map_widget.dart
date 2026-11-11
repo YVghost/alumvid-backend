@@ -216,8 +216,12 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
                   );
                 }),
 
-                // Marcadores de Choferes en tiempo real
-                ...widget.telemetriaChoferes.values.map((tel) {
+                // Marcadores de Choferes en tiempo real (filtrados por unicidad y acotados a zona operativa Quito)
+                ...{
+                  for (final tel in widget.telemetriaChoferes.values)
+                    if (tel.latitud > -0.5 && tel.latitud < 0.2 && tel.longitud > -78.8 && tel.longitud < -78.2)
+                      (tel.choferId ?? tel.choferNombre ?? 'chofer'): tel
+                }.values.map((tel) {
                   final pos = LatLng(tel.latitud, tel.longitud);
                   return Marker(
                     point: pos,
@@ -322,6 +326,23 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
                 onPressed: recentrarEnBodega,
                 iconColor: AppTheme.primaryLight,
               ),
+              if (widget.telemetriaChoferes.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _buildFloatingBtn(
+                  icon: Icons.navigation,
+                  tooltip: 'Centrar en Chofer Activo',
+                  onPressed: () {
+                    final choferesValidos = widget.telemetriaChoferes.values.where(
+                      (t) => t.latitud > -0.5 && t.latitud < 0.2 && t.longitud > -78.8 && t.longitud < -78.2,
+                    );
+                    if (choferesValidos.isNotEmpty) {
+                      final c = choferesValidos.first;
+                      enfocarCoordenada(LatLng(c.latitud, c.longitud), 15.0);
+                    }
+                  },
+                  iconColor: AppTheme.statusEnCurso,
+                ),
+              ],
             ],
           ),
         ),
@@ -361,6 +382,42 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
                   Text(
                     '• Chofer: ${widget.rutaSeleccionada!.choferNombre ?? "Sin asignar"}',
                     style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                  ),
+                  Builder(
+                    builder: (context) {
+                      final tel = widget.rutaSeleccionada?.choferId != null
+                          ? widget.telemetriaChoferes[widget.rutaSeleccionada!.choferId!]
+                          : (widget.rutaSeleccionada?.choferNombre != null
+                              ? widget.telemetriaChoferes[widget.rutaSeleccionada!.choferNombre!]
+                              : null);
+                      if (tel == null) return const SizedBox.shrink();
+
+                      return Padding(
+                        padding: const EdgeInsets.only(left: 10),
+                        child: InkWell(
+                          onTap: () => enfocarCoordenada(LatLng(tel.latitud, tel.longitud), 15.0),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppTheme.statusEnCurso.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.statusEnCurso),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.gps_fixed, size: 12, color: AppTheme.statusEnCurso),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'GPS En Vivo • ${tel.velocidadKmh.toStringAsFixed(0)} km/h',
+                                  style: const TextStyle(color: AppTheme.statusEnCurso, fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

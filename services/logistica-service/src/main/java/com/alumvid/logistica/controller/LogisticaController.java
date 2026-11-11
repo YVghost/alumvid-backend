@@ -8,9 +8,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
@@ -25,6 +27,7 @@ public class LogisticaController {
 
     private final LogisticaService logisticaService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final Map<String, TelemetriaGpsPayload> ultimasUbicaciones = new ConcurrentHashMap<>();
 
     @GetMapping("/health")
     public ResponseEntity<Map<String, String>> healthCheck() {
@@ -199,12 +202,23 @@ public class LogisticaController {
             if (payload.getTimestamp() == null) {
                 payload.setTimestamp(System.currentTimeMillis());
             }
+            if (payload.getChoferId() != null) {
+                ultimasUbicaciones.put(payload.getChoferId().toString(), payload);
+            }
+            if (payload.getChoferNombre() != null && !payload.getChoferNombre().isBlank()) {
+                ultimasUbicaciones.put(payload.getChoferNombre(), payload);
+            }
             if (payload.getDespachoId() != null) {
                 messagingTemplate.convertAndSend("/topic/despachos/" + payload.getDespachoId() + "/ubicacion", payload);
             }
             messagingTemplate.convertAndSend("/topic/choferes-activos", payload);
         }
         return ResponseEntity.ok(Map.of("status", "RECEIVED", "timestamp", System.currentTimeMillis()));
+    }
+
+    @GetMapping("/telemetria/activa")
+    public ResponseEntity<Collection<TelemetriaGpsPayload>> obtenerTelemetriaActiva() {
+        return ResponseEntity.ok(ultimasUbicaciones.values());
     }
 
     @PostMapping("/notificaciones/sesion-revocada")
