@@ -282,6 +282,40 @@ class ApiService {
     throw Exception(err['message'] ?? 'Error al agregar destino a la ruta');
   }
 
+  static Future<Ruta> modificarDestinoRuta({
+    required String rutaId,
+    required String despachoId,
+    required String cliente,
+    required String direccionTexto,
+    required double latitud,
+    required double longitud,
+    String? comentarios,
+  }) async {
+    final apiBase = await getApiBase();
+    final url = Uri.parse('$apiBase/logistica/rutas/$rutaId/destinos/$despachoId');
+    final headers = await _headers();
+
+    final response = await http
+        .put(
+          url,
+          headers: headers,
+          body: jsonEncode({
+            'cliente': cliente,
+            'direccionTexto': direccionTexto,
+            'latitudDestino': latitud,
+            'longitudDestino': longitud,
+            'comentarios': comentarios,
+          }),
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      return Ruta.fromJson(jsonDecode(response.body));
+    }
+    final err = jsonDecode(response.body);
+    throw Exception(err['message'] ?? 'Error al modificar parada');
+  }
+
   static Future<Ruta> eliminarDestinoRuta(String rutaId, String despachoId) async {
     final apiBase = await getApiBase();
     final url = Uri.parse('$apiBase/logistica/rutas/$rutaId/destinos/$despachoId');

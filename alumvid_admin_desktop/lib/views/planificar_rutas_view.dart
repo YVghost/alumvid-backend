@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
-import 'package:latlong2/latlong.dart';
 import '../models/chofer.dart';
 import '../models/despacho.dart';
 import '../models/ruta.dart';
@@ -10,14 +8,17 @@ import '../theme/app_theme.dart';
 import '../utils/app_toast.dart';
 import '../widgets/agregar_parada_dialog.dart';
 import '../widgets/epod_dialog.dart';
+import '../widgets/modificar_parada_dialog.dart';
+import '../widgets/ver_ubicacion_parada_dialog.dart';
 
 class PlanificarRutasView extends StatefulWidget {
   final List<Ruta> rutas;
   final List<Ruta> todasLasRutas;
   final List<Chofer> choferes;
-  final DateTimeRange rangoFiltro;
-  final ValueChanged<DateTimeRange> onCambiarRangoFiltro;
+  final DateTimeRange? rangoFiltro;
+  final ValueChanged<DateTimeRange?> onCambiarRangoFiltro;
   final VoidCallback onRefresh;
+  final void Function(Ruta? ruta)? onIrAMonitoreo;
 
   const PlanificarRutasView({
     super.key,
@@ -27,6 +28,7 @@ class PlanificarRutasView extends StatefulWidget {
     required this.rangoFiltro,
     required this.onCambiarRangoFiltro,
     required this.onRefresh,
+    this.onIrAMonitoreo,
   });
 
   @override
@@ -34,9 +36,11 @@ class PlanificarRutasView extends StatefulWidget {
 }
 
 class _PlanificarRutasViewState extends State<PlanificarRutasView> {
-  // Ruta seleccionada / expandida
-  String? _expandedRutaId;
-  Ruta? _rutaSeleccionada;
+  // Conjunto de IDs de rutas desplegadas (permite desplegar/minimizar múltiples o todas)
+  final Set<String> _expandedRutaIds = {};
+
+  // Filtro activo por tarjeta superior: null (todas), 'EN_CURSO', 'COMPLETADA', 'CANCELADA'
+  String? _filtroEstadoCard;
 
   // Formulario Crear o Asignar Ruta
   final _codigoRutaCtrl = TextEditingController(text: 'Ruta 10');
@@ -47,30 +51,13 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
   final _searchCtrl = TextEditingController();
   String _filtroTexto = '';
 
-  // Mini-mapa Punto de Entrega
-  final MapController _miniMapController = MapController();
-  LatLng _mapCenter = const LatLng(-0.1807, -78.4678); // Quito (La Carolina / Centro)
-  double _mapZoom = 13.0;
-
   @override
   void initState() {
     super.initState();
     _proponerSiguienteCodigo();
+    // Desplegar por defecto la primera ruta si existe
     if (widget.rutas.isNotEmpty) {
-      _expandedRutaId = widget.rutas.first.id;
-      _rutaSeleccionada = widget.rutas.first;
-      _actualizarCentroMapaParaRuta(_rutaSeleccionada);
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant PlanificarRutasView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (_expandedRutaId != null) {
-      final act = widget.rutas.where((r) => r.id == _expandedRutaId).toList();
-      if (act.isNotEmpty) {
-        _rutaSeleccionada = act.first;
-      }
+      _expandedRutaIds.add(widget.rutas.first.id);
     }
   }
 
@@ -93,14 +80,21 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
     _codigoRutaCtrl.text = 'Ruta ${maxNum + 1}';
   }
 
-  void _actualizarCentroMapaParaRuta(Ruta? ruta) {
-    if (ruta != null && ruta.paradas.isNotEmpty) {
-      final p = ruta.paradas.first;
-      _mapCenter = LatLng(p.latitud, p.longitud);
-      _mapZoom = 14.0;
-      try {
-        _miniMapController.move(_mapCenter, _mapZoom);
-      } catch (_) {}
+  String _formatearFechaCreacion(DateTime? fecha) {
+    if (fecha == null) return '';
+    // Ecuador se encuentra en UTC-5
+    final ecDt = fecha.toUtc().subtract(const Duration(hours: 5));
+    final nowEc = DateTime.now().toUtc().subtract(const Duration(hours: 5));
+
+    const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    final mes = meses[ecDt.month - 1];
+    final hora = ecDt.hour.toString().padLeft(2, '0');
+    final min = ecDt.minute.toString().padLeft(2, '0');
+
+    if (ecDt.year == nowEc.year) {
+      return 'Creado: ${ecDt.day} $mes, $hora:$min';
+    } else {
+      return 'Creado: ${ecDt.day} $mes ${ecDt.year}, $hora:$min';
     }
   }
 
@@ -119,15 +113,14 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
       );
 
       if (!mounted) return;
-      AppToast.success(context, 'Ruta "$codigo" creada y disponible en la lista.');
+      AppToast.success(context, 'Ruta "$codigo" creada y agregada a la lista');
 
       _proponerSiguienteCodigo();
       widget.onRefresh();
 
       setState(() {
         _creandoRuta = false;
-        _expandedRutaId = nueva.id;
-        _rutaSeleccionada = nueva;
+        _expandedRutaIds.add(nueva.id);
       });
     } catch (e) {
       if (!mounted) return;
@@ -145,7 +138,40 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
         onParadaAgregada: () {
           widget.onRefresh();
           setState(() {
-            _expandedRutaId = ruta.id;
+            _expandedRutaIds.add(ruta.id);
+          });
+        },
+      ),
+    );
+  }
+
+  void _abrirVerUbicacion(Ruta ruta, Despacho parada) {
+    showDialog(
+      context: context,
+      builder: (_) => VerUbicacionParadaDialog(
+        ruta: ruta,
+        parada: parada,
+        onParadaModificada: () {
+          widget.onRefresh();
+          setState(() {
+            _expandedRutaIds.add(ruta.id);
+          });
+        },
+      ),
+    );
+  }
+
+  void _abrirModificarParada(Ruta ruta, Despacho parada) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ModificarParadaDialog(
+        ruta: ruta,
+        parada: parada,
+        onParadaModificada: () {
+          widget.onRefresh();
+          setState(() {
+            _expandedRutaIds.add(ruta.id);
           });
         },
       ),
@@ -156,11 +182,8 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
     try {
       final act = await ApiService.iniciarRuta(ruta.id);
       if (!mounted) return;
-      AppToast.success(context, 'Ruta "${act.codigoRuta}" puesta EN CURSO.');
+      AppToast.success(context, 'Ruta "${act.codigoRuta}" puesta EN CURSO');
       widget.onRefresh();
-      setState(() {
-        _rutaSeleccionada = act;
-      });
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, 'Error al iniciar ruta: $e');
@@ -173,7 +196,7 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF131B2E),
         title: const Text('Eliminar Ruta', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: Text('¿Desea eliminar la ruta "${ruta.codigoRuta}" y sus paradas?', style: const TextStyle(color: Color(0xFF94A3B8))),
+        content: Text('¿Desea eliminar la ruta "${ruta.codigoRuta}" y todas sus paradas?', style: const TextStyle(color: Color(0xFF94A3B8))),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           ElevatedButton(
@@ -190,12 +213,9 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
         await ApiService.eliminarRuta(ruta.id);
         if (!mounted) return;
         AppToast.success(context, 'Ruta eliminada.');
-        if (_expandedRutaId == ruta.id) {
-          setState(() {
-            _expandedRutaId = null;
-            _rutaSeleccionada = null;
-          });
-        }
+        setState(() {
+          _expandedRutaIds.remove(ruta.id);
+        });
         widget.onRefresh();
       } catch (e) {
         if (!mounted) return;
@@ -206,11 +226,10 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
 
   Future<void> _eliminarParada(Ruta ruta, Despacho parada) async {
     try {
-      final act = await ApiService.eliminarDestinoRuta(ruta.id, parada.id);
+      await ApiService.eliminarDestinoRuta(ruta.id, parada.id);
       if (!mounted) return;
-      AppToast.success(context, 'Parada eliminada de la ruta.');
+      AppToast.success(context, 'Parada eliminada de la ruta');
       widget.onRefresh();
-      setState(() => _rutaSeleccionada = act);
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, 'Error al eliminar parada: $e');
@@ -227,34 +246,40 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Filtrar Rutas por Fecha', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+              // Opción para ver todas las rutas históricas (sin filtro de fecha)
+              ListTile(
+                leading: const Icon(Icons.all_inclusive_rounded, color: Color(0xFF38BDF8)),
+                title: const Text('Todas las Rutas (Histórico completo)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: const Text('Ver todas las rutas registradas sin restricción de fecha', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                onTap: () => Navigator.pop(ctx, 'TODAS'),
+              ),
               const Divider(color: Color(0xFF1E293B)),
               ListTile(
-                leading: const Icon(Icons.today, color: Color(0xFF38BDF8)),
+                leading: const Icon(Icons.today_rounded, color: Color(0xFF38BDF8)),
                 title: const Text('Hoy', style: TextStyle(color: Colors.white)),
                 onTap: () => Navigator.pop(ctx, 'HOY'),
               ),
               ListTile(
-                leading: const Icon(Icons.history, color: Color(0xFF38BDF8)),
+                leading: const Icon(Icons.history_rounded, color: Color(0xFF38BDF8)),
                 title: const Text('Ayer', style: TextStyle(color: Colors.white)),
                 onTap: () => Navigator.pop(ctx, 'AYER'),
               ),
               ListTile(
-                leading: const Icon(Icons.date_range, color: Color(0xFF38BDF8)),
+                leading: const Icon(Icons.date_range_rounded, color: Color(0xFF38BDF8)),
                 title: const Text('Últimos 7 días', style: TextStyle(color: Colors.white)),
                 onTap: () => Navigator.pop(ctx, '7DIAS'),
               ),
               ListTile(
-                leading: const Icon(Icons.calendar_month, color: Color(0xFF38BDF8)),
+                leading: const Icon(Icons.calendar_month_rounded, color: Color(0xFF38BDF8)),
                 title: const Text('Todo el Mes', style: TextStyle(color: Colors.white)),
                 onTap: () => Navigator.pop(ctx, 'MES'),
               ),
               ListTile(
-                leading: const Icon(Icons.edit_calendar, color: Color(0xFF38BDF8)),
+                leading: const Icon(Icons.edit_calendar_rounded, color: Color(0xFF38BDF8)),
                 title: const Text('Elegir Rango Personalizado...', style: TextStyle(color: Colors.white)),
                 onTap: () => Navigator.pop(ctx, 'CUSTOM'),
               ),
@@ -266,7 +291,9 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
 
     if (opcion == null) return;
 
-    if (opcion == 'HOY') {
+    if (opcion == 'TODAS') {
+      widget.onCambiarRangoFiltro(null);
+    } else if (opcion == 'HOY') {
       widget.onCambiarRangoFiltro(DateTimeRange(start: ahora, end: ahora));
     } else if (opcion == 'AYER') {
       final ayer = ahora.subtract(const Duration(days: 1));
@@ -280,7 +307,7 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
       if (!mounted) return;
       final picked = await showDateRangePicker(
         context: context,
-        initialDateRange: widget.rangoFiltro,
+        initialDateRange: widget.rangoFiltro ?? DateTimeRange(start: ahora, end: ahora),
         firstDate: DateTime(2025, 1, 1),
         lastDate: DateTime.now().add(const Duration(days: 30)),
         builder: (ctx, child) {
@@ -307,6 +334,8 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
   Widget build(BuildContext context) {
     // Cálculo de métricas
     final int totalRutas = widget.rutas.length;
+    final int enCaminoCount = widget.rutas.where((r) => r.isEnCurso).length;
+
     int exitosas = 0;
     int canceladas = 0;
     for (final r in widget.rutas) {
@@ -317,24 +346,43 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
       if (r.estado == 'CANCELADA') canceladas++;
     }
 
-    final bool esHoy = widget.rangoFiltro.start.day == DateTime.now().day &&
-        widget.rangoFiltro.start.month == DateTime.now().month &&
-        widget.rangoFiltro.start.year == DateTime.now().year &&
-        widget.rangoFiltro.end.day == DateTime.now().day &&
-        widget.rangoFiltro.end.month == DateTime.now().month &&
-        widget.rangoFiltro.end.year == DateTime.now().year;
+    final bool esFiltroTotal = widget.rangoFiltro == null;
+    final bool esHoy = !esFiltroTotal &&
+        widget.rangoFiltro!.start.day == DateTime.now().day &&
+        widget.rangoFiltro!.start.month == DateTime.now().month &&
+        widget.rangoFiltro!.start.year == DateTime.now().year &&
+        widget.rangoFiltro!.end.day == DateTime.now().day &&
+        widget.rangoFiltro!.end.month == DateTime.now().month &&
+        widget.rangoFiltro!.end.year == DateTime.now().year;
 
-    final String diaNumero = esHoy
-        ? widget.rangoFiltro.start.day.toString()
-        : DateFormat('dd MMM').format(widget.rangoFiltro.start);
+    final String diaNumero = esFiltroTotal
+        ? 'Todas'
+        : (esHoy
+            ? widget.rangoFiltro!.start.day.toString()
+            : DateFormat('dd MMM').format(widget.rangoFiltro!.start));
+
+    final String diaTexto = esFiltroTotal
+        ? 'Histórico'
+        : (esHoy ? 'Hoy' : 'Periodo');
+
+    // Filtrado de rutas por tarjeta seleccionada
+    List<Ruta> rutasBase = widget.rutas;
+    if (_filtroEstadoCard == 'EN_CURSO') {
+      rutasBase = rutasBase.where((r) => r.isEnCurso).toList();
+    } else if (_filtroEstadoCard == 'COMPLETADA') {
+      rutasBase = rutasBase.where((r) => r.isCompletada || r.paradas.any((p) => p.isEntregado)).toList();
+    } else if (_filtroEstadoCard == 'CANCELADA') {
+      rutasBase = rutasBase.where((r) => r.estado == 'CANCELADA' || r.paradas.any((p) => p.isNoEntregado)).toList();
+    }
 
     // Filtrado de rutas por texto de búsqueda
-    final rutasFiltradas = widget.rutas.where((r) {
+    final rutasFiltradas = rutasBase.where((r) {
       if (_filtroTexto.isEmpty) return true;
       final q = _filtroTexto.toLowerCase();
       final cod = r.codigoRuta.toLowerCase();
       final chofer = (r.choferNombre ?? '').toLowerCase();
-      return cod.contains(q) || chofer.contains(q);
+      final tieneCliente = r.paradas.any((p) => p.cliente.toLowerCase().contains(q) || p.direccionTexto.toLowerCase().contains(q));
+      return cod.contains(q) || chofer.contains(q) || tieneCliente;
     }).toList();
 
     return Container(
@@ -345,30 +393,31 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ==========================================
-            // 1. FILA DE 4 TARJETAS DE ESTADO SUPERIORES
+            // 1. FILA DE 5 TARJETAS DE ESTADO (COMPACTAS Y FILTRABLES)
             // ==========================================
             _buildMetricCardsRow(
-              diaTexto: esHoy ? 'Hoy' : 'Periodo',
+              diaTexto: diaTexto,
               diaNumero: diaNumero,
               rutasTotales: totalRutas,
+              enCaminoCount: enCaminoCount,
               entregasExitosas: exitosas,
               entregasCanceladas: canceladas,
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
 
             // ==========================================
-            // 2. SECCIÓN MEDIA: 2 COLUMNAS (CREAR + MAPA)
+            // 2. SECCIÓN MEDIA: 2 COLUMNAS (CREAR + CENTRO OPERATIVO DE FLOTA)
             // ==========================================
             LayoutBuilder(
               builder: (context, constraints) {
-                final isWide = constraints.maxWidth >= 850;
+                final isWide = constraints.maxWidth >= 880;
                 if (isWide) {
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(flex: 5, child: _buildCardCrearOAsignar()),
-                      const SizedBox(width: 18),
-                      Expanded(flex: 4, child: _buildCardPuntoEntrega()),
+                      const SizedBox(width: 16),
+                      Expanded(flex: 4, child: _buildCardCentroOperativoFlota()),
                     ],
                   );
                 } else {
@@ -376,13 +425,13 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                     children: [
                       _buildCardCrearOAsignar(),
                       const SizedBox(height: 16),
-                      _buildCardPuntoEntrega(),
+                      _buildCardCentroOperativoFlota(),
                     ],
                   );
                 }
               },
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
 
             // ==========================================
             // 3. SECCIÓN INFERIOR: RUTAS CREADAS (ACORDEÓN)
@@ -395,190 +444,201 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
   }
 
   // ==========================================
-  // WIDGET: FILA DE 4 TARJETAS DE ESTADO (MOCKUP)
+  // WIDGET: 5 TARJETAS DE MÉTRICAS COMPACTAS
   // ==========================================
   Widget _buildMetricCardsRow({
     required String diaTexto,
     required String diaNumero,
     required int rutasTotales,
+    required int enCaminoCount,
     required int entregasExitosas,
     required int entregasCanceladas,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 900;
+        final isWide = constraints.maxWidth >= 1050;
+        final isMedium = constraints.maxWidth >= 680;
+        final crossCount = isWide ? 5 : (isMedium ? 3 : 2);
+
         return GridView.count(
-          crossAxisCount: isWide ? 4 : 2,
+          crossAxisCount: crossCount,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: isWide ? 2.5 : 2.2,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: isWide ? 3.3 : 2.5,
           children: [
-            // Tarjeta 1: Fecha / Hoy
-            InkWell(
+            // Tarjeta 1: Fecha / Periodo
+            _buildMetricItem(
+              icon: Icons.calendar_month_rounded,
+              iconColor: const Color(0xFF38BDF8),
+              iconBg: const Color(0xFF1E3A8A).withValues(alpha: 0.35),
+              title: diaTexto,
+              value: diaNumero,
+              hasDropdown: true,
+              isSelected: false,
               onTap: _mostrarSelectorFecha,
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF101728),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFF1E293B)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E3A8A).withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.calendar_month_rounded, color: Color(0xFF38BDF8), size: 24),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(diaTexto, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Text(
-                                diaNumero,
-                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF94A3B8), size: 18),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
 
             // Tarjeta 2: Rutas Totales
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF101728),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF1E293B)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1D4ED8).withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.alt_route_rounded, color: Color(0xFF60A5FA), size: 24),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Rutas Totales', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$rutasTotales',
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            _buildMetricItem(
+              icon: Icons.alt_route_rounded,
+              iconColor: const Color(0xFF60A5FA),
+              iconBg: const Color(0xFF1D4ED8).withValues(alpha: 0.25),
+              title: 'Rutas Totales',
+              value: '$rutasTotales',
+              isSelected: _filtroEstadoCard == null,
+              onTap: () {
+                setState(() => _filtroEstadoCard = null);
+              },
             ),
 
-            // Tarjeta 3: Entregas Exitosas
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF101728),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF1E293B)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF065F46).withValues(alpha: 0.35),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 24),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Entregas Exitosas', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$entregasExitosas',
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            // Tarjeta 3: En Camino (NUEVA)
+            _buildMetricItem(
+              icon: Icons.local_shipping_rounded,
+              iconColor: const Color(0xFF38BDF8),
+              iconBg: const Color(0xFF0369A1).withValues(alpha: 0.3),
+              title: 'En Camino',
+              value: '$enCaminoCount',
+              isSelected: _filtroEstadoCard == 'EN_CURSO',
+              activeColor: const Color(0xFF38BDF8),
+              onTap: () {
+                setState(() {
+                  if (_filtroEstadoCard == 'EN_CURSO') {
+                    _filtroEstadoCard = null;
+                  } else {
+                    _filtroEstadoCard = 'EN_CURSO';
+                    // Desplegar automáticamente todas las rutas en curso
+                    final enCurso = widget.rutas.where((r) => r.isEnCurso).map((r) => r.id);
+                    _expandedRutaIds.addAll(enCurso);
+                  }
+                });
+              },
             ),
 
-            // Tarjeta 4: Entregas Canceladas
+            // Tarjeta 4: Entregas Exitosas
+            _buildMetricItem(
+              icon: Icons.check_circle_rounded,
+              iconColor: const Color(0xFF10B981),
+              iconBg: const Color(0xFF065F46).withValues(alpha: 0.3),
+              title: 'Entregas Exitosas',
+              value: '$entregasExitosas',
+              isSelected: _filtroEstadoCard == 'COMPLETADA',
+              activeColor: const Color(0xFF10B981),
+              onTap: () {
+                setState(() {
+                  if (_filtroEstadoCard == 'COMPLETADA') {
+                    _filtroEstadoCard = null;
+                  } else {
+                    _filtroEstadoCard = 'COMPLETADA';
+                    final completas = widget.rutas.where((r) => r.isCompletada || r.paradas.any((p) => p.isEntregado)).map((r) => r.id);
+                    _expandedRutaIds.addAll(completas);
+                  }
+                });
+              },
+            ),
+
+            // Tarjeta 5: Entregas Canceladas
+            _buildMetricItem(
+              icon: Icons.cancel_rounded,
+              iconColor: const Color(0xFFEF4444),
+              iconBg: const Color(0xFF991B1B).withValues(alpha: 0.3),
+              title: 'Entregas Canceladas',
+              value: '$entregasCanceladas',
+              isSelected: _filtroEstadoCard == 'CANCELADA',
+              activeColor: const Color(0xFFEF4444),
+              onTap: () {
+                setState(() {
+                  if (_filtroEstadoCard == 'CANCELADA') {
+                    _filtroEstadoCard = null;
+                  } else {
+                    _filtroEstadoCard = 'CANCELADA';
+                    final canceladas = widget.rutas.where((r) => r.estado == 'CANCELADA' || r.paradas.any((p) => p.isNoEntregado)).map((r) => r.id);
+                    _expandedRutaIds.addAll(canceladas);
+                  }
+                });
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildMetricItem({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    required String value,
+    required VoidCallback onTap,
+    bool hasDropdown = false,
+    bool isSelected = false,
+    Color? activeColor,
+  }) {
+    final borderCol = isSelected && activeColor != null
+        ? activeColor.withValues(alpha: 0.8)
+        : const Color(0xFF1E293B);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF101728),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: borderCol, width: isSelected && activeColor != null ? 1.5 : 1.0),
+          boxShadow: isSelected && activeColor != null
+              ? [BoxShadow(color: activeColor.withValues(alpha: 0.15), blurRadius: 8, spreadRadius: 1)]
+              : null,
+        ),
+        child: Row(
+          children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
-                color: const Color(0xFF101728),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF1E293B)),
+                color: iconBg,
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
+              child: Icon(icon, color: iconColor, size: 19),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF991B1B).withValues(alpha: 0.35),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.cancel_rounded, color: Color(0xFFEF4444), size: 24),
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Entregas Canceladas', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$entregasCanceladas',
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                  const SizedBox(height: 1),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          value,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
+                      ),
+                      if (hasDropdown) ...[
+                        const SizedBox(width: 2),
+                        const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF94A3B8), size: 16),
                       ],
-                    ),
+                    ],
                   ),
                 ],
               ),
             ),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -592,10 +652,10 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
     final String? valorChofer = choferCrearValido ? _choferCrearRutaId : null;
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF101728),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF1E293B)),
       ),
       child: Column(
@@ -605,24 +665,24 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
           Row(
             children: [
               Container(
-                width: 26,
-                height: 26,
+                width: 24,
+                height: 24,
                 decoration: const BoxDecoration(
                   color: Color(0xFF1D72FE),
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
-                  child: Text('1', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                  child: Text('1', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               const Text(
                 'Crear o Asignar Ruta',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           // Campos: Nombre de la Ruta + Chofer Asignado
           LayoutBuilder(
@@ -635,10 +695,10 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Nombre de la Ruta', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-                          const SizedBox(height: 6),
+                          const Text('Nombre de la Ruta', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                          const SizedBox(height: 5),
                           Container(
-                            height: 42,
+                            height: 40,
                             decoration: BoxDecoration(
                               color: const Color(0xFF090E1A),
                               borderRadius: BorderRadius.circular(8),
@@ -658,15 +718,15 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Chofer Asignado', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-                          const SizedBox(height: 6),
+                          const Text('Chofer Asignado', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                          const SizedBox(height: 5),
                           Container(
-                            height: 42,
+                            height: 40,
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             decoration: BoxDecoration(
                               color: const Color(0xFF090E1A),
@@ -678,8 +738,8 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                                 isExpanded: true,
                                 value: valorChofer,
                                 dropdownColor: const Color(0xFF101728),
-                                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF94A3B8)),
-                                style: const TextStyle(color: Colors.white, fontSize: 13),
+                                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF94A3B8), size: 18),
+                                style: const TextStyle(color: Colors.white, fontSize: 12),
                                 items: [
                                   const DropdownMenuItem<String?>(
                                     value: null,
@@ -707,10 +767,10 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Nombre de la Ruta', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-                    const SizedBox(height: 6),
+                    const Text('Nombre de la Ruta', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                    const SizedBox(height: 5),
                     Container(
-                      height: 42,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: const Color(0xFF090E1A),
                         borderRadius: BorderRadius.circular(8),
@@ -727,10 +787,10 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    const Text('Chofer Asignado', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-                    const SizedBox(height: 6),
+                    const Text('Chofer Asignado', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                    const SizedBox(height: 5),
                     Container(
-                      height: 42,
+                      height: 40,
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
                         color: const Color(0xFF090E1A),
@@ -758,23 +818,23 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
               }
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
           // Botón Azul: + Crear / Asignar
           SizedBox(
             width: double.infinity,
-            height: 42,
+            height: 38,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1D72FE),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 elevation: 0,
               ),
               onPressed: _creandoRuta ? null : _crearOAsignarRuta,
               child: _creandoRuta
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('+ Crear / Asignar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('+ Crear / Asignar', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             ),
           ),
         ],
@@ -783,99 +843,139 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
   }
 
   // ==========================================
-  // WIDGET: PUNTO DE ENTREGA (MINI MAPA)
+  // WIDGET: 2. CENTRO OPERATIVO & ESTADO DE FLOTA (REEMPLAZA PUNTO DE ENTREGA)
   // ==========================================
-  Widget _buildCardPuntoEntrega() {
-    // Marcadores del mini-mapa
-    final List<Marker> marcadores = [];
-
-    if (_rutaSeleccionada != null && _rutaSeleccionada!.paradas.isNotEmpty) {
-      for (final p in _rutaSeleccionada!.paradas) {
-        marcadores.add(
-          Marker(
-            point: LatLng(p.latitud, p.longitud),
-            width: 38,
-            height: 38,
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Color(0xFF1D72FE),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(color: Colors.black45, blurRadius: 4, offset: Offset(0, 2)),
-                ],
-              ),
-              child: const Icon(Icons.location_on, color: Colors.white, size: 22),
-            ),
-          ),
-        );
-      }
-    } else {
-      marcadores.add(
-        Marker(
-          point: _mapCenter,
-          width: 36,
-          height: 36,
-          child: const Icon(Icons.location_on, color: Color(0xFF1D72FE), size: 36),
-        ),
-      );
-    }
+  Widget _buildCardCentroOperativoFlota() {
+    // Buscar si hay alguna ruta activa en curso
+    final rutaEnCurso = widget.rutas.where((r) => r.isEnCurso).toList();
+    final choferesEnRuta = widget.choferes.where((c) => c.isEnRuta).length;
+    final choferesDisponibles = widget.choferes.where((c) => c.isDisponible).length;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF101728),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF1E293B)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Cabecera: Icono + Título + Badge En Vivo
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Row(
                 children: [
-                  Icon(Icons.location_on, color: Color(0xFF38BDF8), size: 18),
+                  Icon(Icons.hub_rounded, color: Color(0xFF38BDF8), size: 18),
                   SizedBox(width: 8),
-                  Text('Punto de Entrega', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                  Text(
+                    'Centro Operativo & Flota',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                  ),
                 ],
               ),
-              IconButton(
-                icon: const Icon(Icons.open_in_new_rounded, size: 16, color: Color(0xFF94A3B8)),
-                tooltip: 'Centrar en mapa general',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onPressed: () {
-                  _miniMapController.move(_mapCenter, 14.0);
-                },
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.circle, color: Color(0xFF10B981), size: 7),
+                    SizedBox(width: 5),
+                    Text('En Vivo', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
+                  ],
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: SizedBox(
-              height: 120,
-              width: double.infinity,
-              child: FlutterMap(
-                mapController: _miniMapController,
-                options: MapOptions(
-                  initialCenter: _mapCenter,
-                  initialZoom: _mapZoom,
-                  interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+          const SizedBox(height: 12),
+
+          // Indicadores de estado de flota
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF090E1A),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF1E293B)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildFleetBadge(
+                  label: 'Choferes',
+                  value: '${widget.choferes.length}',
+                  subvalue: '$choferesEnRuta en ruta',
+                  color: const Color(0xFF38BDF8),
                 ),
-                children: [
-                  TileLayer(
-                    urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                    subdomains: const ['a', 'b', 'c', 'd'],
-                  ),
-                  MarkerLayer(markers: marcadores),
-                ],
+                Container(height: 28, width: 1, color: const Color(0xFF1E293B)),
+                _buildFleetBadge(
+                  label: 'Disponibles',
+                  value: '$choferesDisponibles',
+                  subvalue: 'listos',
+                  color: const Color(0xFF10B981),
+                ),
+                Container(height: 28, width: 1, color: const Color(0xFF1E293B)),
+                _buildFleetBadge(
+                  label: 'Bodega Quito',
+                  value: 'Activa',
+                  subvalue: 'Calderón',
+                  color: const Color(0xFFF59E0B),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Botón de Acción Directo: Ir a Monitoreo Satelital GPS
+          SizedBox(
+            width: double.infinity,
+            height: 38,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F2B48),
+                foregroundColor: const Color(0xFF38BDF8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: const BorderSide(color: Color(0xFF0284C7)),
+                ),
+                elevation: 0,
               ),
+              icon: const Icon(Icons.satellite_alt_rounded, size: 16),
+              label: Text(
+                rutaEnCurso.isNotEmpty
+                    ? 'Monitorear ${rutaEnCurso.first.codigoRuta} en Vivo'
+                    : 'Ir a Monitoreo Satelital GPS',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              onPressed: () {
+                final rTarget = rutaEnCurso.isNotEmpty ? rutaEnCurso.first : null;
+                widget.onIrAMonitoreo?.call(rTarget);
+              },
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFleetBadge({
+    required String label,
+    required String value,
+    required String subvalue,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+        const SizedBox(height: 1),
+        Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
+        Text(subvalue, style: const TextStyle(fontSize: 9, color: Color(0xFF64748B))),
+      ],
     );
   }
 
@@ -884,65 +984,120 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
   // ==========================================
   Widget _buildCardRutasCreadas(List<Ruta> rutas) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF101728),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF1E293B)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Cabecera: Icono lista + Título + Buscador
+          // Cabecera: Icono lista + Título + Chips de filtro + Minimizar todas + Buscador
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  const Icon(Icons.format_list_bulleted_rounded, color: Color(0xFF38BDF8), size: 20),
-                  const SizedBox(width: 10),
+                  const Icon(Icons.format_list_bulleted_rounded, color: Color(0xFF38BDF8), size: 18),
+                  const SizedBox(width: 8),
                   Text(
                     'Rutas Creadas (${rutas.length})',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                  ),
+                  if (_filtroEstadoCard != null) ...[
+                    const SizedBox(width: 10),
+                    InkWell(
+                      onTap: () => setState(() => _filtroEstadoCard = null),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.5)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Filtro: $_filtroEstadoCard',
+                              style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.close_rounded, size: 12, color: Color(0xFF38BDF8)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+
+              // Controles a la derecha: Minimizar Todas + Buscador
+              Row(
+                children: [
+                  // Botón Icono para Minimizar Todas las Rutas Desplegadas (sin texto)
+                  IconButton(
+                    icon: const Icon(Icons.unfold_less_rounded, color: Color(0xFF94A3B8), size: 18),
+                    tooltip: 'Minimizar todas las rutas',
+                    padding: const EdgeInsets.all(8),
+                    constraints: const BoxConstraints(),
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFF090E1A),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        side: const BorderSide(color: Color(0xFF1E293B)),
+                      ),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _expandedRutaIds.clear();
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Buscador de Rutas
+                  Container(
+                    width: 190,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF090E1A),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF1E293B)),
+                    ),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      onChanged: (val) => setState(() => _filtroTexto = val.trim()),
+                      decoration: const InputDecoration(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        border: InputBorder.none,
+                        prefixIcon: Icon(Icons.search, size: 15, color: Color(0xFF64748B)),
+                        hintText: 'Buscar ruta o cliente...',
+                        hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                      ),
+                    ),
                   ),
                 ],
               ),
-              // Input Buscador
-              Container(
-                width: 200,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF090E1A),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF1E293B)),
-                ),
-                child: TextField(
-                  controller: _searchCtrl,
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                  onChanged: (val) => setState(() => _filtroTexto = val.trim()),
-                  decoration: const InputDecoration(
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    border: InputBorder.none,
-                    prefixIcon: Icon(Icons.search, size: 16, color: Color(0xFF64748B)),
-                    hintText: 'Buscar ruta...',
-                    hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                  ),
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           // Lista de Rutas
           if (rutas.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 30),
+              padding: const EdgeInsets.symmetric(vertical: 28),
               child: Center(
                 child: Text(
                   _filtroTexto.isNotEmpty
                       ? 'No hay rutas que coincidan con "$_filtroTexto"'
-                      : 'No hay rutas creadas en el periodo. Cree una arriba con "+ Crear / Asignar".',
-                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                      : (_filtroEstadoCard != null
+                          ? 'No hay rutas con estado "$_filtroEstadoCard" en este periodo.'
+                          : 'No hay rutas creadas en el periodo. Cree una arriba con "+ Crear / Asignar".'),
+                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
                 ),
               ),
             )
@@ -953,7 +1108,7 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
               itemCount: rutas.length,
               itemBuilder: (ctx, idx) {
                 final r = rutas[idx];
-                final bool isExpanded = _expandedRutaId == r.id;
+                final bool isExpanded = _expandedRutaIds.contains(r.id);
 
                 Color tagColor = const Color(0xFF10B981); // PENDIENTE verde
                 String tagTexto = 'PENDIENTE';
@@ -968,8 +1123,10 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                   tagTexto = 'CANCELADA';
                 }
 
+                final fechaTexto = _formatearFechaCreacion(r.fechaCreacion);
+
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
+                  margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
                     color: const Color(0xFF090E1A),
                     borderRadius: BorderRadius.circular(10),
@@ -979,38 +1136,47 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                   ),
                   child: Column(
                     children: [
-                      // Fila Principal de la Ruta (Click para Desplegar)
+                      // Fila Principal de la Ruta (Click para Desplegar / Minimizar)
                       InkWell(
                         onTap: () {
                           setState(() {
-                            if (_expandedRutaId == r.id) {
-                              _expandedRutaId = null;
+                            if (_expandedRutaIds.contains(r.id)) {
+                              _expandedRutaIds.remove(r.id);
                             } else {
-                              _expandedRutaId = r.id;
-                              _rutaSeleccionada = r;
-                              _actualizarCentroMapaParaRuta(r);
+                              _expandedRutaIds.add(r.id);
                             }
                           });
                         },
                         borderRadius: BorderRadius.circular(10),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // Nombre y Chofer
+                              // Nombre, Chofer y Fecha de Creación
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       r.codigoRuta,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
                                     ),
                                     const SizedBox(height: 2),
-                                    Text(
-                                      r.choferNombre ?? 'Sin asignar',
-                                      style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          r.choferNombre ?? 'Sin asignar',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                        ),
+                                        if (fechaTexto.isNotEmpty) ...[
+                                          const Text('  •  ', style: TextStyle(color: Color(0xFF475569), fontSize: 11)),
+                                          Text(
+                                            fechaTexto,
+                                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                   ],
                                 ),
@@ -1018,7 +1184,7 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
 
                               // Estado Chip
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
                                   color: tagColor.withValues(alpha: 0.18),
                                   borderRadius: BorderRadius.circular(6),
@@ -1026,16 +1192,16 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                                 ),
                                 child: Text(
                                   tagTexto,
-                                  style: TextStyle(color: tagColor, fontSize: 10, fontWeight: FontWeight.bold),
+                                  style: TextStyle(color: tagColor, fontSize: 9, fontWeight: FontWeight.bold),
                                 ),
                               ),
-                              const SizedBox(width: 14),
+                              const SizedBox(width: 12),
 
                               // Flecha Expandir / Colapsar
                               Icon(
                                 isExpanded ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded,
                                 color: const Color(0xFF94A3B8),
-                                size: 20,
+                                size: 18,
                               ),
                             ],
                           ),
@@ -1048,7 +1214,7 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                       if (isExpanded) ...[
                         const Divider(color: Color(0xFF1E293B), height: 1),
                         Container(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(14),
                           decoration: const BoxDecoration(
                             color: Color(0xFF0D1424),
                             borderRadius: BorderRadius.vertical(bottom: Radius.circular(10)),
@@ -1062,11 +1228,11 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                                 children: [
                                   Row(
                                     children: [
-                                      const Icon(Icons.pin_drop_rounded, size: 16, color: Color(0xFF38BDF8)),
+                                      const Icon(Icons.pin_drop_rounded, size: 15, color: Color(0xFF38BDF8)),
                                       const SizedBox(width: 6),
                                       Text(
                                         '${r.paradas.length} paradas programadas',
-                                        style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 13, fontWeight: FontWeight.w600),
+                                        style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12, fontWeight: FontWeight.w600),
                                       ),
                                     ],
                                   ),
@@ -1078,12 +1244,12 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: const Color(0xFF1D72FE),
                                           foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                                           elevation: 0,
                                         ),
-                                        icon: const Icon(Icons.add_location_alt_rounded, size: 15),
-                                        label: const Text('+ Añadir Parada', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        icon: const Icon(Icons.add_location_alt_rounded, size: 14),
+                                        label: const Text('+ Añadir Parada', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                         onPressed: () => _abrirDialogoAgregarParada(r),
                                       ),
 
@@ -1092,31 +1258,33 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                                         OutlinedButton.icon(
                                           style: OutlinedButton.styleFrom(
                                             side: const BorderSide(color: Color(0xFF10B981)),
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                                           ),
-                                          icon: const Icon(Icons.play_arrow_rounded, size: 16, color: Color(0xFF10B981)),
-                                          label: const Text('Iniciar Ruta', style: TextStyle(color: Color(0xFF10B981), fontSize: 12)),
+                                          icon: const Icon(Icons.play_arrow_rounded, size: 15, color: Color(0xFF10B981)),
+                                          label: const Text('Iniciar Ruta', style: TextStyle(color: Color(0xFF10B981), fontSize: 11)),
                                           onPressed: () => _iniciarRuta(r),
                                         ),
 
                                       // Eliminar Ruta
                                       IconButton(
-                                        icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                                        icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 17),
                                         tooltip: 'Eliminar esta ruta',
+                                        padding: const EdgeInsets.all(6),
+                                        constraints: const BoxConstraints(),
                                         onPressed: () => _eliminarRuta(r),
                                       ),
                                     ],
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 10),
 
                               // Lista de Paradas de la Ruta
                               if (r.paradas.isEmpty)
                                 Container(
                                   width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                                  padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFF101728),
                                     borderRadius: BorderRadius.circular(8),
@@ -1124,20 +1292,20 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                                   ),
                                   child: Column(
                                     children: [
-                                      const Icon(Icons.route_rounded, size: 30, color: Color(0xFF475569)),
-                                      const SizedBox(height: 8),
+                                      const Icon(Icons.route_rounded, size: 28, color: Color(0xFF475569)),
+                                      const SizedBox(height: 6),
                                       const Text(
                                         'Esta ruta no tiene paradas agregadas todavía.',
-                                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                                       ),
-                                      const SizedBox(height: 10),
+                                      const SizedBox(height: 8),
                                       ElevatedButton.icon(
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: const Color(0xFF1D72FE),
-                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                         ),
-                                        icon: const Icon(Icons.add, size: 16),
-                                        label: const Text('Añadir la Primera Parada', style: TextStyle(fontSize: 12)),
+                                        icon: const Icon(Icons.add, size: 14),
+                                        label: const Text('Añadir la Primera Parada', style: TextStyle(fontSize: 11)),
                                         onPressed: () => _abrirDialogoAgregarParada(r),
                                       ),
                                     ],
@@ -1151,25 +1319,77 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                                   itemBuilder: (pCtx, pIdx) {
                                     final p = r.paradas[pIdx];
 
-                                    Color pTagColor = const Color(0xFF10B981);
-                                    if (p.isEnCurso) pTagColor = const Color(0xFF38BDF8);
-                                    if (p.isEntregado) pTagColor = const Color(0xFF059669);
-                                    if (p.isNoEntregado) pTagColor = const Color(0xFFEF4444);
+                                    // Colores y Sombras según Estado para Máxima Claridad Visual
+                                    late final Color borderColor;
+                                    late final Color cardBg;
+                                    late final List<BoxShadow> cardShadow;
+                                    late final Color pTagColor;
+
+                                    if (p.isEntregado) {
+                                      // ENTREGADO: Verde Esmeralda
+                                      borderColor = const Color(0xFF10B981).withValues(alpha: 0.6);
+                                      cardBg = const Color(0xFF0C1F1A);
+                                      cardShadow = [
+                                        BoxShadow(
+                                          color: const Color(0xFF10B981).withValues(alpha: 0.10),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ];
+                                      pTagColor = const Color(0xFF10B981);
+                                    } else if (p.isEnCurso) {
+                                      // EN CURSO: Azul / Cian Luminoso
+                                      borderColor = const Color(0xFF0EA5E9).withValues(alpha: 0.8);
+                                      cardBg = const Color(0xFF0B1B2B);
+                                      cardShadow = [
+                                        BoxShadow(
+                                          color: const Color(0xFF0EA5E9).withValues(alpha: 0.15),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ];
+                                      pTagColor = const Color(0xFF38BDF8);
+                                    } else if (p.isNoEntregado) {
+                                      // CANCELADA / NO ENTREGADO: Rojo
+                                      borderColor = const Color(0xFFEF4444).withValues(alpha: 0.6);
+                                      cardBg = const Color(0xFF221114);
+                                      cardShadow = [
+                                        BoxShadow(
+                                          color: const Color(0xFFEF4444).withValues(alpha: 0.10),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ];
+                                      pTagColor = const Color(0xFFEF4444);
+                                    } else {
+                                      // PENDIENTE: Ámbar Cálido
+                                      borderColor = const Color(0xFFF59E0B).withValues(alpha: 0.5);
+                                      cardBg = const Color(0xFF1A160A);
+                                      cardShadow = [
+                                        BoxShadow(
+                                          color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
+                                          blurRadius: 5,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ];
+                                      pTagColor = const Color(0xFFF59E0B);
+                                    }
 
                                     return Container(
                                       margin: const EdgeInsets.only(bottom: 8),
-                                      padding: const EdgeInsets.all(12),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF101728),
+                                        color: cardBg,
                                         borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: const Color(0xFF1E293B)),
+                                        border: Border.all(color: borderColor, width: 1.3),
+                                        boxShadow: cardShadow,
                                       ),
                                       child: Row(
                                         children: [
                                           // Número de Parada
                                           Container(
-                                            width: 28,
-                                            height: 28,
+                                            width: 26,
+                                            height: 26,
                                             decoration: BoxDecoration(
                                               color: const Color(0xFF1E293B),
                                               borderRadius: BorderRadius.circular(6),
@@ -1177,11 +1397,11 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                                             child: Center(
                                               child: Text(
                                                 '#${pIdx + 1}',
-                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF38BDF8)),
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF38BDF8)),
                                               ),
                                             ),
                                           ),
-                                          const SizedBox(width: 12),
+                                          const SizedBox(width: 10),
 
                                           // Datos Parada (Cliente y Dirección)
                                           Expanded(
@@ -1225,28 +1445,33 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                                               style: TextStyle(color: pTagColor, fontSize: 9, fontWeight: FontWeight.bold),
                                             ),
                                           ),
-                                          const SizedBox(width: 10),
+                                          const SizedBox(width: 8),
 
-                                          // Botón: Centrar en Mini Mapa
+                                          // Botón: Ver Ubicación Guardada en Mapa
                                           IconButton(
-                                            icon: const Icon(Icons.my_location_rounded, size: 16, color: Color(0xFF38BDF8)),
-                                            tooltip: 'Ver en Punto de Entrega',
-                                            onPressed: () {
-                                              setState(() {
-                                                _mapCenter = LatLng(p.latitud, p.longitud);
-                                                _mapZoom = 15.0;
-                                              });
-                                              try {
-                                                _miniMapController.move(_mapCenter, 15.0);
-                                              } catch (_) {}
-                                            },
+                                            icon: const Icon(Icons.location_on_rounded, size: 17, color: Color(0xFF38BDF8)),
+                                            tooltip: 'Ver ubicación guardada en mapa',
+                                            padding: const EdgeInsets.all(6),
+                                            constraints: const BoxConstraints(),
+                                            onPressed: () => _abrirVerUbicacion(r, p),
+                                          ),
+
+                                          // Botón: Modificar Parada
+                                          IconButton(
+                                            icon: const Icon(Icons.edit_outlined, size: 17, color: Color(0xFF94A3B8)),
+                                            tooltip: 'Modificar parada (datos y coordenadas)',
+                                            padding: const EdgeInsets.all(6),
+                                            constraints: const BoxConstraints(),
+                                            onPressed: () => _abrirModificarParada(r, p),
                                           ),
 
                                           // Botón: Ver e-PoD (si entregado)
                                           if (p.isEntregado)
                                             IconButton(
-                                              icon: const Icon(Icons.verified_rounded, size: 16, color: Color(0xFF10B981)),
+                                              icon: const Icon(Icons.verified_rounded, size: 17, color: Color(0xFF10B981)),
                                               tooltip: 'Ver e-PoD (Firma y Foto)',
+                                              padding: const EdgeInsets.all(6),
+                                              constraints: const BoxConstraints(),
                                               onPressed: () {
                                                 showDialog(
                                                   context: context,
@@ -1257,8 +1482,10 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
 
                                           // Botón: Eliminar Parada
                                           IconButton(
-                                            icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFEF4444)),
+                                            icon: const Icon(Icons.close_rounded, size: 17, color: Color(0xFFEF4444)),
                                             tooltip: 'Eliminar esta parada',
+                                            padding: const EdgeInsets.all(6),
+                                            constraints: const BoxConstraints(),
                                             onPressed: () => _eliminarParada(r, p),
                                           ),
                                         ],

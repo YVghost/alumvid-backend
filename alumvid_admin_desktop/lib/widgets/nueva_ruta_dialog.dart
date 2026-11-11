@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/chofer.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_toast.dart';
 
 class NuevaRutaDialog extends StatefulWidget {
   final List<Chofer> choferes;
@@ -57,15 +58,11 @@ class _NuevaRutaDialogState extends State<NuevaRutaDialog> {
   Future<void> _crearRuta() async {
     if (!_formKey.currentState!.validate()) return;
     if (_choferSeleccionadoId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Seleccione un chofer para la ruta')),
-      );
+      AppToast.warning(context, 'Seleccione un chofer para la ruta');
       return;
     }
     if (_destinos.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Debe agregar al menos una parada')),
-      );
+      AppToast.warning(context, 'Debe agregar al menos una parada');
       return;
     }
 
@@ -82,22 +79,11 @@ class _NuevaRutaDialogState extends State<NuevaRutaDialog> {
       if (!mounted) return;
       Navigator.pop(context);
       widget.onRutaCreada();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Hoja de ruta creada exitosamente.'),
-          backgroundColor: AppTheme.statusCompletada,
-        ),
-      );
+      AppToast.success(context, 'Hoja de ruta creada exitosamente');
     } catch (e) {
       if (!mounted) return;
       setState(() => _creando = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString().replaceAll("Exception: ", "")}'),
-          backgroundColor: AppTheme.statusAlerta,
-        ),
-      );
+      AppToast.error(context, 'Error al crear ruta: $e');
     }
   }
 

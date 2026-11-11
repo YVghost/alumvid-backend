@@ -14,6 +14,7 @@ class Chofer {
   });
 
   bool get isEnRuta => estadoDisponibilidad == 'EN_RUTA';
+  bool get isDisponible => estadoDisponibilidad == 'DISPONIBLE';
 
   factory Chofer.fromJson(Map<String, dynamic> json) {
     return Chofer(

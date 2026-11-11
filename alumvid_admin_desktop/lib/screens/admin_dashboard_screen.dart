@@ -56,12 +56,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   String _filtroEstado = 'EN_CURSO';
   bool _cargando = true;
-  DateTimeRange _rangoFiltro = DateTimeRange(
+  DateTimeRange? _rangoFiltro = DateTimeRange(
     start: DateTime.now(),
     end: DateTime.now(),
   );
 
-  bool _estaEnRango(DateTime? dt, DateTimeRange range) {
+  bool _estaEnRango(DateTime? dt, DateTimeRange? range) {
+    if (range == null) return true;
     if (dt == null) return false;
     final start = DateTime(range.start.year, range.start.month, range.start.day, 0, 0, 0);
     final end = DateTime(range.end.year, range.end.month, range.end.day, 23, 59, 59);
@@ -70,12 +71,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   List<Ruta> get _rutasDelPeriodo {
-    final bool esFiltroHoy = _rangoFiltro.start.year == DateTime.now().year &&
-        _rangoFiltro.start.month == DateTime.now().month &&
-        _rangoFiltro.start.day == DateTime.now().day &&
-        _rangoFiltro.end.year == DateTime.now().year &&
-        _rangoFiltro.end.month == DateTime.now().month &&
-        _rangoFiltro.end.day == DateTime.now().day;
+    if (_rangoFiltro == null) {
+      return List<Ruta>.from(_rutas);
+    }
+    final bool esFiltroHoy = _rangoFiltro!.start.year == DateTime.now().year &&
+        _rangoFiltro!.start.month == DateTime.now().month &&
+        _rangoFiltro!.start.day == DateTime.now().day &&
+        _rangoFiltro!.end.year == DateTime.now().year &&
+        _rangoFiltro!.end.month == DateTime.now().month &&
+        _rangoFiltro!.end.day == DateTime.now().day;
 
     return _rutas.where((r) {
       // Rutas operativas en curso o pendientes siempre están vigentes en el día a día
@@ -94,7 +98,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       context: context,
       builder: (_) => AuditoriaHistoricoDialog(
         todasLasRutas: _rutas,
-        rangoInicial: _rangoFiltro,
+        rangoInicial: _rangoFiltro ?? DateTimeRange(start: DateTime.now(), end: DateTime.now()),
         onRangoCambiado: (nuevoRango) {
           setState(() {
             _rangoFiltro = nuevoRango;
@@ -381,21 +385,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       _seleccionarRuta(res);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ruta re-optimizada exitosamente con Google Routes API (menor tiempo de viaje).'),
-            backgroundColor: Color(0xFF059669),
-          ),
-        );
+        AppToast.success(context, 'Ruta re-optimizada exitosamente con Google Routes API');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al re-optimizar ruta: $e'),
-            backgroundColor: const Color(0xFFE11D48),
-          ),
-        );
+        AppToast.error(context, 'Error al re-optimizar ruta: $e');
       }
     }
   }
@@ -1027,6 +1021,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             setState(() => _rangoFiltro = newRange);
           },
           onRefresh: _inicializarDatos,
+          onIrAMonitoreo: (ruta) {
+            setState(() {
+              _selectedTabIndex = 0;
+              if (ruta != null) {
+                _seleccionarRuta(ruta);
+              }
+            });
+          },
         );
       case 3:
         return const PedidosView();
