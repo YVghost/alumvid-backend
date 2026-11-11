@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/chofer.dart';
 import '../models/despacho.dart';
@@ -55,10 +54,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return lat > -0.5 && lat < 0.2 && lon > -78.8 && lon < -78.2;
   }
 
-  int _totalProductosBodega = 0;
   String _filtroEstado = 'EN_CURSO';
   bool _cargando = true;
-  bool _isSidebarHovered = false;
   DateTimeRange _rangoFiltro = DateTimeRange(
     start: DateTime.now(),
     end: DateTime.now(),
@@ -240,11 +237,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Future<void> _cargarEstadisticasInventario() async {
     try {
-      final res = await ApiService.obtenerProductos(page: 0, size: 1);
-      if (!mounted) return;
-      setState(() {
-        _totalProductosBodega = res['total'] as int? ?? 0;
-      });
+      await ApiService.obtenerProductos(page: 0, size: 1);
     } catch (_) {}
   }
 
@@ -560,61 +553,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
-  // Métricas para la barra de estadísticas (filtradas por el día seleccionado)
-  int get _totalRutasHoy => _rutasDelDia.length;
-
-  int get _totalDespachosContador {
-    int sum = 0;
-    for (final r in _rutasDelDia) {
-      sum += r.paradas.length;
-    }
-    return sum;
-  }
-
-  int get _totalEnCursoContador {
-    int sum = 0;
-    for (final r in _rutasDelDia) {
-      for (final p in r.paradas) {
-        if (p.isEnCurso) sum++;
-      }
-    }
-    return sum;
-  }
-
-  int get _totalEntregadosContador {
-    int sum = 0;
-    for (final r in _rutasDelDia) {
-      for (final p in r.paradas) {
-        if (p.isEntregado) sum++;
-      }
-    }
-    return sum;
-  }
-
-  int get _totalCanceladasContador {
-    int sum = 0;
-    for (final r in _rutasDelDia) {
-      if (r.estado == 'CANCELADA' || r.estado == 'CANCELADO') {
-        sum += r.paradas.length;
-      } else {
-        for (final p in r.paradas) {
-          if (p.estado == 'CANCELADA' || p.estado == 'CANCELADO') sum++;
-        }
-      }
-    }
-    return sum;
-  }
-
-  int get _totalAlertasContador {
-    int sum = 0;
-    for (final r in _rutasDelDia) {
-      for (final p in r.paradas) {
-        if (p.alertaDesviacion == true) sum++;
-      }
-    }
-    return sum;
-  }
-
   Map<String, String> get _titulosPestana {
     switch (_selectedTabIndex) {
       case 0:
@@ -629,20 +567,35 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         };
       case 2:
         return {
-          'title': 'Gestión y Asignación Integral de Hojas de Ruta',
-          'subtitle': 'Flujo operativo: 1. Crear Ruta → 2. Agregar Paradas con Mapa → 3. Asignar Chofer Responsable',
+          'title': 'Gestión y Asignación de Rutas',
+          'subtitle': 'Planificación de hojas de ruta, paradas georreferenciadas y asignación de choferes',
         };
       case 3:
         return {
-          'title': 'Gestión de Inventario, Existencias y Retazos',
-          'subtitle': 'Control de existencias de perfiles de aluminio y láminas de vidrio templado',
+          'title': 'Pedidos & Ventas Comerciales',
+          'subtitle': 'Gestión de órdenes de clientes y reservas de stock',
         };
       case 4:
+        return {
+          'title': 'Retazos & Cortes',
+          'subtitle': 'Gestión de piezas de aluminio y vidrio templado para reutilización',
+        };
+      case 5:
+        return {
+          'title': 'Ubicaciones Físicas de Bodega',
+          'subtitle': 'Mapa de racks y compartimentos de almacenamiento',
+        };
+      case 6:
+        return {
+          'title': 'Inventario & Stock',
+          'subtitle': 'Control de existencias de perfiles de aluminio y láminas de vidrio',
+        };
+      case 7:
         return {
           'title': 'Gestión de Usuarios, Cédulas y Seguridad RBAC',
           'subtitle': 'Control de acceso basado en roles y registro civil ecuatoriano',
         };
-      case 5:
+      case 8:
         return {
           'title': 'Simulador Móvil de Chofer y Telemetría',
           'subtitle': 'Emulación de smartphone chofer para pruebas de streaming y e-PoD',
@@ -684,35 +637,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildDesktopFullLayout() {
-    return Stack(
+    return Row(
       children: [
-        // 1. Contenedor Principal (con 68px de margen izquierdo para reservar el espacio del sidebar colapsado)
-        Positioned.fill(
-          child: Padding(
-            padding: const EdgeInsets.only(left: 68),
-            child: Column(
-              children: [
-                // Cabecera Superior con Título, Sesión y Acciones
-                _buildTopBar(),
+        // Barra Lateral Slim fija (no invasiva)
+        _buildSlimSidebar(),
 
-                // Barra de Métricas de Rutas: ÚNICA Y EXCLUSIVAMENTE EN PESTAÑA 2 (Planificar Rutas)
-                if (_selectedTabIndex == 2) _buildMetricsBar(),
-
-                // Vista Activa
-                Expanded(
-                  child: _buildContenidoPestanaActiva(),
-                ),
-              ],
-            ),
+        // Contenedor Principal
+        Expanded(
+          child: Column(
+            children: [
+              _buildTopBar(),
+              Expanded(
+                child: _buildContenidoPestanaActiva(),
+              ),
+            ],
           ),
-        ),
-
-        // 2. Barra Lateral Flotante que se expande elegantemente sobre el contenido al pasar el mouse
-        Positioned(
-          left: 0,
-          top: 0,
-          bottom: 0,
-          child: _buildSidebar(),
         ),
       ],
     );
@@ -722,7 +661,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Column(
       children: [
         _buildTopBar(),
-        if (_selectedTabIndex == 2) _buildMetricsBar(),
         Expanded(
           child: _buildContenidoPestanaActiva(),
         ),
@@ -730,598 +668,338 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  // BARRA LATERAL (SIDEBAR) - Diseño formal, elegante, colapsable por hover
-  Widget _buildSidebar() {
-    final bool expanded = _isSidebarHovered;
+  // BARRA LATERAL (SIDEBAR) SLIM & ELEGANTE - NO INVASIVA
+  Widget _buildSlimSidebar() {
+    final menuItems = [
+      {'index': 0, 'label': 'monitoreo', 'icon': Icons.radar_rounded},
+      {'index': 1, 'label': 'despachos', 'icon': Icons.view_kanban_rounded},
+      {'index': 2, 'label': 'rutas', 'icon': Icons.alt_route_rounded},
+      {'index': 3, 'label': 'pedidos', 'icon': Icons.receipt_long_rounded},
+      {'index': 4, 'label': 'retazos', 'icon': Icons.content_cut_rounded},
+      {'index': 5, 'label': 'bodega', 'icon': Icons.grid_view_rounded},
+      {'index': 6, 'label': 'inventario', 'icon': Icons.inventory_2_rounded},
+      {'index': 7, 'label': 'usuarios', 'icon': Icons.people_alt_rounded},
+      {'index': 8, 'label': 'simulador', 'icon': Icons.phone_android_rounded},
+    ];
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isSidebarHovered = true),
-      onExit: (_) => setState(() => _isSidebarHovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        width: expanded ? 240 : 68,
-        decoration: BoxDecoration(
-          color: const Color(0xFF0D1424),
-          border: const Border(right: BorderSide(color: Color(0xFF1E293B), width: 1.2)),
-          boxShadow: expanded
-              ? [
+    return Container(
+      width: 82,
+      decoration: const BoxDecoration(
+        color: Color(0xFF090E1A),
+        border: Border(right: BorderSide(color: Color(0xFF1E293B), width: 1.2)),
+      ),
+      child: Column(
+        children: [
+          // Logo AlumVid Pin Superior
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFF101728),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF1D72FE).withValues(alpha: 0.5), width: 1.5),
+                boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    blurRadius: 18,
-                    offset: const Offset(4, 0),
+                    color: const Color(0xFF1D72FE).withValues(alpha: 0.25),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
-                ]
-              : null,
-        ),
-        child: Column(
-          children: [
-            // Marca AlumVid
-            Container(
-              height: 64,
-              padding: EdgeInsets.symmetric(horizontal: expanded ? 14 : 0),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
-              ),
-              child: expanded
-                  ? Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [AppTheme.primary, AppTheme.primaryLight],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.primary.withValues(alpha: 0.35),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: const Center(
-                            child: Text('AV', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 16)),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'AlumVid',
-                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white, letterSpacing: 0.3),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                'Logística & Operaciones',
-                                style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    )
-                  : Center(
-                      child: Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppTheme.primary, AppTheme.primaryLight],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(9),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primary.withValues(alpha: 0.35),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Center(
-                          child: Text('AV', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 16)),
-                        ),
-                      ),
-                    ),
-            ),
-
-            // Menú de Navegación (9 Módulos elegantes de plataforma unificada)
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                children: [
-                  _buildNavItem(0, 'Monitoreo en Vivo', Icons.radar_rounded, expanded),
-                  _buildNavItem(1, 'Tablero Despachos', Icons.view_kanban_rounded, expanded),
-                  _buildNavItem(2, 'Planificar Rutas', Icons.alt_route_rounded, expanded),
-                  _buildNavItem(3, 'Pedidos & Ventas', Icons.receipt_long_rounded, expanded),
-                  _buildNavItem(4, 'Retazos & Cortes', Icons.content_cut_rounded, expanded),
-                  _buildNavItem(5, 'Ubicaciones Bodega', Icons.grid_view_rounded, expanded),
-                  _buildNavItem(6, 'Inventario & Stock', Icons.inventory_2_rounded, expanded),
-                  _buildNavItem(7, 'Usuarios & Cédulas', Icons.people_alt_rounded, expanded),
-                  _buildNavItem(8, 'Simulador Chofer', Icons.phone_android_rounded, expanded),
                 ],
               ),
-            ),
-
-            // Footer con Estado de Microservicios
-            Container(
-              padding: EdgeInsets.all(expanded ? 12 : 8),
-              decoration: const BoxDecoration(
-                color: Color(0xFF090E1A),
-                border: Border(top: BorderSide(color: Color(0xFF1E293B))),
+              child: const Center(
+                child: Icon(Icons.location_on_rounded, color: Color(0xFF38BDF8), size: 26),
               ),
-              child: expanded
-                  ? const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+            ),
+          ),
+
+          // Lista de Opciones de Navegación Vertical
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              itemCount: menuItems.length,
+              itemBuilder: (context, idx) {
+                final item = menuItems[idx];
+                final int tabIdx = item['index'] as int;
+                final String label = item['label'] as String;
+                final IconData icon = item['icon'] as IconData;
+                final bool active = _selectedTabIndex == tabIdx;
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Material(
+                    color: active ? const Color(0xFF1D72FE) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => setState(() => _selectedTabIndex = tabIdx),
+                      hoverColor: Colors.white.withValues(alpha: 0.05),
+                      child: Container(
+                        height: 58,
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.hub_rounded, size: 12, color: AppTheme.statusCompletada),
-                            SizedBox(width: 6),
+                            Icon(
+                              icon,
+                              size: 22,
+                              color: active ? Colors.white : const Color(0xFF8DA4C4),
+                            ),
+                            const SizedBox(height: 3),
                             Text(
-                              'MICROSERVICIOS ACTIVOS',
+                              label,
                               style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.8,
-                                color: AppTheme.textMuted,
+                                fontSize: 10,
+                                fontWeight: active ? FontWeight.bold : FontWeight.w500,
+                                color: active ? Colors.white : const Color(0xFF8DA4C4),
+                                letterSpacing: 0.2,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
-                        SizedBox(height: 8),
-                        _SysTag(label: 'Gateway: 8085'),
-                        SizedBox(height: 3),
-                        _SysTag(label: 'Usuarios: 8081'),
-                        SizedBox(height: 3),
-                        _SysTag(label: 'Inventario: 8082'),
-                        SizedBox(height: 3),
-                        _SysTag(label: 'Logística: 8083'),
-                        SizedBox(height: 3),
-                        _SysTag(label: 'Retazos: 8084'),
-                        SizedBox(height: 3),
-                        _SysTag(label: 'Pedidos: 8087'),
-                        SizedBox(height: 3),
-                        _SysTag(label: 'Ubicaciones: 8086'),
-                        SizedBox(height: 3),
-                        _SysTag(label: 'PostGIS 3.4 Activo'),
-                      ],
-                    )
-                  : Tooltip(
-                      message: 'Ecosistema Completo Conectado:\n• Gateway: 8085\n• Usuarios: 8081\n• Inventario: 8082\n• Logística: 8083\n• Retazos: 8084\n• Pedidos: 8087\n• Ubicaciones: 8086\n• PostGIS 3.4 Activo',
-                      preferBelow: false,
-                      child: Center(
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF131D2E),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppTheme.statusCompletada.withValues(alpha: 0.4)),
-                          ),
-                          child: const Icon(Icons.dns_rounded, size: 18, color: AppTheme.statusCompletada),
-                        ),
                       ),
                     ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(int index, String label, IconData icon, bool expanded) {
-    final bool active = _selectedTabIndex == index;
-
-    final navItemContent = Material(
-      color: active ? AppTheme.primary.withValues(alpha: 0.16) : Colors.transparent,
-      borderRadius: BorderRadius.circular(9),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(9),
-        onTap: () => setState(() => _selectedTabIndex = index),
-        child: Container(
-          height: 42,
-          padding: EdgeInsets.symmetric(horizontal: expanded ? 12 : 0),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(
-              color: active ? AppTheme.primaryLight.withValues(alpha: 0.5) : Colors.transparent,
-              width: 1,
+                  ),
+                );
+              },
             ),
           ),
-          child: expanded
-              ? Row(
-                  children: [
-                    Icon(
-                      icon,
-                      size: 18,
-                      color: active ? AppTheme.primaryLight : AppTheme.textMuted,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: active ? FontWeight.bold : FontWeight.w500,
-                          color: active ? Colors.white : const Color(0xFF94A3B8),
-                          letterSpacing: 0.2,
-                        ),
+
+          // Configuración / Ajustes Inferior
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: _mostrarDialogoConfiguracion,
+                hoverColor: Colors.white.withValues(alpha: 0.05),
+                child: Container(
+                  height: 52,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.settings_outlined, size: 20, color: Color(0xFF8DA4C4)),
+                      SizedBox(height: 3),
+                      Text(
+                        'configuración',
+                        style: TextStyle(fontSize: 9.5, color: Color(0xFF8DA4C4)),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    if (active)
-                      Container(
-                        width: 5,
-                        height: 5,
-                        decoration: const BoxDecoration(
-                          color: AppTheme.primaryLight,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                  ],
-                )
-              : Center(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Icon(
-                        icon,
-                        size: 20,
-                        color: active ? AppTheme.primaryLight : const Color(0xFF94A3B8),
-                      ),
-                      if (active)
-                        Positioned(
-                          right: -2,
-                          top: -2,
-                          child: Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: AppTheme.primaryLight,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),
-        ),
-      ),
-    );
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: expanded
-          ? navItemContent
-          : Tooltip(
-              message: label,
-              preferBelow: false,
-              verticalOffset: 0,
-              margin: const EdgeInsets.only(left: 10),
-              child: navItemContent,
+              ),
             ),
+          ),
+        ],
+      ),
     );
   }
 
-  // CABECERA SUPERIOR
+  void _mostrarDialogoConfiguracion() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF101728),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: Color(0xFF1E293B))),
+        title: const Row(
+          children: [
+            Icon(Icons.settings_rounded, color: Color(0xFF38BDF8), size: 20),
+            SizedBox(width: 8),
+            Text('Ecosistema AlumVid', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Microservicios Conectados:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const _SysTag(label: 'Gateway: 8085'),
+            const SizedBox(height: 3),
+            const _SysTag(label: 'Usuarios: 8081'),
+            const SizedBox(height: 3),
+            const _SysTag(label: 'Inventario: 8082'),
+            const SizedBox(height: 3),
+            const _SysTag(label: 'Logística: 8083'),
+            const SizedBox(height: 3),
+            const _SysTag(label: 'Retazos: 8084'),
+            const SizedBox(height: 3),
+            const _SysTag(label: 'Pedidos: 8087'),
+            const SizedBox(height: 3),
+            const _SysTag(label: 'Ubicaciones: 8086'),
+            const SizedBox(height: 3),
+            const _SysTag(label: 'PostGIS 3.4 Activo'),
+            const Divider(color: Color(0xFF1E293B), height: 20),
+            Row(
+              children: [
+                const Text('Estado Streaming: ', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                Text(
+                  _wsService.isConnected ? 'WebSocket Activo' : 'Polling Activo',
+                  style: TextStyle(
+                    color: _wsService.isConnected ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cerrar', style: TextStyle(color: Color(0xFF38BDF8))),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            icon: const Icon(Icons.logout, size: 14),
+            label: const Text('Cerrar Sesión'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _cerrarSesion();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // CABECERA SUPERIOR - ESTILO CLEAN (MOCKUP)
   Widget _buildTopBar() {
     final titles = _titulosPestana;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: const BoxDecoration(
-        color: AppTheme.surface,
-        border: Border(bottom: BorderSide(color: AppTheme.border)),
+        color: Color(0xFF090E1A),
+        border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Título y Subtítulo dinámico
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  titles['title']!,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  titles['subtitle']!,
-                  style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
+          // Título de la Pantalla Activa
+          Text(
+            titles['title']!,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
           ),
 
-          // Acciones y Sesión
-          Row(
-            children: [
-              // Badge Sesión
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF131D2E),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: Row(
+          // Avatar y Menú de Perfil
+          PopupMenuButton<String>(
+            tooltip: 'Menú de Usuario',
+            offset: const Offset(0, 48),
+            color: const Color(0xFF101728),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Color(0xFF1E293B)),
+            ),
+            onSelected: (val) {
+              if (val == 'refresh') _inicializarDatos();
+              if (val == 'auditoria') _abrirAuditoriaHistorico();
+              if (val == 'config') _mostrarDialogoConfiguracion();
+              if (val == 'logout') _cerrarSesion();
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(
+                enabled: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Sesión: ', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                    Text(widget.user.email, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13)),
+                    const SizedBox(height: 2),
                     Text(
-                      widget.user.email,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                    const SizedBox(width: 4),
-                    const Text('[ADMIN]', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primaryLight)),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-
-              // Badge WebSocket
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: _wsService.isConnected ? AppTheme.statusCompletada.withValues(alpha: 0.15) : AppTheme.statusAlerta.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: _wsService.isConnected ? AppTheme.statusCompletada : AppTheme.statusAlerta),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: _wsService.isConnected ? AppTheme.statusCompletada : AppTheme.statusAlerta,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _wsService.isConnected ? 'Streaming Activo' : 'Sincronización Polling',
+                      _wsService.isConnected ? 'Streaming WebSocket Activo' : 'Sincronización Polling',
                       style: TextStyle(
-                        color: _wsService.isConnected ? AppTheme.statusCompletada : AppTheme.statusAlerta,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                        color: _wsService.isConnected ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-
-              // Botón Actualizar Global
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppTheme.primaryLight),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  visualDensity: VisualDensity.compact,
+              const PopupMenuDivider(height: 1),
+              const PopupMenuItem(
+                value: 'refresh',
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh_rounded, size: 16, color: Color(0xFF38BDF8)),
+                    SizedBox(width: 10),
+                    Text('Actualizar Datos', style: TextStyle(color: Colors.white, fontSize: 13)),
+                  ],
                 ),
-                icon: const Icon(Icons.refresh, size: 14, color: AppTheme.primaryLight),
-                label: const Text('Actualizar', style: TextStyle(color: AppTheme.primaryLight, fontSize: 11, fontWeight: FontWeight.bold)),
-                onPressed: _inicializarDatos,
               ),
-              const SizedBox(width: 8),
-
-              // Botón Cerrar Sesión
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.statusAlerta,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  visualDensity: VisualDensity.compact,
+              const PopupMenuItem(
+                value: 'auditoria',
+                child: Row(
+                  children: [
+                    Icon(Icons.history_rounded, size: 16, color: Color(0xFF38BDF8)),
+                    SizedBox(width: 10),
+                    Text('Auditoría Histórica', style: TextStyle(color: Colors.white, fontSize: 13)),
+                  ],
                 ),
-                icon: const Icon(Icons.logout, size: 14),
-                label: const Text('Cerrar Sesión', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                onPressed: _cerrarSesion,
+              ),
+              const PopupMenuItem(
+                value: 'config',
+                child: Row(
+                  children: [
+                    Icon(Icons.hub_rounded, size: 16, color: Color(0xFF38BDF8)),
+                    SizedBox(width: 10),
+                    Text('Servicios & Sistema', style: TextStyle(color: Colors.white, fontSize: 13)),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(height: 1),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout_rounded, size: 16, color: Color(0xFFEF4444)),
+                    SizedBox(width: 10),
+                    Text('Cerrar Sesión', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold)),
+                  ],
+                ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // BARRA DE MÉTRICAS GLOBALES (Hoy vs Histórico con Rango de Fechas y Auditoría)
-  Widget _buildMetricsBar() {
-    final bool esHoy = _rangoFiltro.start.year == DateTime.now().year &&
-        _rangoFiltro.start.month == DateTime.now().month &&
-        _rangoFiltro.start.day == DateTime.now().day &&
-        _rangoFiltro.end.year == DateTime.now().year &&
-        _rangoFiltro.end.month == DateTime.now().month &&
-        _rangoFiltro.end.day == DateTime.now().day;
-
-    final String fechaTexto;
-    if (esHoy) {
-      fechaTexto = 'Hoy (${DateFormat('dd MMM').format(DateTime.now())})';
-    } else if (_rangoFiltro.start.year == _rangoFiltro.end.year &&
-        _rangoFiltro.start.month == _rangoFiltro.end.month &&
-        _rangoFiltro.start.day == _rangoFiltro.end.day) {
-      fechaTexto = DateFormat('dd MMM yyyy').format(_rangoFiltro.start);
-    } else {
-      fechaTexto = '${DateFormat('dd MMM').format(_rangoFiltro.start)} - ${DateFormat('dd MMM yyyy').format(_rangoFiltro.end)}';
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F172A),
-        border: Border(bottom: BorderSide(color: AppTheme.border)),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            // Control de Fecha e Histórico (Calendario con selector de rango y auditoría)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: esHoy ? AppTheme.surfaceCard : AppTheme.primary.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: esHoy ? AppTheme.border : AppTheme.primaryLight),
+                color: const Color(0xFF101728),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF1E293B)),
               ),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    icon: Icon(Icons.calendar_month, color: esHoy ? AppTheme.primaryLight : Colors.white, size: 20),
-                    tooltip: 'Cambiar Rango de Fechas (ej. 10 al 22 de Octubre)',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () async {
-                      final picked = await showDateRangePicker(
-                        context: context,
-                        initialDateRange: _rangoFiltro,
-                        firstDate: DateTime(2025, 1, 1),
-                        lastDate: DateTime.now().add(const Duration(days: 30)),
-                        builder: (ctx, child) {
-                          return Theme(
-                            data: Theme.of(ctx).copyWith(
-                              colorScheme: const ColorScheme.dark(
-                                primary: AppTheme.primary,
-                                onPrimary: Colors.white,
-                                surface: AppTheme.surface,
-                                onSurface: Colors.white,
-                              ),
-                            ),
-                            child: child!,
-                          );
-                        },
-                      );
-                      if (picked != null) {
-                        setState(() {
-                          _rangoFiltro = picked;
-                          if (_rutaSeleccionada != null && !_estaEnRango(_rutaSeleccionada!.fechaCreacion, picked)) {
-                            _rutaSeleccionada = null;
-                            _puntosPolilinea = [];
-                          }
-                        });
-                      }
-                    },
+                  const CircleAvatar(
+                    radius: 12,
+                    backgroundColor: Color(0xFF1D72FE),
+                    child: Icon(Icons.person, size: 14, color: Colors.white),
                   ),
                   const SizedBox(width: 8),
-                  InkWell(
-                    onTap: _abrirAuditoriaHistorico,
-                    borderRadius: BorderRadius.circular(6),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              esHoy ? 'Métricas de Hoy' : 'Histórico Periodo',
-                              style: const TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(Icons.open_in_new, size: 10, color: AppTheme.primaryLight),
-                          ],
-                        ),
-                        Text(
-                          fechaTexto,
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: esHoy ? Colors.white : AppTheme.primaryLight),
-                        ),
-                      ],
-                    ),
+                  Text(
+                    widget.user.email,
+                    style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500),
                   ),
-                  const SizedBox(width: 8),
-                  Tooltip(
-                    message: 'Abrir auditoría cronológica de rutas, choferes y paradas del periodo',
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: AppTheme.primaryLight.withValues(alpha: 0.6)),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      icon: const Icon(Icons.history_edu, size: 13, color: AppTheme.primaryLight),
-                      label: const Text('Auditoría', style: TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.bold)),
-                      onPressed: _abrirAuditoriaHistorico,
-                    ),
-                  ),
-                  if (!esHoy) ...[
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: () {
-                        setState(() {
-                          _rangoFiltro = DateTimeRange(start: DateTime.now(), end: DateTime.now());
-                          if (_rutaSeleccionada != null && !_estaEnRango(_rutaSeleccionada!.fechaCreacion, _rangoFiltro)) {
-                            _rutaSeleccionada = null;
-                            _puntosPolilinea = [];
-                          }
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(4),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.statusCompletada.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: AppTheme.statusCompletada),
-                        ),
-                        child: const Text('Ver Hoy', style: TextStyle(color: AppTheme.statusCompletada, fontSize: 10, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
+                  const SizedBox(width: 4),
+                  const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF94A3B8)),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
-
-            _buildStatCard('Rutas Totales', '$_totalRutasHoy', AppTheme.primaryLight),
-            const SizedBox(width: 10),
-            _buildStatCard('Total Paradas / Pedidos', '$_totalDespachosContador', const Color(0xFF3B82F6)),
-            const SizedBox(width: 10),
-            _buildStatCard('Entregas Exitosas', '$_totalEntregadosContador', AppTheme.statusCompletada),
-            const SizedBox(width: 10),
-            _buildStatCard('Entregas Canceladas', '$_totalCanceladasContador', AppTheme.statusAlerta),
-            const SizedBox(width: 10),
-            _buildStatCard('En Curso (Streaming)', '$_totalEnCursoContador', const Color(0xFFF59E0B)),
-            const SizedBox(width: 10),
-            _buildStatCard('Productos en Bodega', '$_totalProductosBodega', const Color(0xFF06B6D4)),
-            const SizedBox(width: 10),
-            _buildStatCard('Alertas Stock / Desvío', '$_totalAlertasContador', const Color(0xFFF43F5E)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String label, String value, Color color) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 160),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceCard,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color),
           ),
         ],
       ),
     );
   }
+
+
 
   // VISTA ACTIVA
   Widget _buildContenidoPestanaActiva() {
@@ -1341,8 +1019,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         );
       case 2:
         return PlanificarRutasView(
-          rutas: _rutas,
+          rutas: _rutasDelPeriodo,
+          todasLasRutas: _rutas,
           choferes: _choferes,
+          rangoFiltro: _rangoFiltro,
+          onCambiarRangoFiltro: (newRange) {
+            setState(() => _rangoFiltro = newRange);
+          },
           onRefresh: _inicializarDatos,
         );
       case 3:

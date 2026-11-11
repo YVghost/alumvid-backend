@@ -42,6 +42,11 @@ class Despacho {
   bool get isEnCurso => estado == 'EN_CURSO';
   bool get hasAlertaDesviacion => alertaDesviacion == true;
   String get pedidoId => pedido?.id ?? id;
+  String get cliente => pedido?.cliente ?? 'Cliente';
+  String get direccionTexto => pedido?.direccionTexto ?? 'Dirección de entrega';
+  double get latitud => latitudEntrega ?? pedido?.latitudDestino ?? -0.1807;
+  double get longitud => longitudEntrega ?? pedido?.longitudDestino ?? -78.4678;
+  bool get isNoEntregado => estado == 'CANCELADA' || estado == 'CANCELADO' || estado == 'NO_ENTREGADO';
 
   factory Despacho.fromJson(Map<String, dynamic> json) {
     return Despacho(
