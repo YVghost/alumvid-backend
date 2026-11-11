@@ -12,6 +12,9 @@
 	<modules>
 		<module>services/usuarios-service</module>
 		<module>services/inventario-service</module>
+		<module>services/retazos-service</module>
+		<module>services/pedidos-service</module>
+        <module>services/ubicaciones-service</module>
 		<module>services/logistica-service</module>
 		<module>services/gateway-service</module>
 	</modules>

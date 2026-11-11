@@ -21,6 +21,7 @@ class InventoryService {
     public InventoryRepository.Product update(UUID id,InventoryApi.ProductInput r,AuthClient.Identity actor) {
         admin(actor);var before=products.get(id,true);
         if(!before.code().equals(r.code().trim().toUpperCase(Locale.ROOT))) throw new InventoryError(409,"El código de un producto no se puede cambiar");
+        if(before.piecesManaged() && before.unit()!=r.unit()) throw new InventoryError(409,"La unidad de un producto gestionado por piezas no se puede cambiar");
         if(before.unit()!=r.unit() && products.hasMovements(id)) throw new InventoryError(409,"No puedes cambiar la unidad de un producto con movimientos");
         if(!r.active() && before.stock().signum()!=0) throw new InventoryError(409,"El stock debe ser cero antes de desactivar el producto");
         products.update(id,r);var after=products.get(id,false);
@@ -38,12 +39,15 @@ class InventoryService {
                 throw new InventoryError(409,"Este identificador de solicitud ya se usó con otros datos");
             return m;
         }
+        if(product.piecesManaged()) throw new InventoryError(409,"Este producto se gestiona por piezas: registra ingresos, cortes y ajustes desde Retazos");
         if(!product.active()) throw new InventoryError(409,"El producto está inactivo");
         if(r.type()!=InventoryRepository.MovementType.AJUSTE && r.quantity().signum()<=0) throw new InventoryError(400,"La cantidad debe ser mayor que cero");
         BigDecimal delta=switch(r.type()) {
             case INGRESO->r.quantity();case SALIDA->r.quantity().negate();case AJUSTE->r.quantity().subtract(product.stock());
         };
         var after=product.stock().add(delta);
+        BigDecimal reserved=products.reserved(id);
+        if(after.compareTo(reserved)<0) throw new InventoryError(409,"El saldo no puede quedar por debajo del material reservado por pedidos");
         if(after.signum()<0) throw new InventoryError(409,"Stock insuficiente para registrar la salida");
         if(after.precision()-after.scale()>15) throw new InventoryError(400,"El saldo supera la capacidad permitida");
         if(delta.signum()==0) throw new InventoryError(400,"El ajuste no modifica las existencias");

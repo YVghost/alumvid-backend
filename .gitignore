@@ -36,3 +36,7 @@ build/
 .env
 *.env
 
+
+# Herramientas y entornos temporales de validación
+.cache/
+*.log
