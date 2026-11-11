@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/producto.dart';
+import '../models/pedido_comercial.dart';
 import '../models/ruta.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
@@ -35,6 +36,7 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
   bool _ubicacionSeleccionada = false;
 
   List<Producto> _productosInventario = [];
+  List<PedidoComercial> _pedidosComerciales = [];
   Producto? _productoSeleccionado;
   bool _cargandoProductos = true;
   bool _guardando = false;
@@ -58,9 +60,11 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
     try {
       final res = await ApiService.obtenerProductos(size: 100);
       final List<Producto> prods = res['items'] as List<Producto>? ?? [];
+      final pedidos = await ApiService.obtenerPedidosComerciales(size: 30);
       if (mounted) {
         setState(() {
           _productosInventario = prods;
+          _pedidosComerciales = pedidos.where((p) => p.isEntregaDomicilio).toList();
           if (prods.isNotEmpty) {
             _productoSeleccionado = prods.first;
           }
@@ -200,6 +204,39 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
                     final formSection = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Vincular con Pedido Comercial (Opcional)
+                        if (_pedidosComerciales.isNotEmpty) ...[
+                          DropdownButtonFormField<PedidoComercial>(
+                            dropdownColor: AppTheme.surfaceDark,
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            decoration: const InputDecoration(
+                              labelText: 'Importar de Pedido Comercial (Opcional)',
+                              prefixIcon: Icon(Icons.receipt_long_rounded, size: 18, color: Color(0xFF38BDF8)),
+                              hintText: 'Seleccione un pedido para autocompletar',
+                            ),
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text('-- Ingreso manual independiente --')),
+                              ..._pedidosComerciales.map((p) => DropdownMenuItem(
+                                value: p,
+                                child: Text('#${p.number} · ${p.clientName} (\$${p.total.toStringAsFixed(2)})', overflow: TextOverflow.ellipsis),
+                              )),
+                            ],
+                            onChanged: (p) {
+                              if (p != null) {
+                                setState(() {
+                                  _clienteCtrl.text = p.clientName;
+                                  if (p.deliveryAddress != null && p.deliveryAddress!.isNotEmpty) {
+                                    _direccionCtrl.text = p.deliveryAddress!;
+                                    _direccionResuelta = p.deliveryAddress!;
+                                  }
+                                  _observacionesCtrl.text = 'Orden #${p.number} comercial • ${p.notes ?? "Entrega a domicilio"}';
+                                });
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
                         // Cliente y Dirección
                         TextFormField(
                           controller: _clienteCtrl,

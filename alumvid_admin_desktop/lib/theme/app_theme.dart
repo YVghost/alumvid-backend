@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   static const Color background = Color(0xFF0A0E17);
+  static const Color bgDark = Color(0xFF0A0E17);
   static const Color surface = Color(0xFF111827);
+  static const Color surfaceDark = Color(0xFF111827);
   static const Color surfaceCard = Color(0xFF1E293B);
   static const Color surfaceCardHover = Color(0xFF283548);
   static const Color border = Color(0xFF334155);

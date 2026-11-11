@@ -11,6 +11,9 @@ import '../models/producto.dart';
 import '../models/ruta.dart';
 import '../models/telemetria.dart';
 import '../models/user.dart';
+import '../models/pedido_comercial.dart';
+import '../models/retazo_pieza.dart';
+import '../models/espacio_ubicacion.dart';
 
 class ApiService {
   static const String _prefHostKey = 'server_host_custom';
@@ -835,6 +838,120 @@ class ApiService {
       return list.map((a) => EventoAuditoria.fromJson(a)).toList();
     }
     throw Exception('Error al obtener bitácora de auditoría');
+  }
+
+  // =========================================================================
+  // INTEGRACIÓN MICROSERVICIOS WILSON: PEDIDOS, RETAZOS Y UBICACIONES
+  // =========================================================================
+
+  static Future<List<PedidoComercial>> obtenerPedidosComerciales({
+    String state = '',
+    String q = '',
+    int page = 0,
+    int size = 50,
+  }) async {
+    try {
+      final host = await getBaseHost();
+      final query = URLSearchParams({
+        if (state.isNotEmpty) 'state': state,
+        if (q.isNotEmpty) 'q': q,
+        'page': page.toString(),
+        'size': size.toString(),
+      }).toString();
+      final url = Uri.parse('$host/api/pedidos/orders?$query');
+      final headers = await _headers();
+      final res = await http.get(url, headers: headers).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final List<dynamic> items = data['items'] ?? [];
+        return items.map((i) => PedidoComercial.fromJson(i)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<List<ClienteComercial>> obtenerClientesComerciales({
+    String q = '',
+    int size = 100,
+  }) async {
+    try {
+      final host = await getBaseHost();
+      final url = Uri.parse('$host/api/pedidos/clients?q=${Uri.encodeComponent(q)}&size=$size');
+      final headers = await _headers();
+      final res = await http.get(url, headers: headers).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final List<dynamic> items = data['items'] ?? [];
+        return items.map((i) => ClienteComercial.fromJson(i)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<List<ProductoRetazo>> obtenerProductosRetazos({
+    String q = '',
+    int page = 0,
+    int size = 50,
+  }) async {
+    try {
+      final host = await getBaseHost();
+      final url = Uri.parse('$host/api/retazos/products?q=${Uri.encodeComponent(q)}&page=$page&size=$size');
+      final headers = await _headers();
+      final res = await http.get(url, headers: headers).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final List<dynamic> items = data['items'] ?? [];
+        return items.map((i) => ProductoRetazo.fromJson(i)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<List<PiezaRetazo>> obtenerPiezasRetazo(String productoId, {String state = 'DISPONIBLE'}) async {
+    try {
+      final host = await getBaseHost();
+      final url = Uri.parse('$host/api/retazos/products/$productoId/pieces?state=$state&size=50');
+      final headers = await _headers();
+      final res = await http.get(url, headers: headers).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final List<dynamic> items = data['items'] ?? [];
+        return items.map((i) => PiezaRetazo.fromJson(i)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<List<EspacioUbicacion>> obtenerEspaciosUbicacion({
+    String q = '',
+    int page = 0,
+    int size = 50,
+  }) async {
+    try {
+      final host = await getBaseHost();
+      final url = Uri.parse('$host/api/ubicaciones/spaces?q=${Uri.encodeComponent(q)}&page=$page&size=$size');
+      final headers = await _headers();
+      final res = await http.get(url, headers: headers).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final List<dynamic> items = data['items'] ?? [];
+        return items.map((i) => EspacioUbicacion.fromJson(i)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<Map<String, dynamic>> obtenerContenidoEspacio(String spaceId) async {
+    try {
+      final host = await getBaseHost();
+      final url = Uri.parse('$host/api/ubicaciones/spaces/$spaceId/contents');
+      final headers = await _headers();
+      final res = await http.get(url, headers: headers).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+    } catch (_) {}
+    return {};
   }
 }
 

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
@@ -13,6 +12,9 @@ import '../services/websocket_service.dart';
 import '../theme/app_theme.dart';
 import '../views/inventario_view.dart';
 import '../views/kanban_view.dart';
+import '../views/pedidos_view.dart';
+import '../views/retazos_view.dart';
+import '../views/ubicaciones_view.dart';
 import '../views/planificar_rutas_view.dart';
 import '../views/simulador_view.dart';
 import '../views/usuarios_view.dart';
@@ -835,7 +837,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
             ),
 
-            // Menú de Navegación (6 Módulos elegantes sin corchetes feos)
+            // Menú de Navegación (9 Módulos elegantes de plataforma unificada)
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
@@ -843,9 +845,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   _buildNavItem(0, 'Monitoreo en Vivo', Icons.radar_rounded, expanded),
                   _buildNavItem(1, 'Tablero Despachos', Icons.view_kanban_rounded, expanded),
                   _buildNavItem(2, 'Planificar Rutas', Icons.alt_route_rounded, expanded),
-                  _buildNavItem(3, 'Inventario & Bodega', Icons.inventory_2_rounded, expanded),
-                  _buildNavItem(4, 'Usuarios & Cédulas', Icons.people_alt_rounded, expanded),
-                  _buildNavItem(5, 'Simulador Chofer', Icons.phone_android_rounded, expanded),
+                  _buildNavItem(3, 'Pedidos & Ventas', Icons.receipt_long_rounded, expanded),
+                  _buildNavItem(4, 'Retazos & Cortes', Icons.content_cut_rounded, expanded),
+                  _buildNavItem(5, 'Ubicaciones Bodega', Icons.grid_view_rounded, expanded),
+                  _buildNavItem(6, 'Inventario & Stock', Icons.inventory_2_rounded, expanded),
+                  _buildNavItem(7, 'Usuarios & Cédulas', Icons.people_alt_rounded, expanded),
+                  _buildNavItem(8, 'Simulador Chofer', Icons.phone_android_rounded, expanded),
                 ],
               ),
             ),
@@ -866,7 +871,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             Icon(Icons.hub_rounded, size: 12, color: AppTheme.statusCompletada),
                             SizedBox(width: 6),
                             Text(
-                              'SERVICIOS ACTIVOS',
+                              'MICROSERVICIOS ACTIVOS',
                               style: TextStyle(
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
@@ -877,7 +882,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           ],
                         ),
                         SizedBox(height: 8),
-                        _SysTag(label: 'Gateway: 8080'),
+                        _SysTag(label: 'Gateway: 8085'),
                         SizedBox(height: 3),
                         _SysTag(label: 'Usuarios: 8081'),
                         SizedBox(height: 3),
@@ -885,11 +890,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         SizedBox(height: 3),
                         _SysTag(label: 'Logística: 8083'),
                         SizedBox(height: 3),
+                        _SysTag(label: 'Retazos: 8084'),
+                        SizedBox(height: 3),
+                        _SysTag(label: 'Pedidos: 8087'),
+                        SizedBox(height: 3),
+                        _SysTag(label: 'Ubicaciones: 8086'),
+                        SizedBox(height: 3),
                         _SysTag(label: 'PostGIS 3.4 Activo'),
                       ],
                     )
                   : Tooltip(
-                      message: 'Plataforma Conectada:\n• Gateway: 8080\n• Usuarios: 8081\n• Inventario: 8082\n• Logística: 8083\n• PostGIS 3.4 Activo',
+                      message: 'Ecosistema Completo Conectado:\n• Gateway: 8085\n• Usuarios: 8081\n• Inventario: 8082\n• Logística: 8083\n• Retazos: 8084\n• Pedidos: 8087\n• Ubicaciones: 8086\n• PostGIS 3.4 Activo',
                       preferBelow: false,
                       child: Center(
                         child: Container(
@@ -1335,10 +1346,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           onRefresh: _inicializarDatos,
         );
       case 3:
-        return const InventarioView();
+        return const PedidosView();
       case 4:
-        return UsuariosView(currentUser: widget.user);
+        return const RetazosView();
       case 5:
+        return const UbicacionesView();
+      case 6:
+        return const InventarioView();
+      case 7:
+        return UsuariosView(currentUser: widget.user);
+      case 8:
         return SimuladorView(
           rutas: _rutas,
           choferes: _choferes,

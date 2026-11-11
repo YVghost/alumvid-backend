@@ -32,7 +32,6 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
   final MapController _mapController = MapController();
 
   LatLng? _posicionChofer;
-  List<LatLng> _puntosRutaVial = [];
   List<LatLng> _puntosTramoActivo = [];
   List<LatLng> _puntosTramoSiguiente = [];
   Map<String, dynamic>? _proximaParada;
@@ -248,7 +247,6 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
     setState(() {
       _puntosTramoActivo = listaActivo;
       _puntosTramoSiguiente = listaSiguiente;
-      _puntosRutaVial = [...listaActivo, ...listaSiguiente];
       _distanciaRestanteKm = distActivoKm;
       _duracionEstimadaMin = durActivoMin;
       _proximaParada = proxima;
