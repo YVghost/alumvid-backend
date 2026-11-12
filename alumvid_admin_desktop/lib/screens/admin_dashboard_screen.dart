@@ -811,7 +811,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           children: [
             const Text('Microservicios Conectados:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            const _SysTag(label: 'Gateway: 8085'),
+            const _SysTag(label: 'Gateway: 8080'),
             const SizedBox(height: 3),
             const _SysTag(label: 'Usuarios: 8081'),
             const SizedBox(height: 3),

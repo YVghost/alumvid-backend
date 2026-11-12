@@ -3,6 +3,7 @@
 ```
 entrega-pruebas/
 ├── android/AlumVid-Chofer.apk        App móvil del chofer (release)      ← local, no se sube a Git
+├── AlumVidAdmin-Windows.zip          Administrador de Windows comprimido   ← local, no se sube a Git
 ├── windows/AlumVidAdmin/             Administrador de Windows (copiar la carpeta completa)
 │   └── alumvid_admin_desktop.exe
 ├── windows/mostrar_ip_servidor.bat   Muestra la IP actual del backend
@@ -17,7 +18,7 @@ Los binarios y las contraseñas están en `.gitignore`. Para regenerarlos ver "R
 
 1. Ejecutar `iniciar_todo.bat` en la raíz del proyecto (Docker Desktop abierto).
 2. Ejecutar `mostrar_ip_servidor.bat`: indica si el backend responde y la dirección a usar desde el teléfono
-   (por ejemplo `http://172.30.156.135:8080`).
+   (por ejemplo `http://192.168.1.31:8080`).
 3. Solo la primera vez, si el teléfono no conecta: abrir PowerShell **como administrador** y permitir el puerto 8080:
    ```powershell
    New-NetFirewallRule -DisplayName "AlumVid Gateway 8080" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow -Profile Private,Public
