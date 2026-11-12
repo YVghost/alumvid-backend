@@ -1,5 +1,8 @@
 # Pedidos confirmados y entregas por partes
 
+> **Sin portal web.** La interfaz de este servicio está en las apps (Windows y Android). Responsabilidad y datos: ver `ARQUITECTURA_SERVICIOS.md` en la raíz.
+
+
 Portal administrativo: **http://localhost:8080/pedidos/**. API `/api/pedidos`, puerto interno 8085.
 
 ## Alcance acordado

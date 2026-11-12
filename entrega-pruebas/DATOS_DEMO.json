@@ -223,6 +223,21 @@
       "dispatchId": "9a734043-ddec-4b17-91ac-8ec596df3f53",
       "routeId": "937c4abc-9a58-450e-b45a-f57bb2fbbddc",
       "state": "ENTREGADO"
+    },
+    "POR_ASIGNAR_NORTE": {
+      "orderId": "c33a68e9-50b0-4f90-931a-293fd6ab30f7",
+      "number": 28,
+      "state": "LISTO"
+    },
+    "POR_ASIGNAR_SUR": {
+      "orderId": "0c656e66-ff47-4942-aca5-2cfc7505dece",
+      "number": 29,
+      "state": "LISTO"
+    },
+    "EN_PREPARACION_BODEGA": {
+      "orderId": "bd58f7d5-5e52-4816-bd0e-a7f7e321d462",
+      "number": 30,
+      "state": "RESERVADO"
     }
   },
   "users": [

@@ -19,14 +19,14 @@ class UbicacionesSecurity {
     @Bean SecurityFilterChain ubicacionesFilterChain(HttpSecurity http,AuthClient auth) throws Exception {
         var filter=new OncePerRequestFilter() {
             @Override protected boolean shouldNotFilter(HttpServletRequest r) {
-                return !r.getRequestURI().startsWith("/api/") || r.getRequestURI().equals("/api/ubicaciones/auth/login");
+                return !r.getRequestURI().startsWith("/api/");
             }
             @Override protected void doFilterInternal(HttpServletRequest q,HttpServletResponse r,FilterChain chain) throws ServletException,IOException {
                 String token=q.getHeader("Authorization");
                 if(token==null || !token.startsWith("Bearer ")) { fail(r,401,"Debes iniciar sesión"); return; }
                 try {
                     var identity=auth.identity(token);
-                    if(identity.mustChangePassword() && !Set.of("/api/ubicaciones/auth/me","/api/ubicaciones/auth/password","/api/ubicaciones/auth/logout").contains(q.getRequestURI())) {
+                    if(identity.mustChangePassword() ) {
                         fail(r,403,"Debes cambiar tu contraseña temporal");return;
                     }
                     var roles=identity.roles().stream().map(role->new SimpleGrantedAuthority("ROLE_"+role)).toList();
@@ -36,8 +36,7 @@ class UbicacionesSecurity {
             }
         };
         return http.csrf(c->c.disable()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(a->a.requestMatchers("/","/index.html","/app.js","/style.css","/api/ubicaciones/auth/login","/actuator/health").permitAll()
-                .requestMatchers("/api/ubicaciones/auth/**").authenticated()
+            .authorizeHttpRequests(a->a.requestMatchers("/actuator/health").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET,"/api/**").hasAnyRole("ADMINISTRADOR","VENDEDOR","BODEGUERO")
                 .requestMatchers(org.springframework.http.HttpMethod.POST,"/api/ubicaciones/moves").hasAnyRole("ADMINISTRADOR","BODEGUERO")
                 .requestMatchers("/api/**").hasRole("ADMINISTRADOR").anyRequest().denyAll())

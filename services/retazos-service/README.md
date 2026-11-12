@@ -1,5 +1,8 @@
 # Retazos y piezas físicas · AlumVid
 
+> **Sin portal web.** La interfaz de este servicio está en las apps (Windows y Android). Responsabilidad y datos: ver `ARQUITECTURA_SERVICIOS.md` en la raíz.
+
+
 Servicio independiente Spring Boot 3.4.3 / Java 21, puerto **8084**. Portal administrativo directo: **http://localhost:8084/**. A través del gateway: **http://localhost:8080/retazos/** (con barra final). API: `/api/retazos`.
 
 ## Reglas de negocio

@@ -1,20 +1,24 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:alumvid_admin_desktop/models/ruta.dart';
 import 'package:alumvid_admin_desktop/models/telemetria.dart';
+import 'package:alumvid_admin_desktop/modulos/rutas/ruta_detalle.dart';
+import 'package:alumvid_admin_desktop/modulos/rutas/rutas_modulo.dart';
+import 'package:alumvid_admin_desktop/services/api_negocio.dart';
 import 'package:alumvid_admin_desktop/services/api_service.dart' as adm;
+import 'package:alumvid_admin_desktop/shared/mapa_selector.dart';
+import 'package:alumvid_admin_desktop/shared/permisos.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../theme/app_theme.dart';
 import '../../widgets/ui.dart';
-import 'rutas_admin_screen.dart';
 
 /// Monitoreo en tiempo real de choferes (solo ADMINISTRADOR).
 class MonitoreoScreen extends StatefulWidget {
-  const MonitoreoScreen({super.key});
+  const MonitoreoScreen({super.key, required this.permisos});
+  final Permisos permisos;
 
   @override
   State<MonitoreoScreen> createState() => _MonitoreoScreenState();
@@ -25,7 +29,7 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
   final _map = MapController();
   Timer? _timer;
   List<TelemetriaGps> _gps = [];
-  List<Ruta> _enCurso = [];
+  List<Map<String, dynamic>> _enCurso = [];
   String? _error;
   DateTime? _actualizado;
   bool _primeraCarga = true;
@@ -47,12 +51,12 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
     try {
       final res = await Future.wait([
         adm.ApiService.obtenerTelemetriaActiva(),
-        adm.ApiService.obtenerRutas(),
+        Api.rutas(),
       ]);
       if (!mounted) return;
       setState(() {
         _gps = res[0] as List<TelemetriaGps>;
-        _enCurso = (res[1] as List<Ruta>).where((r) => r.isEnCurso).toList();
+        _enCurso = (res[1] as List<Map<String, dynamic>>).where((r) => r['estado'] == 'EN_CURSO').toList();
         _error = null;
         _actualizado = DateTime.now();
       });
@@ -83,8 +87,18 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
     return 'hace ${d.inHours} h';
   }
 
-  Ruta? _rutaDe(TelemetriaGps t) =>
-      _enCurso.where((r) => r.choferId != null && r.choferId == t.choferId).firstOrNull;
+  Map<String, dynamic>? _rutaDe(TelemetriaGps t) =>
+      _enCurso.where((r) => r['choferId'] != null && r['choferId'] == t.choferId).firstOrNull;
+
+  String _avance(Map<String, dynamic> r) {
+    final paradas = (r['paradas'] as List? ?? const []);
+    return '${paradas.where((p) => p['estado'] == 'ENTREGADO').length}/${paradas.length} paradas';
+  }
+
+  void _abrirRuta(Map<String, dynamic> r) => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => RutaDetalle(rutaId: '${r['id']}', permisos: widget.permisos)),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -95,7 +109,7 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
             mapController: _map,
             options: const MapOptions(initialCenter: _quito, initialZoom: 12),
             children: [
-              TileLayer(urlTemplate: tileUrl, userAgentPackageName: tileAgent),
+              TileLayer(urlTemplate: mapaTiles, userAgentPackageName: mapaAgente),
               MarkerLayer(
                 markers: [
                   for (final t in _gps)
@@ -185,7 +199,7 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
                       title: Text(t.choferNombre ?? 'Chofer'),
                       subtitle: Text(
                         '${t.velocidadKmh.round()} km/h · ${_hace(t.timestamp)}'
-                        '${_rutaDe(t) != null ? ' · ${_rutaDe(t)!.paradasEntregadas}/${_rutaDe(t)!.totalParadas} paradas' : ''}',
+                        '${_rutaDe(t) != null ? ' · ${_avance(_rutaDe(t)!)}' : ''}',
                         style: const TextStyle(color: AppColors.textMuted),
                       ),
                       trailing: const Icon(Icons.my_location),
@@ -196,15 +210,7 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
                     for (final r in _enCurso)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),
-                        child: RutaCard(
-                          ruta: r,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => RutaDetalleScreen(rutaId: r.id, inicial: r),
-                            ),
-                          ),
-                        ),
+                        child: TarjetaRuta(ruta: r, onTap: () => _abrirRuta(r)),
                       ),
                   ],
                 ],
@@ -274,12 +280,7 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
                 FilledButton.icon(
                   onPressed: () {
                     Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RutaDetalleScreen(rutaId: ruta.id, inicial: ruta),
-                      ),
-                    );
+                    _abrirRuta(ruta);
                   },
                   icon: const Icon(Icons.alt_route),
                   label: const Text('Ver su ruta'),

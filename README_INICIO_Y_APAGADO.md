@@ -24,11 +24,7 @@ Si modificaste el código de los servicios y necesitas reconstruir sus imágenes
 docker compose -f compose.yaml up -d --build
 ```
 
-Portales administrativos:
-
-- Pedidos y clientes: http://localhost:8080/pedidos/
-- Retazos: http://localhost:8080/retazos/
-- Ubicaciones: http://localhost:8080/ubicaciones/
+Gestión: desde la app de Windows (`abrir_admin_windows.bat`) o la app Android. Ya no hay portales web.
 
 Los contenedores con estado `starting` pueden necesitar unos segundos para quedar `healthy`.
 

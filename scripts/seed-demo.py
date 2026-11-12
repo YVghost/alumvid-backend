@@ -61,13 +61,24 @@ def product(key,name,unit='UNIDAD',stock=0,minimum=0):
     p=once('product:'+key,lambda:call('/api/products','POST',{'code':state['prefix']+'-'+key,'name':'DEMO '+name,'category':'VIDRIO' if key.startswith('VID') else 'ALUMINIO' if key.startswith('ALU') else 'ACCESORIOS','unit':unit,'description':'Material ficticio para pruebas manuales','supplier':'Proveedor ficticio','externalCode':'','location':'','minStock':str(minimum),'active':True},admin))
     if stock:once('stock:'+key,lambda:call('/api/products/'+p['id']+'/movements','POST',{'requestId':request_id('stock:'+key),'type':'INGRESO','quantity':str(stock),'reason':'DEMO carga inicial'},admin))
     return p
+PUNTOS={'RUTA_PENDIENTE':(-0.1762,-78.4847,'DEMO Av. Amazonas y Naciones Unidas'),'EN_RUTA':(-0.2002,-78.4903,'DEMO Av. 6 de Diciembre y Colón'),
+        'CANCELADO_REPARTO':(-0.1580,-78.4794,'DEMO Av. Eloy Alfaro y Portugal'),'ENTREGA_HISTORICA':(-0.2205,-78.5126,'DEMO Centro Histórico, Plaza Grande'),
+        'POR_ASIGNAR_NORTE':(-0.1306,-78.4890,'DEMO Av. del Maestro y Real Audiencia'),'POR_ASIGNAR_SUR':(-0.2650,-78.5350,'DEMO Av. Maldonado y Morán Valverde'),
+        'EN_PREPARACION':(-0.1900,-78.4500,'DEMO Cumbayá, Av. Interoceánica')}
 def order(key,lines,delivery=False):
-    result=once('order:'+key,lambda:call('/api/pedidos/orders','POST',{'requestId':request_id('order:'+key),'clientId':clients[0 if not delivery else 1]['id'],'deliveryMode':'ENTREGA' if delivery else 'RETIRO','deliveryAddress':'DEMO Av. de los Shyris, Quito' if delivery else '', 'receiverName':'Receptor ficticio','externallyConfirmed':True,'externalInvoiceReference':state['prefix']+'-'+key,'notes':'DEMO escenario '+key,'lines':lines},admin))
-    return result
+    lat,lon,direccion=PUNTOS.get(key,(-0.1807,-78.4678,'DEMO Av. de los Shyris, Quito'))
+    body={'requestId':request_id('order:'+key),'clientId':clients[0 if not delivery else 1]['id'],'deliveryMode':'ENTREGA' if delivery else 'RETIRO','deliveryAddress':direccion if delivery else '','receiverName':'Receptor ficticio','externallyConfirmed':True,'externalInvoiceReference':state['prefix']+'-'+key,'notes':'DEMO escenario '+key,'lines':lines}
+    if delivery:body.update({'deliveryLatitude':lat,'deliveryLongitude':lon})
+    return once('order:'+key,lambda:call('/api/pedidos/orders','POST',body,admin))
 def line(p,quantity,**measures):return {'productId':p['id'],'quantity':str(quantity),'unitPrice':'10',**measures}
 def ship(key,o,driver,quantities=None):
-    body={'requestId':request_id('shipment:'+key),'driverId':driver['id'],'latitude':-0.1807,'longitude':-78.4678,'lines':quantities or [{'lineId':l['id'],'quantity':l['quantity']} for l in o['lines']],'reason':'DEMO despacho '+key,'receiverName':'Receptor ficticio'}
-    return once('shipment:'+key,lambda:call('/api/pedidos/orders/'+o['order']['id']+'/shipments','POST',body,admin))
+    item={'pedidoId':o['order']['id']}
+    if quantities:item['lineas']=[{'lineId':q['lineId'],'quantity':q['quantity']} for q in quantities]
+    def crear():
+        ruta=call('/api/v1/logistica/rutas','POST',{'codigoRuta':state['prefix']+'-'+key,'choferId':driver['id'],'comentarios':'DEMO ruta '+key,'pedidos':[item]},admin)
+        parada=ruta['paradas'][0]
+        return {'id':parada['envioComercialId'],'dispatch_id':parada['id'],'route_id':ruta['id']}
+    return once('shipment:'+key,crear)
 def sql(statement):
     result=subprocess.run(['docker','exec','-i','alumvid-postgres','sh','-c','exec psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'],input=statement,text=True,capture_output=True)
     if result.returncode:raise RuntimeError('No se pudo ajustar el escenario DEMO de vencimiento.')
@@ -114,6 +125,11 @@ try:
     o=order('ENTREGA_HISTORICA',[line(screw,1)],True);action(o['order']['id'],'prepare');s=ship('ENTREGA_HISTORICA',o,d1)
     once('start:HISTORICA',lambda:call('/api/v1/logistica/despachos/'+s['dispatch_id']+'/aceptar-inicio','POST',{},t1))
     once('complete:HISTORICA',lambda:call('/api/v1/logistica/despachos/'+s['dispatch_id']+'/cerrar-entrega','POST',{'fotoPodUrl':'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jp9sAAAAASUVORK5CYII=','firmaUrl':'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jp9sAAAAASUVORK5CYII=','latitud':-0.1807,'longitud':-78.4678,'comentarios':'DEMO evidencia sintética; no representa una entrega real'},t1));keep('ENTREGADO_LOGISTICA',o,s)
+    # Lotes creados antes de que el pedido guardara su ubicación: se completa con puntos ficticios.
+    once('coords:backfill',lambda:(sql("UPDATE pedidos.sale_order SET delivery_latitude=-0.1807+((number%7)-3)*0.012,delivery_longitude=-78.4678+((number%5)-2)*0.010 WHERE delivery_mode='ENTREGA' AND delivery_latitude IS NULL AND external_invoice_reference LIKE '"+state['prefix']+"-%'"),True)[1])
+    o=order('POR_ASIGNAR_NORTE',[line(screw,5),line(aluminum,1,lengthM='2.4')],True);action(o['order']['id'],'prepare');keep('POR_ASIGNAR_NORTE',o)
+    o=order('POR_ASIGNAR_SUR',[line(glass,1,widthCm='35',heightCm='244')],True);action(o['order']['id'],'prepare');keep('POR_ASIGNAR_SUR',o)
+    o=order('EN_PREPARACION',[line(screw,3)],True);keep('EN_PREPARACION_BODEGA',o)
     for entry in scenarios.values():entry['state']=call('/api/pedidos/orders/'+entry['orderId'],token=admin)['order']['state']
     manifest={'prefix':state['prefix'],'createdAt':state['createdAt'],'clients':clients,'products':{'tornillos':screw,'silicona':silicone,'faltante':missing,'vidrio':glass,'aluminio':aluminum},'spaces':spaces,'scenarios':scenarios,'users':[{'id':a['id'],'identification':a['identification'],'roles':a['roles'],'temporary':a['temporary'],'inactive':a['inactive']} for a in state['accounts'].values()]}
     (OUT/'DATOS_DEMO.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')

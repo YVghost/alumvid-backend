@@ -1,6 +1,6 @@
 # Flujo actual
 
-Portales: [Pedidos y clientes](http://localhost:8080/pedidos/), [Retazos](http://localhost:8080/retazos/), [Ubicaciones físicas](http://localhost:8080/ubicaciones/).
+Gestión: módulos Pedidos, Rutas, Inventario, Piezas y Bodega de las apps (Windows y Android). Ver ARQUITECTURA_SERVICIOS.md.
 
 ```mermaid
 flowchart TD

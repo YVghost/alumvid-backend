@@ -116,9 +116,9 @@ class PedidosIntegrationTest {
     }
     @Test void unconfirmedOrdersAreRejectedAndClientNamesAreHistoricalSnapshots() {
         UUID p=product("2"),client=UUID.randomUUID();db.update("INSERT INTO pedidos.client(id,name) VALUES (?,'Nombre original')",client);
-        var request=new PedidosApi.Create(UUID.randomUUID(),null,PedidosApi.Delivery.RETIRO,"","Receptor solo historico","",List.of(line(p,"1")),client,false,"Referencia externa");
+        var request=new PedidosApi.Create(UUID.randomUUID(),null,PedidosApi.Delivery.RETIRO,"","Receptor solo historico","",List.of(line(p,"1")),client,false,"Referencia externa",null,null);
         assertEquals(400,assertThrows(PedidosError.class,()->service.create(request,SELLER)).status);
-        var order=service.create(new PedidosApi.Create(UUID.randomUUID(),null,PedidosApi.Delivery.RETIRO,"","Receptor solo historico","",List.of(line(p,"1")),client,true,"Referencia externa"),SELLER);
+        var order=service.create(new PedidosApi.Create(UUID.randomUUID(),null,PedidosApi.Delivery.RETIRO,"","Receptor solo historico","",List.of(line(p,"1")),client,true,"Referencia externa",null,null),SELLER);
         db.update("UPDATE pedidos.client SET name='Nombre actualizado' WHERE id=?",client);
         assertEquals("Nombre original",db.queryForObject("SELECT client_name FROM pedidos.sale_order WHERE id=?",String.class,id(order)));
         assertEquals("RESERVADO",state(id(order)));

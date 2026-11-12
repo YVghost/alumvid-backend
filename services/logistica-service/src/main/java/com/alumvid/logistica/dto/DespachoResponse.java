@@ -7,6 +7,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Data
@@ -31,4 +33,8 @@ public class DespachoResponse {
     private Boolean alertaDesviacion;
     private EstadoDespacho estado;
     private String comentarios;
+    private UUID pedidoComercialId;
+    private Integer numeroPedido;
+    private UUID envioComercialId;
+    private List<Map<String, Object>> carga;
 }

@@ -1,6 +1,5 @@
 package com.alumvid.logistica.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,8 +12,12 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CrearRutaSimpleRequest {
-    @NotBlank(message = "El nombre o codigo de la ruta es obligatorio")
+    /** Opcional: si no se indica se genera RUTA-aaaammdd-hhmm. */
     private String codigoRuta;
+    @jakarta.validation.constraints.NotNull(message = "Selecciona un chofer disponible")
     private UUID choferId;
     private String comentarios;
+    /** Pedidos que se agregan al crear la ruta (opcional). */
+    @jakarta.validation.Valid
+    private java.util.List<PedidoRutaRequest> pedidos;
 }

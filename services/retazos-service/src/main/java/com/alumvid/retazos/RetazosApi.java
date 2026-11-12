@@ -34,12 +34,7 @@ class RetazosApi {
         @NotBlank @Size(max=500) String reason) {}
     private final RetazosService service;
     private final RetazosRepository repository;
-    private final AuthClient auth;
-    RetazosApi(RetazosService service,RetazosRepository repository,AuthClient auth) { this.service=service;this.repository=repository;this.auth=auth; }
-    @PostMapping("/auth/login") ResponseEntity<String> login(@RequestBody Map<String,Object> body) { return auth.forward("login",null,body); }
-    @GetMapping("/auth/me") AuthClient.Identity me(@AuthenticationPrincipal AuthClient.Identity actor) { return actor; }
-    @PostMapping("/auth/password") ResponseEntity<String> password(@RequestHeader("Authorization") String token,@RequestBody Map<String,Object> body) { return auth.forward("password",token,body); }
-    @PostMapping("/auth/logout") ResponseEntity<String> logout(@RequestHeader("Authorization") String token) { return auth.forward("logout",token,null); }
+    RetazosApi(RetazosService service,RetazosRepository repository) { this.service=service;this.repository=repository; }
     private void page(int page,int size) { if(page<0||size<1||size>100)throw new RetazosError(400,"Página >=0 y tamaño entre 1 y 100"); }
     @GetMapping("/products") Map<String,Object> products(@RequestParam(defaultValue="") String q,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {
         page(page,size);if(q.length()>150)throw new RetazosError(400,"Filtro demasiado largo");
@@ -50,6 +45,28 @@ class RetazosApi {
     }
     @PutMapping("/products/{id}/format") Map<String,Object> configure(@PathVariable UUID id,@Valid @RequestBody FormatInput body,@AuthenticationPrincipal AuthClient.Identity actor) { return service.configure(id,body,actor); }
     @GetMapping("/products/{id}/summary") Map<String,Object> summary(@PathVariable UUID id) { return service.summary(id); }
+    @GetMapping("/pieces") Map<String,Object> searchPieces(@RequestParam(defaultValue="") String q,@RequestParam(defaultValue="") String kind,@RequestParam(defaultValue="DISPONIBLE") String state,
+            @RequestParam(required=false) BigDecimal minLengthM,@RequestParam(required=false) BigDecimal minWidthCm,@RequestParam(required=false) BigDecimal minHeightCm,
+            @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size) {
+        page(page,size);
+        if(!Set.of("","DISPONIBLE","TRANSFORMADO","CONSUMIDO","DESCARTADO","PREPARADO","ENTREGADO").contains(state))throw new RetazosError(400,"Estado inválido");
+        if(!Set.of("","ALUMINIO","VIDRIO").contains(kind))throw new RetazosError(400,"Tipo inválido");
+        if(q.length()>150)throw new RetazosError(400,"Filtro muy largo");
+        return repository.searchPieces(q,kind,state,minLengthM,minWidthCm,minHeightCm,size,(long)page*size);
+    }
+    /** Ficha de una pieza: medidas, equivalencia, ubicación, origen, cortes derivados, reserva e historial. */
+    @GetMapping("/pieces/{pieceId}") Map<String,Object> piece(@PathVariable UUID pieceId) {
+        var piece=repository.pieceById(pieceId);var format=repository.format(piece.productId());
+        var result=new LinkedHashMap<String,Object>();
+        result.put("piece",piece.view(format));
+        result.put("product",repository.product(piece.productId(),false));
+        result.put("format",RetazosRepository.map("kind",format.kind(),"fullLengthM",format.fullLengthM(),"fullWidthCm",format.fullWidthCm(),"fullHeightCm",format.fullHeightCm()));
+        result.put("parent",piece.parentId()==null?null:repository.pieceById(piece.parentId()).view(format));
+        result.put("children",repository.children(pieceId).stream().map(c->c.view(format)).toList());
+        result.put("order",repository.db().queryForList("SELECT o.id,o.number,o.client_name,o.state FROM pedidos.allocation a JOIN pedidos.sale_order o ON o.id=a.order_id WHERE a.piece_id=? AND a.state IN ('ACTIVA','CONSUMIDA') AND o.state NOT IN ('CANCELADO','VENCIDO','ENTREGADO') ORDER BY a.created_at DESC LIMIT 1",pieceId).stream().findFirst().orElse(null));
+        result.put("history",repository.db().queryForList("SELECT action,reason,actor_name,created_at FROM retazos.operation WHERE product_id=? AND result::text LIKE ? ORDER BY created_at DESC LIMIT 20",piece.productId(),"%"+pieceId+"%"));
+        return result;
+    }
     @GetMapping("/products/{id}/pieces") Map<String,Object> pieces(@PathVariable UUID id,@RequestParam(defaultValue="DISPONIBLE") String state,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {
         page(page,size);
         if(!Set.of("","DISPONIBLE","TRANSFORMADO","CONSUMIDO","DESCARTADO","PREPARADO","ENTREGADO").contains(state))throw new RetazosError(400,"Estado inválido");

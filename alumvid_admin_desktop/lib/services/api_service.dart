@@ -7,7 +7,6 @@ import '../models/audit_event.dart';
 import '../models/chofer.dart';
 import '../models/despacho.dart';
 import '../models/movimiento.dart';
-import '../models/pedido.dart';
 import '../models/producto.dart';
 import '../models/ruta.dart';
 import '../models/telemetria.dart';
@@ -236,132 +235,10 @@ class ApiService {
     throw Exception('Error al listar choferes');
   }
 
-  static Future<List<Pedido>> obtenerPedidosPendientes() async {
-    final apiBase = await getApiBase();
-    final url = Uri.parse('$apiBase/logistica/pedidos/pendientes');
-    final headers = await _headers();
 
-    final response = await http
-        .get(url, headers: headers)
-        .timeout(const Duration(seconds: 8));
-    if (response.statusCode == 200) {
-      final List<dynamic> list = jsonDecode(response.body);
-      return list.map((p) => Pedido.fromJson(p)).toList();
-    }
-    throw Exception('Error al listar pedidos pendientes');
-  }
 
-  static Future<List<Pedido>> obtenerTodosLosPedidos() async {
-    final apiBase = await getApiBase();
-    final url = Uri.parse('$apiBase/logistica/pedidos');
-    final headers = await _headers();
 
-    final response = await http
-        .get(url, headers: headers)
-        .timeout(const Duration(seconds: 8));
-    if (response.statusCode == 200) {
-      final List<dynamic> list = jsonDecode(response.body);
-      return list.map((p) => Pedido.fromJson(p)).toList();
-    }
-    throw Exception('Error al listar todos los pedidos');
-  }
 
-  static Future<Ruta> crearRutaMultiDestino({
-    required String codigoRuta,
-    required String choferId,
-    String? comentarios,
-    required List<Map<String, dynamic>> destinos,
-  }) async {
-    final apiBase = await getApiBase();
-    final url = Uri.parse('$apiBase/logistica/rutas/multi-destino');
-    final headers = await _headers();
-
-    final response = await http
-        .post(
-          url,
-          headers: headers,
-          body: jsonEncode({
-            'codigoRuta': codigoRuta,
-            'choferId': choferId,
-            'comentarios': comentarios ?? '',
-            'destinos': destinos,
-          }),
-        )
-        .timeout(const Duration(seconds: 12));
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return Ruta.fromJson(jsonDecode(response.body));
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['message'] ?? 'Error al crear la ruta multi-destino');
-  }
-
-  static Future<Ruta> agregarDestinoRuta({
-    required String rutaId,
-    required String cliente,
-    required String direccionTexto,
-    required double latitud,
-    required double longitud,
-    String? comentarios,
-  }) async {
-    final apiBase = await getApiBase();
-    final url = Uri.parse('$apiBase/logistica/rutas/$rutaId/destinos');
-    final headers = await _headers();
-
-    final response = await http
-        .post(
-          url,
-          headers: headers,
-          body: jsonEncode({
-            'cliente': cliente,
-            'direccionTexto': direccionTexto,
-            'latitudDestino': latitud,
-            'longitudDestino': longitud,
-            'comentarios': comentarios,
-          }),
-        )
-        .timeout(const Duration(seconds: 10));
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return Ruta.fromJson(jsonDecode(response.body));
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['message'] ?? 'Error al agregar destino a la ruta');
-  }
-
-  static Future<Ruta> modificarDestinoRuta({
-    required String rutaId,
-    required String despachoId,
-    required String cliente,
-    required String direccionTexto,
-    required double latitud,
-    required double longitud,
-    String? comentarios,
-  }) async {
-    final apiBase = await getApiBase();
-    final url = Uri.parse('$apiBase/logistica/rutas/$rutaId/destinos/$despachoId');
-    final headers = await _headers();
-
-    final response = await http
-        .put(
-          url,
-          headers: headers,
-          body: jsonEncode({
-            'cliente': cliente,
-            'direccionTexto': direccionTexto,
-            'latitudDestino': latitud,
-            'longitudDestino': longitud,
-            'comentarios': comentarios,
-          }),
-        )
-        .timeout(const Duration(seconds: 10));
-
-    if (response.statusCode == 200) {
-      return Ruta.fromJson(jsonDecode(response.body));
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['message'] ?? 'Error al modificar parada');
-  }
 
   static Future<Ruta> eliminarDestinoRuta(
     String rutaId,
@@ -468,33 +345,6 @@ class ApiService {
     throw Exception(err['message'] ?? 'Error al cancelar ruta');
   }
 
-  static Future<Ruta> crearRutaSimple({
-    required String codigoRuta,
-    String? choferId,
-    String? comentarios,
-  }) async {
-    final apiBase = await getApiBase();
-    final url = Uri.parse('$apiBase/logistica/rutas/simple');
-    final headers = await _headers();
-
-    final response = await http
-        .post(
-          url,
-          headers: headers,
-          body: jsonEncode({
-            'codigoRuta': codigoRuta,
-            'choferId': choferId,
-            'comentarios': comentarios,
-          }),
-        )
-        .timeout(const Duration(seconds: 10));
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return Ruta.fromJson(jsonDecode(response.body));
-    }
-    final err = jsonDecode(response.body);
-    throw Exception(err['message'] ?? 'Error al crear hoja de ruta simple');
-  }
 
   static Future<void> eliminarRuta(String rutaId) async {
     final apiBase = await getApiBase();

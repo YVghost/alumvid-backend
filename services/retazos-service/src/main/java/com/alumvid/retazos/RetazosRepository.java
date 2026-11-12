@@ -47,6 +47,28 @@ class RetazosRepository {
             (r,n)->new Piece(pieceId,productId,r.getObject("parent_id",UUID.class),r.getBigDecimal("length_m"),r.getBigDecimal("width_cm"),r.getBigDecimal("height_cm"),r.getString("state"),r.getString("location"),r.getObject("created_at",OffsetDateTime.class)),productId,pieceId)
             .stream().findFirst().orElseThrow(()->new RetazosError(404,"Pieza no encontrada en este producto"));
     }
+    private static final org.springframework.jdbc.core.RowMapper<Piece> PIECE=(r,n)->new Piece(r.getObject("id",UUID.class),r.getObject("product_id",UUID.class),r.getObject("parent_id",UUID.class),r.getBigDecimal("length_m"),r.getBigDecimal("width_cm"),r.getBigDecimal("height_cm"),r.getString("state"),r.getString("location"),r.getObject("created_at",OffsetDateTime.class));
+    /** Búsqueda de piezas en todos los materiales (para encontrar un retazo por medida). */
+    Map<String,Object> searchPieces(String q,String kind,String state,BigDecimal minLengthM,BigDecimal minWidthCm,BigDecimal minHeightCm,int size,long offset) {
+        String where=" FROM retazos.piece pc JOIN retazos.material_format f ON f.product_id=pc.product_id JOIN inventario.product p ON p.id=pc.product_id"
+            +" WHERE (?='' OR pc.state=?) AND (?='' OR f.kind=?) AND POSITION(? IN lower(p.code||' '||p.name||' '||pc.location))>0"
+            +" AND (?::numeric IS NULL OR pc.length_m>=?::numeric) AND (?::numeric IS NULL OR pc.width_cm>=?::numeric) AND (?::numeric IS NULL OR pc.height_cm>=?::numeric)";
+        String filter=q.toLowerCase(Locale.ROOT);
+        Object[] args={state,state,kind,kind,filter,minLengthM,minLengthM,minWidthCm,minWidthCm,minHeightCm,minHeightCm};
+        long total=db.queryForObject("SELECT count(*)"+where,Long.class,args);
+        var params=new ArrayList<Object>(Arrays.asList(args));params.add(size);params.add(offset);
+        var items=db.query("SELECT pc.*,p.code AS product_code,p.name AS product_name"+where+" ORDER BY p.name,COALESCE(pc.length_m,pc.width_cm*pc.height_cm) DESC,pc.id LIMIT ? OFFSET ?",(r,n)->{
+            var piece=PIECE.mapRow(r,n);var view=new LinkedHashMap<>(piece.view(format(piece.productId())));
+            view.put("productCode",r.getString("product_code"));view.put("productName",r.getString("product_name"));return (Map<String,Object>)view;
+        },params.toArray());
+        return map("items",items,"total",total,"size",size);
+    }
+    Piece pieceById(UUID pieceId) {
+        return db.query("SELECT * FROM retazos.piece WHERE id=?",PIECE,pieceId).stream().findFirst().orElseThrow(()->new RetazosError(404,"Pieza no encontrada"));
+    }
+    List<Piece> children(UUID pieceId) {
+        return db.query("SELECT * FROM retazos.piece WHERE parent_id=? ORDER BY created_at,id",PIECE,pieceId);
+    }
     BigDecimal allocatedMeasure(UUID id) {
         return db.queryForObject("SELECT COALESCE(SUM(COALESCE(length_m,width_cm*height_cm)),0) FROM retazos.piece WHERE product_id=? AND state='DISPONIBLE'",BigDecimal.class,id);
     }

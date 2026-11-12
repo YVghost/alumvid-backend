@@ -9,15 +9,18 @@ import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/websocket_service.dart';
 import '../theme/app_theme.dart';
-import '../views/inventario_view.dart';
+import '../modulos/bodega/bodega_modulo.dart';
+import '../modulos/inventario/inventario_modulo.dart';
+import '../modulos/pedidos/pedidos_modulo.dart';
+import '../modulos/piezas/piezas_modulo.dart';
+import '../modulos/rutas/ruta_detalle.dart';
+import '../modulos/rutas/rutas_modulo.dart';
+import '../modulos/usuarios/cambiar_clave.dart';
+import '../modulos/usuarios/usuarios_modulo.dart';
+import '../shared/adaptable.dart';
+import '../shared/permisos.dart';
 import '../views/kanban_view.dart';
-import '../views/pedidos_view.dart';
-import '../views/retazos_view.dart';
-import '../views/ubicaciones_view.dart';
-import '../views/planificar_rutas_view.dart';
 import '../views/simulador_view.dart';
-import '../views/usuarios_view.dart';
-import '../widgets/agregar_parada_dialog.dart';
 import '../widgets/epod_dialog.dart';
 import '../widgets/live_map_widget.dart';
 import '../widgets/paradas_list_widget.dart';
@@ -350,19 +353,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
 
 
-  void _abrirAgregarParadaDialog(Ruta ruta) {
-    showDialog(
-      context: context,
-      builder: (_) => AgregarParadaDialog(
-        ruta: ruta,
-        onParadaAgregada: () async {
-          await _cargarRutas();
-          if (_rutaSeleccionada != null && _rutaSeleccionada!.id == ruta.id) {
-            _seleccionarRuta(_rutaSeleccionada!);
-          }
-        },
-      ),
-    );
+  Permisos get _permisos => Permisos(widget.user);
+
+  /// Las paradas nacen de pedidos: se gestionan en el detalle de la ruta.
+  Future<void> _abrirAgregarParadaDialog(Ruta ruta) async {
+    await abrirPanel(context, (_) => RutaDetalle(rutaId: ruta.id, permisos: _permisos), ancho: 680);
+    await _cargarRutas();
+    if (_rutaSeleccionada != null && _rutaSeleccionada!.id == ruta.id) {
+      final actual = _rutas.where((r) => r.id == ruta.id).firstOrNull;
+      if (actual != null) _seleccionarRuta(actual);
+    }
   }
 
   Future<void> _reoptimizarRutaDesdeDashboard(Ruta ruta) async {
@@ -556,33 +556,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         };
       case 2:
         return {
-          'title': 'Gestión y Asignación de Rutas',
-          'subtitle': 'Planificación de hojas de ruta, paradas georreferenciadas y asignación de choferes',
+          'title': 'Rutas y entregas',
+          'subtitle': 'Pedidos por asignar, rutas por estado y choferes disponibles',
         };
       case 3:
         return {
-          'title': 'Pedidos & Ventas Comerciales',
-          'subtitle': 'Gestión de órdenes de clientes y reservas de stock',
+          'title': 'Pedidos y clientes',
+          'subtitle': 'Ventas, reservas, preparación y entregas',
         };
       case 4:
         return {
-          'title': 'Retazos & Cortes',
-          'subtitle': 'Gestión de piezas de aluminio y vidrio templado para reutilización',
+          'title': 'Piezas y retazos',
+          'subtitle': 'Busca piezas por medida en todos los materiales',
         };
       case 5:
         return {
-          'title': 'Ubicaciones Físicas de Bodega',
-          'subtitle': 'Mapa de racks y compartimentos de almacenamiento',
+          'title': 'Bodega',
+          'subtitle': 'Dónde está cada material y traslados entre espacios',
         };
       case 6:
         return {
-          'title': 'Inventario & Stock',
-          'subtitle': 'Control de existencias de perfiles de aluminio y láminas de vidrio',
+          'title': 'Inventario',
+          'subtitle': 'Existencias por material, unidades y piezas con medida',
         };
       case 7:
         return {
-          'title': 'Gestión de Usuarios, Cédulas y Seguridad RBAC',
-          'subtitle': 'Control de acceso basado en roles y registro civil ecuatoriano',
+          'title': 'Usuarios',
+          'subtitle': 'Colaboradores, roles y auditoría de seguridad',
         };
       case 8:
         return {
@@ -598,30 +598,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isDesktop = constraints.maxWidth >= 960;
-          return isDesktop ? _buildDesktopFullLayout() : _buildMobileFullLayout();
-        },
-      ),
-      bottomNavigationBar: MediaQuery.of(context).size.width < 960
-          ? BottomNavigationBar(
-              currentIndex: _selectedTabIndex,
-              backgroundColor: AppTheme.surface,
-              selectedItemColor: AppTheme.primaryLight,
-              unselectedItemColor: AppTheme.textMuted,
-              type: BottomNavigationBarType.fixed,
-              onTap: (idx) => setState(() => _selectedTabIndex = idx),
-              items: const [
-                BottomNavigationBarItem(icon: Icon(Icons.gps_fixed), label: 'GPS'),
-                BottomNavigationBarItem(icon: Icon(Icons.view_kanban), label: 'Despachos'),
-                BottomNavigationBarItem(icon: Icon(Icons.alt_route), label: 'Rutas'),
-                BottomNavigationBarItem(icon: Icon(Icons.inventory_2), label: 'Inventario'),
-                BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Usuarios'),
-                BottomNavigationBarItem(icon: Icon(Icons.phone_android), label: 'Simulador'),
-              ],
-            )
-          : null,
+      body: _buildDesktopFullLayout(),
     );
   }
 
@@ -646,16 +623,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildMobileFullLayout() {
-    return Column(
-      children: [
-        _buildTopBar(),
-        Expanded(
-          child: _buildContenidoPestanaActiva(),
-        ),
-      ],
-    );
-  }
 
   // BARRA LATERAL (SIDEBAR) SLIM & ELEGANTE - NO INVASIVA
   Widget _buildSlimSidebar() {
@@ -664,7 +631,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       {'index': 1, 'label': 'despachos', 'icon': Icons.view_kanban_rounded},
       {'index': 2, 'label': 'rutas', 'icon': Icons.alt_route_rounded},
       {'index': 3, 'label': 'pedidos', 'icon': Icons.receipt_long_rounded},
-      {'index': 4, 'label': 'retazos', 'icon': Icons.content_cut_rounded},
+      {'index': 4, 'label': 'piezas', 'icon': Icons.content_cut_rounded},
       {'index': 5, 'label': 'bodega', 'icon': Icons.grid_view_rounded},
       {'index': 6, 'label': 'inventario', 'icon': Icons.inventory_2_rounded},
       {'index': 7, 'label': 'usuarios', 'icon': Icons.people_alt_rounded},
@@ -895,6 +862,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               if (val == 'auditoria') _abrirAuditoriaHistorico();
               if (val == 'config') _mostrarDialogoConfiguracion();
               if (val == 'logout') _cerrarSesion();
+              if (val == 'clave') cambiarMiClave(context, alTerminar: _cerrarSesion);
             },
             itemBuilder: (ctx) => [
               PopupMenuItem(
@@ -942,6 +910,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     Icon(Icons.hub_rounded, size: 16, color: Color(0xFF38BDF8)),
                     SizedBox(width: 10),
                     Text('Servicios & Sistema', style: TextStyle(color: Colors.white, fontSize: 13)),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'clave',
+                child: Row(
+                  children: [
+                    Icon(Icons.key_rounded, size: 16, color: Color(0xFF38BDF8)),
+                    SizedBox(width: 10),
+                    Text('Cambiar mi contraseña', style: TextStyle(color: Colors.white, fontSize: 13)),
                   ],
                 ),
               ),
@@ -1007,34 +985,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           },
         );
       case 2:
-        return PlanificarRutasView(
-          rutas: _rutasDelPeriodo,
-          todasLasRutas: _rutas,
-          choferes: _choferes,
-          rangoFiltro: _rangoFiltro,
-          onCambiarRangoFiltro: (newRange) {
-            setState(() => _rangoFiltro = newRange);
-          },
-          onRefresh: _inicializarDatos,
-          onIrAMonitoreo: (ruta) {
-            setState(() {
-              _selectedTabIndex = 0;
-              if (ruta != null) {
-                _seleccionarRuta(ruta);
-              }
-            });
-          },
-        );
+        return ConTemaAlumVid(child: RutasModulo(permisos: _permisos));
       case 3:
-        return const PedidosView();
+        return ConTemaAlumVid(child: PedidosModulo(permisos: _permisos));
       case 4:
-        return const RetazosView();
+        return ConTemaAlumVid(child: PiezasModulo(permisos: _permisos));
       case 5:
-        return const UbicacionesView();
+        return ConTemaAlumVid(child: BodegaModulo(permisos: _permisos));
       case 6:
-        return const InventarioView();
+        return ConTemaAlumVid(child: InventarioModulo(permisos: _permisos));
       case 7:
-        return UsuariosView(currentUser: widget.user);
+        return ConTemaAlumVid(child: UsuariosModulo(permisos: _permisos));
       case 8:
         return SimuladorView(
           rutas: _rutas,
@@ -1185,7 +1146,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         visualDensity: VisualDensity.compact,
                       ),
                       icon: const Icon(Icons.add_location_alt, size: 16),
-                      label: const Text('+ Agregar Parada', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      label: const Text('Gestionar paradas', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                       onPressed: _rutaSeleccionada != null
                           ? () => _abrirAgregarParadaDialog(_rutaSeleccionada!)
                           : null,
@@ -1365,7 +1326,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ],
                   TextButton.icon(
                     icon: const Icon(Icons.add_location_alt, size: 14, color: AppTheme.primaryLight),
-                    label: const Text('+ Agregar Parada', style: TextStyle(fontSize: 11, color: AppTheme.primaryLight)),
+                    label: const Text('Gestionar paradas', style: TextStyle(fontSize: 11, color: AppTheme.primaryLight)),
                     onPressed: () => _abrirAgregarParadaDialog(ruta),
                   ),
                 ],

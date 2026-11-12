@@ -121,7 +121,7 @@ public class Api {
     @GetMapping("/admin/audit")
     public List<Map<String, Object>> audit(@AuthenticationPrincipal Users.User u) {
         if (u == null) throw new ApiError(401, "No autenticado");
-        if (!u.master()) throw new ApiError(403, "Solo el administrador principal puede consultar la auditoría");
+        if (!u.admin()) throw new ApiError(403, "Solo administradores pueden consultar la auditoría");
         return users.db().queryForList(
             "SELECT e.id, e.action, e.detail, e.occurred_at, a.identification AS actor, t.identification AS target " +
             "FROM usuarios.audit_event e " +

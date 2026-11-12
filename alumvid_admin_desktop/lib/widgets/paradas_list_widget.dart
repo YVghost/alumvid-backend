@@ -48,7 +48,7 @@ class ParadasListWidget extends StatelessWidget {
           parada: parada,
           orden: index + 1,
           onVerEpod: parada.isEntregado ? () => onVerEpod(parada) : null,
-          onEliminar: (ruta.isPendiente && ruta.paradas.length > 1)
+          onEliminar: ruta.isPendiente
               ? () => onEliminarParada(parada)
               : null,
         );

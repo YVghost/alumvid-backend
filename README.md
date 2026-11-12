@@ -55,7 +55,7 @@ El ecosistema de software está estructurado bajo una **arquitectura de microser
 ```text
 ├── services/
 │   ├── gateway-service/       # API Gateway unificado (Spring Cloud Gateway MVC, puerto 8080)
-│   ├── usuarios-service/      # RBAC, autenticacion JWT/Bearer, auditoria y portal (puerto 8081)
+│   ├── usuarios-service/      # RBAC, autenticacion JWT/Bearer y auditoria (puerto 8081)
 │   ├── inventario-service/    # Catalogo de productos, existencias y movimientos (puerto 8082)
 │   └── logistica-service/     # Rutas multi-destino, PostGIS, telemetria y e-PoD (puerto 8083)
 ├── alumvid_admin_desktop/     # Panel administrativo nativo Desktop (Windows) y Móvil (Android)
@@ -101,8 +101,7 @@ El ecosistema de software está estructurado bajo una **arquitectura de microser
 
 ### Accesos Disponibles:
 - **API Gateway & Dashboard Administrador:** [http://localhost:8080](http://localhost:8080)
-- **Portal de Usuarios:** [http://localhost:8081](http://localhost:8081)
-- **Portal de Inventario:** [http://localhost:8082](http://localhost:8082)
+- **Gestión:** desde las apps de escritorio (Windows) y móvil (Android). Los paneles web se eliminaron; ver `ARQUITECTURA_SERVICIOS.md`.
 - **Credenciales Iniciales (Master Admin):**
   - **Identificación:** `1700000000` (o `admin@alumvid.com`)
   - **Contraseña:** `MASTER_PASSWORD` de tu `.env` local
@@ -162,7 +161,7 @@ Desarrollada en Flutter para dispositivos Android / iOS de los choferes:
 
 `services/retazos-service` incorpora el desglose físico del inventario. Una unidad equivale a un perfil completo por longitud (m) o a una plancha completa por área (cm²). El vidrio se corta solo por ancho y conserva su alto. Dos retazos de medio perfil suman una unidad, pero siguen siendo dos piezas diferentes.
 
-Portal: **http://localhost:8084/** o **http://localhost:8080/retazos/** a través del gateway. La referencia completa de cada producto se configura conservando su código y nombre. El modo EXISTENTE desglosa stock ya contabilizado sin volver a sumarlo. La migración V2 de inventario amplía precisión y protege el saldo de productos gestionados por piezas.
+Se gestiona desde Inventario y Piezas en las apps. La referencia completa de cada producto se configura conservando su código y nombre. El modo EXISTENTE desglosa stock ya contabilizado sin volver a sumarlo. La migración V2 de inventario amplía precisión y protege el saldo de productos gestionados por piezas.
 
 Reglas, arquitectura de base compartida, endpoints, despliegue y pruebas: [services/retazos-service/README.md](services/retazos-service/README.md). Antes de desplegar, configura DB_PASSWORD en .env; no se usa la contraseña de otra variable implícitamente.
 
@@ -172,7 +171,7 @@ Reglas, arquitectura de base compartida, endpoints, despliegue y pruebas: [servi
 
 ## Pedidos y ventas operativas
 
-Portal: **http://localhost:8080/pedidos/**. Permite consultar disponibilidad sin vender, registrar cliente/productos/precios/entrega, confirmar y reservar, revisar faltantes, preparar material y documentar cancelaciones, retrasos y entregas. Retazos compatibles tienen prioridad sobre material completo.
+El módulo Pedidos de las apps permite consultar disponibilidad sin vender, registrar cliente/productos/precios/entrega, confirmar y reservar, revisar faltantes, preparar material y documentar cancelaciones, retrasos y entregas. Retazos compatibles tienen prioridad sobre material completo.
 
 Todos los Dockerfiles ahora compilan con Java 21 dentro de Docker: `docker compose -f compose.yaml up -d --build` levanta la plataforma sin preparar JARs en el host. Configurar `.env` con `DB_NAME`, `DB_USER`, `DB_PASSWORD` y `JWT_SECRET`, ademas del administrador inicial. Las reservas requieren Inventario V3, aplicado automaticamente al arrancar antes de Retazos/Pedidos.
 
@@ -180,9 +179,9 @@ Consulta [el flujo y pendientes actuales](FLUJO_ACTUAL.md) y [la API de Pedidos]
 
 ## Clientes, entregas parciales y ubicaciones
 
-Los pedidos nuevos se registran confirmados y pagados externamente. El catalogo de clientes, los lotes de preparacion/retiro/entrega y el plazo renovable de 72 horas se gestionan en http://localhost:8080/pedidos/. Cada retiro o entrega parcial y cada retraso reinician el plazo. Al cancelar o vencer, vuelve lo no entregado con sus medidas actuales; lo que esta en reparto espera recepcion fisica. Pagos y facturacion estan fuera del alcance.
+Los pedidos nuevos se registran confirmados y pagados externamente. El catalogo de clientes, los lotes de preparacion/retiro/entrega y el plazo renovable de 72 horas se gestionan en el módulo Pedidos de las apps. Cada retiro o entrega parcial y cada retraso reinician el plazo. Al cancelar o vencer, vuelve lo no entregado con sus medidas actuales; lo que esta en reparto espera recepcion fisica. Pagos y facturacion estan fuera del alcance.
 
-http://localhost:8080/ubicaciones/ permite compartir espacios como A3/B3 entre productos y trasladar piezas/cantidades sin cambiar stock. Detalle actualizado en [FLUJO_ACTUAL.md](FLUJO_ACTUAL.md). El entorno completo tiene siete servicios de aplicacion y PostgreSQL/PostGIS.
+El módulo Bodega de las apps permite compartir espacios como A3/B3 entre productos y trasladar piezas/cantidades sin cambiar stock. Detalle actualizado en [FLUJO_ACTUAL.md](FLUJO_ACTUAL.md). El entorno completo tiene siete servicios de aplicacion y PostgreSQL/PostGIS.
 
 ## Integración en revisión
 

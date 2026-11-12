@@ -74,6 +74,21 @@ public class Despacho {
     @Column(columnDefinition = "TEXT")
     private String comentarios;
 
+    /** Pedido comercial que origina la parada (pedidos-service). */
+    @Column(name = "pedido_comercial_id")
+    private java.util.UUID pedidoComercialId;
+
+    @Column(name = "numero_pedido")
+    private Integer numeroPedido;
+
+    /** Envío comercial que registra la custodia del material en pedidos-service. */
+    @Column(name = "envio_comercial_id")
+    private java.util.UUID envioComercialId;
+
+    /** Manifiesto de lo que lleva el chofer (JSON con productos, cantidades y medidas). */
+    @Column(columnDefinition = "TEXT")
+    private String carga;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

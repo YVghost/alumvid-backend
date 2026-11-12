@@ -23,9 +23,11 @@ class PedidosApi {
     record Create(@NotNull UUID requestId,@Size(max=150) String clientName,
         @NotNull Delivery deliveryMode,@Size(max=500) String deliveryAddress,@Size(max=150) String receiverName,
         @Size(max=1000) String notes,@NotEmpty @Size(max=50) List<@Valid Line> lines,
-        @NotNull UUID clientId,@NotNull @AssertTrue Boolean externallyConfirmed,@Size(max=100) String externalInvoiceReference) {
+        @NotNull UUID clientId,@NotNull @AssertTrue Boolean externallyConfirmed,@Size(max=100) String externalInvoiceReference,
+        @DecimalMin("-90") @DecimalMax("90") BigDecimal deliveryLatitude,
+        @DecimalMin("-180") @DecimalMax("180") BigDecimal deliveryLongitude) {
         Create(UUID requestId,String clientName,Delivery deliveryMode,String deliveryAddress,String receiverName,String notes,List<Line> lines) {
-            this(requestId,clientName,deliveryMode,deliveryAddress,receiverName,notes,lines,null,true,"");
+            this(requestId,clientName,deliveryMode,deliveryAddress,receiverName,notes,lines,null,true,"",null,null);
         }
     }
     record BatchLine(@NotNull UUID lineId,@NotNull @DecimalMin(value="0",inclusive=false) @Digits(integer=6,fraction=4) BigDecimal quantity) {}
@@ -34,12 +36,7 @@ class PedidosApi {
         Action(UUID requestId,String reason) {this(requestId,reason,null,null);}
     }
     private final PedidosService service;
-    private final AuthClient auth;
-    PedidosApi(PedidosService service,AuthClient auth) {this.service=service;this.auth=auth;}
-    @PostMapping("/auth/login") ResponseEntity<String> login(@RequestBody Map<String,Object> body) {return auth.forward("login",null,body);}
-    @GetMapping("/auth/me") AuthClient.Identity me(@AuthenticationPrincipal AuthClient.Identity actor) {return actor;}
-    @PostMapping("/auth/password") ResponseEntity<String> password(@RequestHeader("Authorization") String token,@RequestBody Map<String,Object> body) {return auth.forward("password",token,body);}
-    @PostMapping("/auth/logout") ResponseEntity<String> logout(@RequestHeader("Authorization") String token) {return auth.forward("logout",token,null);}
+    PedidosApi(PedidosService service) {this.service=service;}
     @GetMapping("/products") Object products(@RequestParam(defaultValue="") String q,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {return service.products(q,page,size);}
     @PostMapping("/availability") Object availability(@Valid @RequestBody Check r) {return service.availability(r.lines());}
     @PostMapping("/orders") Object create(@Valid @RequestBody Create r,@AuthenticationPrincipal AuthClient.Identity actor) {return service.create(r,actor);}

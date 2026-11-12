@@ -29,16 +29,4 @@ class AuthClient {
             throw new InventoryError(503,"El servicio de usuarios no está disponible");
         } catch(RestClientException e) { throw new InventoryError(503,"El servicio de usuarios no está disponible"); }
     }
-    org.springframework.http.ResponseEntity<String> forward(String path,String authorization,Object body) {
-        try {
-            var request=client.post().uri("/api/auth/"+path).header("Content-Type","application/json");
-            if(authorization!=null) request.header("Authorization",authorization);
-            if(body!=null) request.body(body);
-            var response=request.retrieve().toEntity(String.class);
-            return org.springframework.http.ResponseEntity.status(response.getStatusCode()).contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(response.getBody());
-        } catch(RestClientResponseException e) {
-            if(e.getStatusCode().is4xxClientError()) return org.springframework.http.ResponseEntity.status(e.getStatusCode()).contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(e.getResponseBodyAsString());
-            throw new InventoryError(503,"El servicio de usuarios no está disponible");
-        } catch(RestClientException e) { throw new InventoryError(503,"El servicio de usuarios no está disponible"); }
-    }
 }

@@ -6,15 +6,21 @@ import com.alumvid.logistica.repository.ChoferRepository;
 import com.alumvid.logistica.repository.DespachoRepository;
 import com.alumvid.logistica.repository.PedidoRepository;
 import com.alumvid.logistica.repository.RutaRepository;
+import com.alumvid.logistica.security.AuthClient;
+import com.alumvid.logistica.security.Sesion;
 import com.alumvid.logistica.util.GeoDistanceCalculator;
 import com.alumvid.logistica.util.GeometryUtil;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.locationtech.jts.geom.Point;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -22,8 +28,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Implementacion del servicio de logistica con soporte espacial PostGIS,
- * rutas consolidadas multi-parada y WebSockets en tiempo real.
+ * Rutas y paradas de reparto. Cada parada nace de un pedido comercial: logística
+ * guarda el destino y el manifiesto de carga; pedidos registra la custodia del
+ * material (despacho, entrega, devolución) y mueve el inventario.
  */
 @Service
 @RequiredArgsConstructor
@@ -31,6 +38,9 @@ import java.util.stream.Collectors;
 public class LogisticaServiceImpl implements LogisticaService {
 
     private static final double UMBRAL_ALERTA_DESVIACION_METROS = 150.0;
+    private static final double LAT_BODEGA_QUITO = -0.089290;
+    private static final double LON_BODEGA_QUITO = -78.439607;
+    private static final Set<EstadoDespacho> FINALES = EnumSet.of(EstadoDespacho.ENTREGADO, EstadoDespacho.CANCELADA);
 
     private final ChoferRepository choferRepository;
     private final PedidoRepository pedidoRepository;
@@ -40,753 +50,88 @@ public class LogisticaServiceImpl implements LogisticaService {
     private final GoogleRoutesService googleRoutesService;
     private final JdbcTemplate jdbcTemplate;
     private final CommercialOrderBridge commercialBridge;
+    private final PedidosClient pedidosClient;
+    private final AuthClient authClient;
+    private final ObjectMapper json;
 
-    @Override
-    @Transactional
-    public PedidoResponse crearPedido(CrearPedidoRequest request) {
-        Point puntoDestino = GeometryUtil.crearPunto(request.getLatitud(), request.getLongitud());
+    // =====================================================================
+    // Utilidades
+    // =====================================================================
 
-        Pedido pedido = Pedido.builder()
-                .cliente(request.getCliente().trim())
-                .direccionTexto(request.getDireccionTexto().trim())
-                .coordenadaDestino(puntoDestino)
-                .estado(EstadoPedido.PENDIENTE)
-                .build();
-
-        Pedido guardado = pedidoRepository.save(pedido);
-        log.info("Pedido registrado: {} para cliente: {}", guardado.getId(), guardado.getCliente());
-
-        notificarActualizacionTablero();
-        return mapearAPedidoResponse(guardado);
+    private static ResponseStatusException conflicto(String mensaje) {
+        return new ResponseStatusException(HttpStatus.CONFLICT, mensaje);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<PedidoResponse> listarPedidos() {
-        return pedidoRepository.findAllByOrderByFechaSolicitudDesc().stream()
-                .map(this::mapearAPedidoResponse)
-                .collect(Collectors.toList());
+    private Ruta ruta(UUID id) {
+        return rutaRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ruta no encontrada"));
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<PedidoResponse> listarPedidosPendientes() {
-        return pedidoRepository.findByEstado(EstadoPedido.PENDIENTE).stream()
-                .map(this::mapearAPedidoResponse)
-                .collect(Collectors.toList());
+    private Despacho despacho(UUID id) {
+        return despachoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Parada no encontrada"));
     }
 
-    @Override
-    @Transactional
-    public ChoferResponse sincronizarOCrearChofer(SincronizarChoferRequest request) {
-        Chofer chofer = choferRepository.findById(request.getId())
-                .orElseGet(() -> Chofer.builder()
-                        .id(request.getId())
-                        .email(request.getEmail().toLowerCase().trim())
-                        .build());
-
-        chofer.setNombre(request.getNombre().trim());
-        chofer.setEmail(request.getEmail().toLowerCase().trim());
-        chofer.setTelefono(request.getTelefono() != null ? request.getTelefono().trim() : null);
-
-        Chofer guardado = choferRepository.save(chofer);
-        log.info("Perfil de chofer sincronizado: {} ({})", guardado.getNombre(), guardado.getId());
-        return mapearAChoferResponse(guardado);
-    }
-
-    @Override
-    @Transactional
-    public List<ChoferResponse> listarChoferes() {
-        sincronizarChoferesDesdeUsuarios();
-        return choferRepository.findAll().stream()
-                .map(this::mapearAChoferResponse)
-                .collect(Collectors.toList());
-    }
-
-    private void sincronizarChoferesDesdeUsuarios() {
-        try {
-            jdbcTemplate.update("""
-                INSERT INTO logistica.choferes (id, nombre, email, telefono, estado_disponibilidad, created_at, updated_at)
-                SELECT u.id, u.full_name, u.email, COALESCE(u.telefono, ''), 'DISPONIBLE', NOW(), NOW()
-                FROM usuarios.app_user u
-                WHERE u.roles LIKE '%CHOFER%'
-                ON CONFLICT (id) DO UPDATE
-                SET nombre = EXCLUDED.nombre,
-                    email = EXCLUDED.email,
-                    telefono = COALESCE(EXCLUDED.telefono, logistica.choferes.telefono)
-            """);
-        } catch (Exception e) {
-            log.warn("No se pudo sincronizar choferes desde usuarios: {}", e.getMessage());
+    private static void exigirPendiente(Ruta r, String accion) {
+        if (r.getEstado() != EstadoRuta.PENDIENTE) {
+            throw conflicto("Solo se puede " + accion + " en una ruta pendiente (esta ruta está " + r.getEstado().name().toLowerCase().replace('_', ' ') + ")");
         }
     }
 
-    @Override
-    @Transactional
-    public DespachoResponse asignarDespacho(AsignarDespachoRequest request) {
-        commercialBridge.immutableLogisticsOrder(request.getPedidoId());
-        Pedido pedido = pedidoRepository.findById(request.getPedidoId())
-                .orElseThrow(() -> new IllegalArgumentException("Pedido no encontrado con ID: " + request.getPedidoId()));
-
-        Chofer chofer = choferRepository.findById(request.getChoferId())
-                .orElseThrow(() -> new IllegalArgumentException("Chofer no encontrado con ID: " + request.getChoferId()));
-
-        if (pedido.getEstado() != EstadoPedido.PENDIENTE) {
-            throw new IllegalStateException("El pedido ya se encuentra asignado o en proceso de despacho.");
-        }
-
-        // Crear una ruta consolidada unitaria bajo el nuevo modelo
-        String codigoRuta = "RUTA-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
-        Ruta ruta = Ruta.builder()
-                .codigoRuta(codigoRuta)
-                .chofer(chofer)
-                .estado(EstadoRuta.PENDIENTE)
-                .fechaCreacion(LocalDateTime.now())
-                .build();
-        Ruta rutaGuardada = rutaRepository.save(ruta);
-
-        Despacho despacho = Despacho.builder()
-                .ruta(rutaGuardada)
-                .ordenParada(1)
-                .pedido(pedido)
-                .chofer(chofer)
-                .fechaAsignacion(LocalDateTime.now())
-                .estado(EstadoDespacho.PENDIENTE)
-                .build();
-
-        Despacho guardado = despachoRepository.save(despacho);
-        rutaGuardada.getParadas().add(guardado);
-        log.info("Ruta unitaria creada. Despacho: {} asignado a chofer: {}", guardado.getId(), chofer.getNombre());
-
-        DespachoResponse response = mapearADespachoResponse(guardado);
-
-        messagingTemplate.convertAndSend("/topic/choferes/" + chofer.getId() + "/rutas-asignadas", response);
-        notificarActualizacionTablero();
-
-        return response;
-    }
-
-    // Coordenadas base de la Central de Operaciones y Bodega Arq-AlumVid en Quito
-    private static final double LAT_BODEGA_QUITO = -0.089290;
-    private static final double LON_BODEGA_QUITO = -78.439607;
-
-    @Override
-    @Transactional
-    public RutaResponse crearRutaConsolidada(CrearRutaConsolidadaRequest request) {
-        request.getPedidoIds().forEach(commercialBridge::immutableLogisticsOrder);
-        Chofer chofer = choferRepository.findById(request.getChoferId())
-                .orElseThrow(() -> new IllegalArgumentException("Chofer no encontrado con ID: " + request.getChoferId()));
-
-        List<Pedido> pedidos = pedidoRepository.findAllById(request.getPedidoIds());
-        if (pedidos.isEmpty()) {
-            throw new IllegalArgumentException("Debe seleccionar al menos un pedido valido.");
-        }
-
-        for (Pedido p : pedidos) {
-            if (p.getEstado() != EstadoPedido.PENDIENTE) {
-                throw new IllegalStateException("El pedido " + p.getId() + " ya no esta pendiente.");
-            }
-        }
-
-        // Ordenamiento automatico de destinos por proximidad espacial (Nearest Neighbor TSP)
-        List<Pedido> pedidosOrdenados = ordenarPedidosPorProximidad(pedidos, LAT_BODEGA_QUITO, LON_BODEGA_QUITO);
-
-        String codigoRuta = "RUTA-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
-
-        Ruta ruta = Ruta.builder()
-                .codigoRuta(codigoRuta)
-                .chofer(chofer)
-                .estado(EstadoRuta.PENDIENTE)
-                .fechaCreacion(LocalDateTime.now())
-                .comentarios(request.getComentarios())
-                .build();
-
-        Ruta rutaGuardada = rutaRepository.save(ruta);
-
-        List<Despacho> paradas = new ArrayList<>();
-        int orden = 1;
-        for (Pedido p : pedidosOrdenados) {
-            Despacho d = Despacho.builder()
-                    .ruta(rutaGuardada)
-                    .ordenParada(orden++)
-                    .pedido(p)
-                    .chofer(chofer)
-                    .fechaAsignacion(LocalDateTime.now())
-                    .estado(EstadoDespacho.PENDIENTE)
-                    .build();
-            paradas.add(despachoRepository.save(d));
-        }
-
-        rutaGuardada.setParadas(paradas);
-
-        RutaResponse response = mapearARutaResponse(rutaGuardada);
-        messagingTemplate.convertAndSend("/topic/choferes/" + chofer.getId() + "/rutas-asignadas", response);
-        notificarActualizacionTablero();
-
-        return response;
-    }
-
-    @Override
-    @Transactional
-    public RutaResponse crearRutaMultiDestino(CrearRutaMultiDestinoRequest request) {
-        Chofer chofer = choferRepository.findById(request.getChoferId())
-                .orElseThrow(() -> new IllegalArgumentException("Chofer no encontrado con ID: " + request.getChoferId()));
-
-        if (request.getDestinos() == null || request.getDestinos().isEmpty()) {
-            throw new IllegalArgumentException("Debe ingresar al menos un destino para la ruta.");
-        }
-
-        // 1. Crear y persistir cada pedido de destino
-        List<Pedido> pedidosCreados = new ArrayList<>();
-        for (CrearRutaMultiDestinoRequest.DestinoItemRequest item : request.getDestinos()) {
-            Point puntoDestino = GeometryUtil.crearPunto(item.getLatitudDestino(), item.getLongitudDestino());
-            Pedido pedido = Pedido.builder()
-                    .cliente(item.getCliente().trim())
-                    .direccionTexto(item.getDireccionTexto().trim())
-                    .coordenadaDestino(puntoDestino)
-                    .estado(EstadoPedido.PENDIENTE)
-                    .fechaSolicitud(LocalDateTime.now())
-                    .build();
-            pedidosCreados.add(pedidoRepository.save(pedido));
-        }
-
-        // 2. Ordenamiento automatico por proximidad desde el origen central
-        List<Pedido> pedidosOrdenados = ordenarPedidosPorProximidad(pedidosCreados, LAT_BODEGA_QUITO, LON_BODEGA_QUITO);
-
-        // 3. Crear la cabecera de la ruta consolidada
-        String codigoBase = (request.getCodigoRuta() != null && !request.getCodigoRuta().trim().isEmpty())
-                ? request.getCodigoRuta().trim()
-                : "Ruta 1";
-        String codigoRuta = codigoBase;
-        if (rutaRepository.existsByCodigoRuta(codigoRuta)) {
-            codigoRuta = codigoBase + " (" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")) + ")";
-        }
-
-        Ruta ruta = Ruta.builder()
-                .codigoRuta(codigoRuta)
-                .chofer(chofer)
-                .estado(EstadoRuta.PENDIENTE)
-                .fechaCreacion(LocalDateTime.now())
-                .comentarios(request.getComentarios())
-                .build();
-
-        Ruta rutaGuardada = rutaRepository.save(ruta);
-
-        // 4. Crear los despachos con orden de parada secuencial optimizado
-        List<Despacho> paradas = new ArrayList<>();
-        int orden = 1;
-        for (Pedido p : pedidosOrdenados) {
-            Despacho d = Despacho.builder()
-                    .ruta(rutaGuardada)
-                    .ordenParada(orden++)
-                    .pedido(p)
-                    .chofer(chofer)
-                    .fechaAsignacion(LocalDateTime.now())
-                    .estado(EstadoDespacho.PENDIENTE)
-                    .build();
-            paradas.add(despachoRepository.save(d));
-        }
-
-        rutaGuardada.setParadas(paradas);
-
-        RutaResponse response = mapearARutaResponse(rutaGuardada);
-        messagingTemplate.convertAndSend("/topic/choferes/" + chofer.getId() + "/rutas-asignadas", response);
-        notificarActualizacionTablero();
-
-        return response;
+    /** Un chofer está ocupado si tiene una ruta en curso (distinta de la indicada) con paradas por atender. */
+    private boolean ocupado(UUID choferId, UUID excluirRuta) {
+        return rutaRepository.findByChoferIdAndEstadoIn(choferId, List.of(EstadoRuta.EN_CURSO)).stream()
+                .filter(r -> !r.getId().equals(excluirRuta))
+                .anyMatch(r -> r.getParadas().stream().anyMatch(d -> !FINALES.contains(d.getEstado())));
     }
 
     /**
-     * Algoritmo voraz de optimizacion de secuencia por tiempo de conduccion vial (Greedy Search + Driving Duration).
-     * Consulta la matriz de duraciones viales de Google Routes API (con fallback a OSRM/Haversine)
-     * e itera vorazmente hacia la siguiente parada de menor duracion de viaje en tiempo real.
+     * Sincroniza la identidad de los choferes desde usuarios (dueño de las cuentas)
+     * y calcula su disponibilidad: INACTIVO, EN_RUTA o DISPONIBLE.
      */
-    private List<Pedido> ordenarPedidosPorProximidad(List<Pedido> pedidos, double latOrigen, double lonOrigen) {
-        if (pedidos == null || pedidos.size() <= 1) {
-            return pedidos != null ? new ArrayList<>(pedidos) : new ArrayList<>();
+    private void sincronizarChoferes() {
+        var activos = new HashSet<UUID>();
+        for (var u : authClient.activeDrivers(Sesion.token())) {
+            if (Boolean.TRUE.equals(u.get("mustChangePassword")) || Boolean.FALSE.equals(u.get("active"))) continue;
+            UUID id = UUID.fromString(String.valueOf(u.get("id")));
+            String nombre = String.valueOf(u.getOrDefault("fullName", "Chofer"));
+            String email = String.valueOf(u.getOrDefault("email", id + "@alumvid.local")).toLowerCase(Locale.ROOT);
+            String telefono = u.get("telefono") == null ? "" : String.valueOf(u.get("telefono"));
+            activos.add(id);
+            jdbcTemplate.update("INSERT INTO logistica.choferes(id,nombre,email,telefono,estado_disponibilidad,created_at,updated_at) "
+                    + "VALUES (?,?,?,?,'DISPONIBLE',NOW(),NOW()) ON CONFLICT DO NOTHING", id, nombre, email, telefono);
+            jdbcTemplate.update("UPDATE logistica.choferes SET nombre=?,telefono=?,updated_at=NOW() WHERE id=?", nombre, telefono, id);
+            jdbcTemplate.update("UPDATE logistica.choferes SET email=? WHERE id=? AND NOT EXISTS "
+                    + "(SELECT 1 FROM logistica.choferes o WHERE o.email=? AND o.id<>?)", email, id, email, id);
         }
-
-        // 1. Estructurar coordenadas para la matriz: indice 0 es el origen
-        List<double[]> coordenadas = new ArrayList<>();
-        coordenadas.add(new double[]{latOrigen, lonOrigen});
-
-        List<Pedido> pedidosValidos = new ArrayList<>();
-        for (Pedido p : pedidos) {
-            Double lat = GeometryUtil.extraerLatitud(p.getCoordenadaDestino());
-            Double lon = GeometryUtil.extraerLongitud(p.getCoordenadaDestino());
-            if (lat != null && lon != null) {
-                coordenadas.add(new double[]{lat, lon});
-                pedidosValidos.add(p);
+        for (Chofer c : choferRepository.findAll()) {
+            EstadoChofer estado = !activos.contains(c.getId()) ? EstadoChofer.INACTIVO
+                    : ocupado(c.getId(), null) ? EstadoChofer.EN_RUTA : EstadoChofer.DISPONIBLE;
+            if (c.getEstadoDisponibilidad() != estado) {
+                c.setEstadoDisponibilidad(estado);
+                choferRepository.save(c);
             }
         }
-
-        if (pedidosValidos.size() <= 1) {
-            return pedidosValidos;
-        }
-
-        // 2. Obtener matriz de duraciones viales reales (Google Routes / OSRM / Haversine)
-        double[][] matrizDuraciones = googleRoutesService.obtenerMatrizDuracionesViales(coordenadas);
-
-        // 3. Algoritmo Voraz (Greedy / Nearest Neighbor) guiado por menor tiempo de viaje
-        int totalNodos = coordenadas.size();
-        boolean[] visitados = new boolean[totalNodos];
-        visitados[0] = true; // El punto de partida ya esta visitado
-
-        List<Pedido> rutaOptimizada = new ArrayList<>();
-        int indiceActual = 0;
-
-        for (int step = 0; step < pedidosValidos.size(); step++) {
-            int siguienteMejor = -1;
-            double menorTiempo = Double.MAX_VALUE;
-
-            for (int candidato = 1; candidato < totalNodos; candidato++) {
-                if (!visitados[candidato]) {
-                    double tiempo = matrizDuraciones[indiceActual][candidato];
-                    if (tiempo < menorTiempo) {
-                        menorTiempo = tiempo;
-                        siguienteMejor = candidato;
-                    }
-                }
-            }
-
-            if (siguienteMejor != -1) {
-                visitados[siguienteMejor] = true;
-                rutaOptimizada.add(pedidosValidos.get(siguienteMejor - 1));
-                indiceActual = siguienteMejor;
-            } else {
-                for (int c = 1; c < totalNodos; c++) {
-                    if (!visitados[c]) {
-                        visitados[c] = true;
-                        rutaOptimizada.add(pedidosValidos.get(c - 1));
-                        indiceActual = c;
-                        break;
-                    }
-                }
-            }
-        }
-
-        return rutaOptimizada;
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<RutaResponse> listarRutas() {
-        return rutaRepository.findAllByOrderByFechaCreacionDesc().stream()
-                .map(this::mapearARutaResponse)
-                .collect(Collectors.toList());
+    /** Solo se asignan choferes activos que no estén en ruta. */
+    private Chofer choferDisponible(UUID choferId, UUID rutaActual) {
+        sincronizarChoferes();
+        Chofer chofer = choferRepository.findById(choferId)
+                .orElseThrow(() -> conflicto("El chofer no existe o no tiene el rol CHOFER"));
+        if (chofer.getEstadoDisponibilidad() == EstadoChofer.INACTIVO) {
+            throw conflicto(chofer.getNombre() + " está inactivo o aún no cambia su clave temporal");
+        }
+        if (ocupado(choferId, rutaActual)) {
+            throw conflicto(chofer.getNombre() + " está en ruta; podrás asignarlo cuando termine su recorrido");
+        }
+        return chofer;
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<RutaResponse> listarRutasPorChofer(UUID choferId) {
-        return rutaRepository.findByChoferIdOrderByFechaCreacionDesc(choferId).stream()
-                .map(this::mapearARutaResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public RutaResponse obtenerRutaPorId(UUID rutaId) {
-        Ruta ruta = rutaRepository.findById(rutaId)
-                .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
-        return mapearARutaResponse(ruta);
-    }
-
-    @Override
-    @Transactional
-    public RutaResponse aceptarEIniciarRutaConsolidada(UUID rutaId) {
-        commercialBridge.route(rutaId,true);
-        Ruta ruta = rutaRepository.findById(rutaId)
-                .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
-
-        if (ruta.getEstado() != EstadoRuta.PENDIENTE) {
-            throw new IllegalStateException("La ruta no se encuentra en estado pendiente de aprobacion.");
+    private void avisarChofer(Ruta r) {
+        if (r.getChofer() != null) {
+            messagingTemplate.convertAndSend("/topic/choferes/" + r.getChofer().getId() + "/rutas-asignadas", mapearARutaResponse(r));
         }
-
-        ruta.setEstado(EstadoRuta.EN_CURSO);
-        ruta.setFechaInicio(LocalDateTime.now());
-
-        Chofer chofer = ruta.getChofer();
-        chofer.setEstadoDisponibilidad(EstadoChofer.EN_RUTA);
-        choferRepository.save(chofer);
-
-        // Las paradas se mantienen en estado PENDIENTE.
-        // El chofer inicia y finaliza manualmente cada parada una por una conforme avanza su recorrido.
-        for (Despacho d : ruta.getParadas()) {
-            if (d.getEstado() == null) {
-                d.setEstado(EstadoDespacho.PENDIENTE);
-                despachoRepository.save(d);
-            }
-        }
-
-        Ruta guardada = rutaRepository.save(ruta);
-        messagingTemplate.convertAndSend("/topic/rutas/" + rutaId + "/estado",
-                Map.of("rutaId", rutaId.toString(), "estado", "EN_CURSO", "mensaje", "Ruta consolidada iniciada"));
-        notificarActualizacionTablero();
-
-        return mapearARutaResponse(guardada);
-    }
-
-    @Override
-    @Transactional
-    public RutaResponse cancelarRutaConsolidada(UUID rutaId, String motivo) {
-        commercialBridge.route(rutaId,false);
-        commercialBridge.cancelRoute(rutaId,motivo);
-        Ruta ruta = rutaRepository.findById(rutaId)
-                .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
-
-        if (ruta.getEstado() == EstadoRuta.COMPLETADA || ruta.getEstado() == EstadoRuta.CANCELADA) {
-            throw new IllegalStateException("No se puede cancelar una ruta que ya se encuentra finalizada.");
-        }
-
-        ruta.setEstado(EstadoRuta.CANCELADA);
-        ruta.setFechaFin(LocalDateTime.now());
-        ruta.setComentarios(motivo != null ? "Cancelada: " + motivo : "Cancelada voluntariamente por el chofer.");
-
-        if (ruta.getChofer() != null) {
-            Chofer chofer = ruta.getChofer();
-            chofer.setEstadoDisponibilidad(EstadoChofer.DISPONIBLE);
-            choferRepository.save(chofer);
-        }
-
-        for (Despacho d : ruta.getParadas()) {
-            if (d.getEstado() != EstadoDespacho.ENTREGADO) {
-                liberarPiezaPreparada(d.getComentarios());
-                d.setEstado(EstadoDespacho.CANCELADA);
-                d.setComentarios(motivo != null ? motivo : "Ruta cancelada");
-                d.getPedido().setEstado(EstadoPedido.CANCELADO);
-                pedidoRepository.save(d.getPedido());
-                despachoRepository.save(d);
-            }
-        }
-
-        Ruta guardada = rutaRepository.save(ruta);
-        messagingTemplate.convertAndSend("/topic/rutas/" + rutaId + "/estado",
-                Map.of("rutaId", rutaId.toString(), "estado", "CANCELADA", "mensaje", "Ruta cancelada por chofer"));
-        notificarActualizacionTablero();
-
-        return mapearARutaResponse(guardada);
-    }
-
-    @Override
-    @Transactional
-    public RutaResponse completarRutaConsolidada(UUID rutaId) {
-        commercialBridge.route(rutaId,false);
-        Ruta ruta = rutaRepository.findById(rutaId)
-                .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
-
-        if (ruta.getEstado() == EstadoRuta.COMPLETADA || ruta.getEstado() == EstadoRuta.CANCELADA) {
-            throw new IllegalStateException("La ruta ya se encuentra finalizada.");
-        }
-
-        List<Despacho> paradas = ruta.getParadas() != null ? ruta.getParadas() : Collections.emptyList();
-        if (paradas.isEmpty()) {
-            throw new IllegalStateException("No se puede marcar como completada una ruta sin paradas registradas.");
-        }
-
-        boolean todasEntregadas = paradas.stream().allMatch(d -> d.getEstado() == EstadoDespacho.ENTREGADO);
-        if (!todasEntregadas) {
-            throw new IllegalStateException("La ruta solo puede marcarse como completada si todas las paradas fueron entregadas exitosamente.");
-        }
-
-        ruta.setEstado(EstadoRuta.COMPLETADA);
-        ruta.setFechaFin(LocalDateTime.now());
-
-        if (ruta.getChofer() != null) {
-            Chofer chofer = ruta.getChofer();
-            chofer.setEstadoDisponibilidad(EstadoChofer.DISPONIBLE);
-            choferRepository.save(chofer);
-        }
-
-        Ruta guardada = rutaRepository.save(ruta);
-        messagingTemplate.convertAndSend("/topic/rutas/" + rutaId + "/estado",
-                Map.of("rutaId", rutaId.toString(), "estado", "COMPLETADA", "mensaje", "Ruta marcada como completada por el administrador"));
-        notificarActualizacionTablero();
-
-        return mapearARutaResponse(guardada);
-    }
-
-    @Override
-    @Transactional
-    public DespachoResponse aceptarEIniciarRuta(UUID despachoId) {
-        commercialBridge.lock(despachoId,true);
-        Despacho despacho = despachoRepository.findById(despachoId)
-                .orElseThrow(() -> new IllegalArgumentException("Despacho no encontrado con ID: " + despachoId));
-
-        if (despacho.getEstado() != EstadoDespacho.PENDIENTE) {
-            throw new IllegalStateException("La ruta no se encuentra en estado pendiente de aprobacion.");
-        }
-
-        Chofer chofer = despacho.getChofer();
-        if (chofer == null && despacho.getRuta() != null) {
-            chofer = despacho.getRuta().getChofer();
-        }
-
-        // Regla de Negocio: Un chofer no puede moverse a 2 lugares a la vez (solo 1 parada EN_CURSO activa simultáneamente)
-        if (chofer != null) {
-            List<Despacho> despachosChofer = despachoRepository.findByChoferId(chofer.getId());
-            boolean yaTieneEnCurso = despachosChofer.stream()
-                    .anyMatch(d -> d.getEstado() == EstadoDespacho.EN_CURSO && !d.getId().equals(despachoId));
-            if (yaTieneEnCurso) {
-                throw new IllegalStateException("El chofer ya tiene una parada en curso. No puede trasladarse a dos destinos a la vez. Finalice o cancele la parada activa antes de iniciar otra.");
-            }
-        }
-
-        despacho.setEstado(EstadoDespacho.EN_CURSO);
-        despacho.setFechaInicioRuta(LocalDateTime.now());
-
-        Pedido pedido = despacho.getPedido();
-        pedido.setEstado(EstadoPedido.EN_RUTA);
-        pedidoRepository.save(pedido);
-
-        if (chofer != null) {
-            chofer.setEstadoDisponibilidad(EstadoChofer.EN_RUTA);
-            choferRepository.save(chofer);
-        }
-
-        if (despacho.getRuta() != null && despacho.getRuta().getEstado() == EstadoRuta.PENDIENTE) {
-            Ruta ruta = despacho.getRuta();
-            ruta.setEstado(EstadoRuta.EN_CURSO);
-            ruta.setFechaInicio(LocalDateTime.now());
-            rutaRepository.save(ruta);
-        }
-
-        Despacho actualizado = despachoRepository.save(despacho);
-        log.info("Chofer {} ha iniciado el despacho: {}", chofer.getNombre(), despachoId);
-
-        DespachoResponse response = mapearADespachoResponse(actualizado);
-
-        messagingTemplate.convertAndSend("/topic/despachos/" + despachoId + "/estado",
-                Map.of("despachoId", despachoId.toString(), "estado", "EN_CURSO", "mensaje", "Ruta iniciada por chofer"));
-        notificarActualizacionTablero();
-
-        return response;
-    }
-
-    @Override
-    @Transactional
-    public DespachoResponse cancelarRuta(UUID despachoId, String motivo) {
-        commercialBridge.lock(despachoId,false);
-        Despacho despacho = despachoRepository.findById(despachoId)
-                .orElseThrow(() -> new IllegalArgumentException("Despacho no encontrado con ID: " + despachoId));
-
-        if (despacho.getEstado() == EstadoDespacho.ENTREGADO) {
-            throw new IllegalStateException("No se puede cancelar una entrega ya completada y documentada.");
-        }
-
-        commercialBridge.cancelled(despachoId,motivo);
-        despacho.setEstado(EstadoDespacho.CANCELADA);
-        String comentarioPrevio = despacho.getComentarios() != null ? despacho.getComentarios() : "";
-        StringBuilder sbTags = new StringBuilder();
-        java.util.regex.Matcher mTags = java.util.regex.Pattern.compile("\\[META:[^\\]]+\\]").matcher(comentarioPrevio);
-        while (mTags.find()) {
-            sbTags.append(mTags.group()).append(" ");
-        }
-        String tagsPreservados = sbTags.toString().trim();
-        String limpio = comentarioPrevio.replaceAll("\\[META:[^\\]]+\\]", "").trim();
-        String motivoTexto = motivo != null ? "Cancelada por chofer: " + motivo : "Cancelada por chofer voluntariamente.";
-        String nuevoComentario = (limpio.isEmpty() ? motivoTexto : (limpio + " (" + motivoTexto + ")")) +
-                (tagsPreservados.isEmpty() ? "" : " " + tagsPreservados);
-        despacho.setComentarios(nuevoComentario);
-
-        Pedido pedido = despacho.getPedido();
-        pedido.setEstado(EstadoPedido.CANCELADO);
-        pedidoRepository.save(pedido);
-
-        Despacho actualizado = despachoRepository.save(despacho);
-
-        // Re-enrutado dinamico automatico (Vehicle Rescheduling Problem - VRSP):
-        // Si el despacho pertenece a una ruta consolidada con paradas pendientes,
-        // recalcular de inmediato la secuencia optima desde la coordenada del despacho cancelado.
-        if (despacho.getRuta() != null) {
-            Ruta ruta = despacho.getRuta();
-            Double latActual = GeometryUtil.extraerLatitud(despacho.getPedido().getCoordenadaDestino());
-            Double lonActual = GeometryUtil.extraerLongitud(despacho.getPedido().getCoordenadaDestino());
-
-            try {
-                optimizarRutaPorChofer(ruta.getId(), latActual, lonActual);
-                log.info("VRSP Automatico: Paradas pendientes reoptimizadas para ruta {} tras cancelacion de parada {}",
-                        ruta.getId(), despachoId);
-            } catch (Exception e) {
-                log.warn("No se pudo ejecutar la reoptimizacion automatica de la ruta: {}", e.getMessage());
-            }
-
-            actualizarEstadoRutaMatriz(ruta);
-        } else {
-            Chofer chofer = despacho.getChofer();
-            if (chofer != null) {
-                chofer.setEstadoDisponibilidad(EstadoChofer.DISPONIBLE);
-                choferRepository.save(chofer);
-            }
-        }
-
-        log.warn("Despacho cancelado por chofer: {}. Motivo: {}", despachoId, motivo);
-
-        messagingTemplate.convertAndSend("/topic/despachos/" + despachoId + "/estado",
-                Map.of("despachoId", despachoId.toString(), "estado", "CANCELADA", "mensaje", "Streaming de ubicacion cortado"));
-        notificarActualizacionTablero();
-
-        return mapearADespachoResponse(actualizado);
-    }
-
-    @Override
-    @Transactional
-    public DespachoResponse cerrarEntrega(UUID despachoId, CerrarEntregaRequest request) {
-        commercialBridge.lock(despachoId,false);
-        Despacho despacho = despachoRepository.findById(despachoId)
-                .orElseThrow(() -> new IllegalArgumentException("Despacho no encontrado con ID: " + despachoId));
-
-        if (despacho.getEstado() == EstadoDespacho.ENTREGADO) {
-            return mapearADespachoResponse(despacho);
-        }
-
-        if (request.getFotoPodUrl() == null || request.getFotoPodUrl().trim().isEmpty()) {
-            throw new IllegalArgumentException("CP-LOG-01: La evidencia fotografica del vidrio es estrictamente requerida.");
-        }
-        if (request.getFirmaUrl() == null || request.getFirmaUrl().trim().isEmpty()) {
-            throw new IllegalArgumentException("CP-LOG-01: La firma digital tactil del receptor es estrictamente requerida.");
-        }
-        if (request.getLatitud() == null || request.getLongitud() == null) {
-            throw new IllegalArgumentException("CP-LOG-01: Las coordenadas GPS de telemetria en sitio son estrictamente requeridas.");
-        }
-
-        Point puntoEntrega = GeometryUtil.crearPunto(request.getLatitud(), request.getLongitud());
-        despacho.setCoordenadaEntrega(puntoEntrega);
-        despacho.setFotoPodUrl(request.getFotoPodUrl());
-        despacho.setFirmaUrl(request.getFirmaUrl());
-        despacho.setFechaEntrega(LocalDateTime.now());
-        despacho.setComentarios(request.getComentarios());
-
-        // HU-06 y CP-LOG-02: Calculo de desviacion espacial con PostGIS y Haversine con tolerancia de 150m
-        Point puntoDestino = despacho.getPedido().getCoordenadaDestino();
-        double distanciaCalculada = GeoDistanceCalculator.calcularDistanciaPuntos(puntoEntrega, puntoDestino);
-
-        despacho.setDesviacionMetros(distanciaCalculada);
-        boolean desvioExcesivo = distanciaCalculada > UMBRAL_ALERTA_DESVIACION_METROS;
-        despacho.setAlertaDesviacion(desvioExcesivo);
-
-        commercialBridge.delivered(despachoId);
-        despacho.setEstado(EstadoDespacho.ENTREGADO);
-
-        Pedido pedido = despacho.getPedido();
-        pedido.setEstado(EstadoPedido.ENTREGADO);
-        pedidoRepository.save(pedido);
-
-        Despacho guardado = despachoRepository.save(despacho);
-        descontarMaterialDespachoEntregado(guardado, guardado.getChofer());
-
-        // Si pertenece a una ruta consolidada, verificar si todas las paradas han terminado
-        if (despacho.getRuta() != null) {
-            actualizarEstadoRutaMatriz(despacho.getRuta());
-        } else {
-            Chofer chofer = despacho.getChofer();
-            chofer.setEstadoDisponibilidad(EstadoChofer.DISPONIBLE);
-            choferRepository.save(chofer);
-        }
-
-        messagingTemplate.convertAndSend("/topic/despachos/" + despachoId + "/estado",
-                Map.of("despachoId", despachoId.toString(), "estado", "ENTREGADO", "mensaje", "Entrega completada"));
-        notificarActualizacionTablero();
-
-        return mapearADespachoResponse(guardado);
-    }
-
-    @Override
-    @Transactional
-    public DespachoResponse reintentarParada(UUID despachoId) {
-        Despacho despacho = despachoRepository.findById(despachoId)
-                .orElseThrow(() -> new IllegalArgumentException("Despacho no encontrado con ID: " + despachoId));
-
-        if (despacho.getEstado() == EstadoDespacho.ENTREGADO) {
-            throw new IllegalStateException("No se puede reintentar una entrega que ya fue completada exitosamente.");
-        }
-
-        despacho.setEstado(EstadoDespacho.PENDIENTE);
-        if (despacho.getPedido() != null) {
-            despacho.getPedido().setEstado(EstadoPedido.PENDIENTE);
-            pedidoRepository.save(despacho.getPedido());
-        }
-
-        marcarPiezaPreparada(despacho.getComentarios());
-        Despacho guardado = despachoRepository.save(despacho);
-
-        if (despacho.getRuta() != null) {
-            Ruta ruta = despacho.getRuta();
-            if (ruta.getEstado() == EstadoRuta.COMPLETADA || ruta.getEstado() == EstadoRuta.CANCELADA) {
-                ruta.setEstado(EstadoRuta.EN_CURSO);
-                rutaRepository.save(ruta);
-            }
-            if (ruta.getChofer() != null) {
-                RutaResponse res = mapearARutaResponse(ruta);
-                messagingTemplate.convertAndSend("/topic/choferes/" + ruta.getChofer().getId() + "/rutas-asignadas", res);
-            }
-        }
-
-        notificarActualizacionTablero();
-        return mapearADespachoResponse(guardado);
-    }
-
-    private void actualizarEstadoRutaMatriz(Ruta ruta) {
-        if (ruta.getChofer() == null) return;
-        List<Despacho> paradas = despachoRepository.findByChoferId(ruta.getChofer().getId()).stream()
-                .filter(d -> d.getRuta() != null && d.getRuta().getId().equals(ruta.getId()))
-                .collect(Collectors.toList());
-
-        boolean todasFinalizadas = paradas.stream().allMatch(
-                d -> d.getEstado() == EstadoDespacho.ENTREGADO || d.getEstado() == EstadoDespacho.CANCELADA
-        );
-
-        if (todasFinalizadas && !paradas.isEmpty()) {
-            Chofer chofer = ruta.getChofer();
-            chofer.setEstadoDisponibilidad(EstadoChofer.DISPONIBLE);
-            choferRepository.save(chofer);
-            log.info("Paradas de ruta {} finalizadas por el chofer. Queda a la espera de cierre por el administrador.", ruta.getId());
-            notificarActualizacionTablero();
-        }
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<DespachoResponse> listarDespachos() {
-        return despachoRepository.findAllByOrderByFechaAsignacionDesc().stream()
-                .map(this::mapearADespachoResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<DespachoResponse> listarDespachosHoyChofer(UUID choferId) {
-        return despachoRepository.findByChoferId(choferId).stream()
-                .map(this::mapearADespachoResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public EvidenciaPodResponse obtenerEvidenciaPod(UUID despachoId) {
-        Despacho despacho = despachoRepository.findById(despachoId)
-                .orElseThrow(() -> new IllegalArgumentException("Despacho no encontrado con ID: " + despachoId));
-
-        if (despacho.getEstado() != EstadoDespacho.ENTREGADO) {
-            throw new IllegalStateException("El despacho aun no ha sido entregado, por lo que no posee e-PoD.");
-        }
-
-        return EvidenciaPodResponse.builder()
-                .despachoId(despacho.getId())
-                .cliente(despacho.getPedido().getCliente())
-                .direccionCliente(despacho.getPedido().getDireccionTexto())
-                .choferNombre(despacho.getChofer().getNombre())
-                .choferEmail(despacho.getChofer().getEmail())
-                .fotoPodUrl(despacho.getFotoPodUrl())
-                .firmaUrl(despacho.getFirmaUrl())
-                .latitudEntrega(GeometryUtil.extraerLatitud(despacho.getCoordenadaEntrega()))
-                .longitudEntrega(GeometryUtil.extraerLongitud(despacho.getCoordenadaEntrega()))
-                .latitudCliente(GeometryUtil.extraerLatitud(despacho.getPedido().getCoordenadaDestino()))
-                .longitudCliente(GeometryUtil.extraerLongitud(despacho.getPedido().getCoordenadaDestino()))
-                .desviacionMetros(despacho.getDesviacionMetros())
-                .alertaDesviacion(despacho.getAlertaDesviacion())
-                .fechaEntrega(despacho.getFechaEntrega())
-                .comentarios(despacho.getComentarios())
-                .build();
     }
 
     private void notificarActualizacionTablero() {
@@ -796,6 +141,691 @@ public class LogisticaServiceImpl implements LogisticaService {
             log.warn("No se pudo emitir evento de actualizacion de tablero: {}", e.getMessage());
         }
     }
+
+    private UUID envioDe(Despacho d) {
+        if (d.getEnvioComercialId() != null) return d.getEnvioComercialId();
+        return commercialBridge.envioDe(d.getId()).orElse(null);
+    }
+
+    /** Devuelve a bodega (sin salida física) el material de una parada de ruta pendiente. */
+    private void anularEnvio(Despacho d, String motivo) {
+        UUID envio = envioDe(d);
+        if (envio != null) pedidosClient.anular(envio, motivo);
+    }
+
+    /**
+     * Si el pedido se canceló o venció en pedidos, su parada queda cancelada aquí.
+     * Logística solo lee el estado del envío; no modifica datos de pedidos.
+     */
+    private void sincronizarConPedidos(Collection<Ruta> rutas) {
+        var abiertas = rutas.stream()
+                .filter(r -> r.getEstado() == EstadoRuta.PENDIENTE || r.getEstado() == EstadoRuta.EN_CURSO)
+                .flatMap(r -> r.getParadas().stream())
+                .filter(d -> !FINALES.contains(d.getEstado()))
+                .collect(Collectors.toMap(Despacho::getId, d -> d));
+        if (abiertas.isEmpty()) {
+            rutas.stream().filter(r -> r.getEstado() == EstadoRuta.EN_CURSO).toList().forEach(this::cerrarRutaSiTermino);
+            return;
+        }
+        var estados = commercialBridge.estados(abiertas.keySet());
+        // Rutas en curso cuyas paradas ya terminaron (p. ej. datos previos) se cierran.
+        var tocadas = rutas.stream().filter(r -> r.getEstado() == EstadoRuta.EN_CURSO)
+                .collect(Collectors.toCollection(HashSet::new));
+        for (var e : estados.entrySet()) {
+            if (!Set.of("RETORNO_PENDIENTE", "DEVUELTO_BODEGA").contains(e.getValue())) continue;
+            Despacho d = abiertas.get(e.getKey());
+            d.setEstado(EstadoDespacho.CANCELADA);
+            d.setComentarios("El pedido fue cancelado o venció: el material vuelve a bodega");
+            d.getPedido().setEstado(EstadoPedido.CANCELADO);
+            pedidoRepository.save(d.getPedido());
+            despachoRepository.save(d);
+            tocadas.add(d.getRuta());
+        }
+        tocadas.forEach(this::cerrarRutaSiTermino);
+    }
+
+    /** Una ruta en curso se completa sola cuando todas sus paradas terminan. */
+    private void cerrarRutaSiTermino(Ruta ruta) {
+        if (ruta == null || ruta.getEstado() != EstadoRuta.EN_CURSO) return;
+        var paradas = ruta.getParadas();
+        if (paradas.isEmpty() || !paradas.stream().allMatch(d -> FINALES.contains(d.getEstado()))) return;
+        for (Despacho d : paradas) {
+            if (d.getEstado() == EstadoDespacho.CANCELADA) {
+                // El material salió con el chofer y no se entregó: bodega debe recibirlo.
+                commercialBridge.cancelled(d.getId(), d.getComentarios() != null ? d.getComentarios() : "No entregado en ruta");
+            }
+        }
+        ruta.setEstado(EstadoRuta.COMPLETADA);
+        ruta.setFechaFin(LocalDateTime.now());
+        rutaRepository.save(ruta);
+        if (ruta.getChofer() != null && !ocupado(ruta.getChofer().getId(), ruta.getId())) {
+            ruta.getChofer().setEstadoDisponibilidad(EstadoChofer.DISPONIBLE);
+            choferRepository.save(ruta.getChofer());
+        }
+        messagingTemplate.convertAndSend("/topic/rutas/" + ruta.getId() + "/estado",
+                Map.of("rutaId", ruta.getId().toString(), "estado", "COMPLETADA", "mensaje", "Todas las paradas finalizaron"));
+        notificarActualizacionTablero();
+    }
+
+    private void reordenar(Ruta ruta) {
+        int orden = 1;
+        for (Despacho d : ruta.getParadas().stream().sorted(Comparator.comparing(Despacho::getOrdenParada)).toList()) {
+            d.setOrdenParada(orden++);
+        }
+    }
+
+    // =====================================================================
+    // Choferes
+    // =====================================================================
+
+    @Override
+    @Transactional
+    public List<ChoferResponse> listarChoferes() {
+        sincronizarChoferes();
+        return choferRepository.findAll().stream()
+                .sorted(Comparator.comparing(Chofer::getNombre, String.CASE_INSENSITIVE_ORDER))
+                .map(this::mapearAChoferResponse)
+                .collect(Collectors.toList());
+    }
+
+    // =====================================================================
+    // Planificación
+    // =====================================================================
+
+    @Override
+    @Transactional
+    public RutaResponse crearRuta(CrearRutaSimpleRequest request) {
+        Chofer chofer = choferDisponible(request.getChoferId(), null);
+        String base = request.getCodigoRuta() != null && !request.getCodigoRuta().isBlank()
+                ? request.getCodigoRuta().trim()
+                : "RUTA-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm"));
+        String codigo = rutaRepository.existsByCodigoRuta(base)
+                ? base + " (" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")) + ")"
+                : base;
+        Ruta ruta = rutaRepository.save(Ruta.builder()
+                .codigoRuta(codigo)
+                .chofer(chofer)
+                .estado(EstadoRuta.PENDIENTE)
+                .fechaCreacion(LocalDateTime.now())
+                .comentarios(request.getComentarios())
+                .paradas(new ArrayList<>())
+                .build());
+        if (request.getPedidos() != null && !request.getPedidos().isEmpty()) {
+            agregar(ruta, request.getPedidos());
+        }
+        notificarActualizacionTablero();
+        avisarChofer(ruta);
+        return mapearARutaResponse(ruta);
+    }
+
+    @Override
+    @Transactional
+    public RutaResponse agregarPedidos(UUID rutaId, AgregarPedidosRequest request) {
+        Ruta ruta = ruta(rutaId);
+        exigirPendiente(ruta, "agregar pedidos");
+        if (ruta.getChofer() == null) throw conflicto("Asigna un chofer antes de agregar pedidos");
+        choferDisponible(ruta.getChofer().getId(), ruta.getId());
+        agregar(ruta, request.getPedidos());
+        notificarActualizacionTablero();
+        avisarChofer(ruta);
+        return mapearARutaResponse(ruta);
+    }
+
+    /**
+     * Crea una parada por pedido. Si pedidos rechaza alguno, se anulan los
+     * despachos ya registrados en este lote y la transacción se revierte.
+     */
+    private void agregar(Ruta ruta, List<PedidoRutaRequest> pedidos) {
+        var enRuta = ruta.getParadas().stream()
+                .filter(d -> d.getPedidoComercialId() != null && d.getEstado() != EstadoDespacho.CANCELADA)
+                .map(Despacho::getPedidoComercialId).collect(Collectors.toSet());
+        var registrados = new ArrayList<UUID>();
+        try {
+            int orden = ruta.getParadas().size() + 1;
+            for (PedidoRutaRequest item : pedidos) {
+                if (!enRuta.add(item.getPedidoId())) {
+                    throw conflicto("El pedido ya está en esta ruta");
+                }
+                Despacho d = crearParada(ruta, item, orden++);
+                registrados.add(d.getEnvioComercialId());
+            }
+        } catch (RuntimeException e) {
+            for (UUID envio : registrados) {
+                try {
+                    pedidosClient.anular(envio, "Ruta no creada: se revierte el despacho");
+                } catch (RuntimeException ignored) {
+                    log.error("No se pudo revertir el envío {} tras un error al armar la ruta", envio);
+                }
+            }
+            throw e;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Despacho crearParada(Ruta ruta, PedidoRutaRequest item, int orden) {
+        var pedido = (Map<String, Object>) pedidosClient.pedido(item.getPedidoId()).get("order");
+        Integer numero = pedido.get("number") instanceof Number n ? n.intValue() : null;
+        if (!"ENTREGA".equals(pedido.get("delivery_mode"))) {
+            throw conflicto("El pedido #" + numero + " es para retiro en local");
+        }
+        Double lat = item.getLatitud() != null ? item.getLatitud() : numero(pedido.get("delivery_latitude"));
+        Double lon = item.getLongitud() != null ? item.getLongitud() : numero(pedido.get("delivery_longitude"));
+        if (lat == null || lon == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "El pedido #" + numero + " no tiene ubicación de entrega; márcala en el mapa");
+        }
+        Pedido destino = pedidoRepository.save(Pedido.builder()
+                .cliente(texto(pedido.get("client_name"), "Cliente"))
+                .direccionTexto(texto(pedido.get("delivery_address"), "Dirección de entrega"))
+                .coordenadaDestino(GeometryUtil.crearPunto(lat, lon))
+                .estado(EstadoPedido.PENDIENTE)
+                .fechaSolicitud(LocalDateTime.now())
+                .build());
+        Despacho parada = despachoRepository.save(Despacho.builder()
+                .ruta(ruta)
+                .ordenParada(orden)
+                .pedido(destino)
+                .chofer(ruta.getChofer())
+                .fechaAsignacion(LocalDateTime.now())
+                .estado(EstadoDespacho.PENDIENTE)
+                .pedidoComercialId(item.getPedidoId())
+                .numeroPedido(numero)
+                .build());
+        List<Map<String, Object>> lineas = item.getLineas() == null ? null : item.getLineas().stream()
+                .map(l -> Map.<String, Object>of("lineId", l.getLineId(), "quantity", l.getQuantity()))
+                .toList();
+        var envio = pedidosClient.despachar(item.getPedidoId(), ruta.getChofer().getId(), ruta.getId(),
+                parada.getId(), destino.getId(), lineas, "Despacho en ruta " + ruta.getCodigoRuta());
+        parada.setEnvioComercialId(UUID.fromString(String.valueOf(envio.get("id"))));
+        try {
+            parada.setCarga(json.writeValueAsString(envio.get("items")));
+        } catch (Exception e) {
+            parada.setCarga("[]");
+        }
+        despachoRepository.save(parada);
+        ruta.getParadas().add(parada);
+        return parada;
+    }
+
+    private static Double numero(Object v) {
+        if (v == null) return null;
+        try {
+            return Double.parseDouble(v.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static String texto(Object v, String porDefecto) {
+        return v == null || v.toString().isBlank() ? porDefecto : v.toString();
+    }
+
+    @Override
+    @Transactional
+    public RutaResponse modificarCarga(UUID rutaId, UUID despachoId, ModificarCargaRequest request) {
+        Ruta ruta = ruta(rutaId);
+        exigirPendiente(ruta, "modificar la carga");
+        Despacho anterior = despacho(despachoId);
+        if (!ruta.getId().equals(anterior.getRuta().getId())) throw conflicto("La parada no pertenece a esta ruta");
+        if (anterior.getPedidoComercialId() == null) throw conflicto("Esta parada no proviene de un pedido");
+        int orden = anterior.getOrdenParada();
+        var item = new PedidoRutaRequest(anterior.getPedidoComercialId(), request.getLineas(),
+                GeometryUtil.extraerLatitud(anterior.getPedido().getCoordenadaDestino()),
+                GeometryUtil.extraerLongitud(anterior.getPedido().getCoordenadaDestino()));
+        anularEnvio(anterior, "Carga modificada antes de salir");
+        ruta.getParadas().remove(anterior);
+        despachoRepository.delete(anterior);
+        pedidoRepository.delete(anterior.getPedido());
+        despachoRepository.flush();
+        crearParada(ruta, item, orden);
+        notificarActualizacionTablero();
+        avisarChofer(ruta);
+        return mapearARutaResponse(ruta);
+    }
+
+    @Override
+    @Transactional
+    public RutaResponse eliminarDestinoRuta(UUID rutaId, UUID despachoId) {
+        Ruta ruta = ruta(rutaId);
+        exigirPendiente(ruta, "quitar paradas");
+        Despacho d = despacho(despachoId);
+        if (!ruta.getId().equals(d.getRuta().getId())) throw conflicto("La parada no pertenece a esta ruta");
+        if (d.getEstado() != EstadoDespacho.CANCELADA) anularEnvio(d, "Pedido retirado de la ruta");
+        ruta.getParadas().remove(d);
+        despachoRepository.delete(d);
+        pedidoRepository.delete(d.getPedido());
+        reordenar(ruta);
+        rutaRepository.save(ruta);
+        notificarActualizacionTablero();
+        avisarChofer(ruta);
+        return mapearARutaResponse(ruta);
+    }
+
+    @Override
+    @Transactional
+    public RutaResponse asignarChoferRuta(UUID rutaId, UUID choferId) {
+        Ruta ruta = ruta(rutaId);
+        if (ruta.getEstado() == EstadoRuta.EN_CURSO) {
+            throw conflicto("No se cambia el chofer de una ruta en curso");
+        }
+        exigirPendiente(ruta, "asignar chofer");
+        Chofer chofer = choferDisponible(choferId, ruta.getId());
+        boolean conPedidos = ruta.getParadas().stream().anyMatch(d -> d.getPedidoComercialId() != null);
+        if (conPedidos) pedidosClient.reasignarChofer(ruta.getId(), chofer.getId());
+        ruta.setChofer(chofer);
+        ruta.getParadas().forEach(d -> d.setChofer(chofer));
+        rutaRepository.save(ruta);
+        notificarActualizacionTablero();
+        avisarChofer(ruta);
+        return mapearARutaResponse(ruta);
+    }
+
+    @Override
+    @Transactional
+    public void eliminarRuta(UUID rutaId) {
+        Ruta ruta = ruta(rutaId);
+        if (ruta.getEstado() != EstadoRuta.PENDIENTE) {
+            throw conflicto("Solo se eliminan rutas pendientes; las demás se conservan como historial");
+        }
+        for (Despacho d : ruta.getParadas()) {
+            if (d.getEstado() != EstadoDespacho.CANCELADA) anularEnvio(d, "Ruta eliminada antes de salir");
+        }
+        var destinos = ruta.getParadas().stream().map(Despacho::getPedido).toList();
+        rutaRepository.delete(ruta);
+        rutaRepository.flush();
+        pedidoRepository.deleteAll(destinos);
+        notificarActualizacionTablero();
+    }
+
+    @Override
+    @Transactional
+    public RutaResponse aceptarEIniciarRutaConsolidada(UUID rutaId) {
+        Ruta ruta = ruta(rutaId);
+        exigirPendiente(ruta, "iniciar");
+        if (ruta.getChofer() == null) throw conflicto("Asigna un chofer antes de iniciar la ruta");
+        if (ruta.getParadas().stream().noneMatch(d -> d.getEstado() == EstadoDespacho.PENDIENTE)) {
+            throw conflicto("La ruta no tiene paradas pendientes");
+        }
+        if (ocupado(ruta.getChofer().getId(), ruta.getId())) {
+            throw conflicto(ruta.getChofer().getNombre() + " ya está en otra ruta; debe terminarla antes de iniciar esta");
+        }
+        commercialBridge.route(rutaId, true);
+        ruta.setEstado(EstadoRuta.EN_CURSO);
+        ruta.setFechaInicio(LocalDateTime.now());
+        ruta.getChofer().setEstadoDisponibilidad(EstadoChofer.EN_RUTA);
+        choferRepository.save(ruta.getChofer());
+        rutaRepository.save(ruta);
+        messagingTemplate.convertAndSend("/topic/rutas/" + rutaId + "/estado",
+                Map.of("rutaId", rutaId.toString(), "estado", "EN_CURSO", "mensaje", "Ruta iniciada"));
+        notificarActualizacionTablero();
+        avisarChofer(ruta);
+        return mapearARutaResponse(ruta);
+    }
+
+    @Override
+    @Transactional
+    public RutaResponse cancelarRutaConsolidada(UUID rutaId, String motivo) {
+        Ruta ruta = ruta(rutaId);
+        if (ruta.getEstado() == EstadoRuta.COMPLETADA || ruta.getEstado() == EstadoRuta.CANCELADA) {
+            throw conflicto("La ruta ya está finalizada");
+        }
+        String texto = motivo != null && !motivo.isBlank() ? motivo.trim() : "Ruta cancelada";
+        boolean salio = ruta.getEstado() == EstadoRuta.EN_CURSO;
+        for (Despacho d : ruta.getParadas()) {
+            if (d.getEstado() == EstadoDespacho.ENTREGADO) continue;
+            if (salio) {
+                commercialBridge.cancelled(d.getId(), texto);   // el material vuelve con el chofer
+            } else if (d.getEstado() != EstadoDespacho.CANCELADA) {
+                anularEnvio(d, texto);                           // nunca salió de bodega
+            }
+            d.setEstado(EstadoDespacho.CANCELADA);
+            d.setComentarios(texto);
+            d.getPedido().setEstado(EstadoPedido.CANCELADO);
+        }
+        ruta.setEstado(EstadoRuta.CANCELADA);
+        ruta.setFechaFin(LocalDateTime.now());
+        ruta.setComentarios(ruta.getComentarios() == null ? "Cancelada: " + texto : ruta.getComentarios() + " · Cancelada: " + texto);
+        if (ruta.getChofer() != null && !ocupado(ruta.getChofer().getId(), ruta.getId())) {
+            ruta.getChofer().setEstadoDisponibilidad(EstadoChofer.DISPONIBLE);
+            choferRepository.save(ruta.getChofer());
+        }
+        rutaRepository.save(ruta);
+        messagingTemplate.convertAndSend("/topic/rutas/" + rutaId + "/estado",
+                Map.of("rutaId", rutaId.toString(), "estado", "CANCELADA", "mensaje", texto));
+        notificarActualizacionTablero();
+        avisarChofer(ruta);
+        return mapearARutaResponse(ruta);
+    }
+
+    @Override
+    @Transactional
+    public RutaResponse completarRutaConsolidada(UUID rutaId) {
+        Ruta ruta = ruta(rutaId);
+        if (ruta.getEstado() != EstadoRuta.EN_CURSO) throw conflicto("Solo se completa una ruta en curso");
+        if (!ruta.getParadas().stream().allMatch(d -> FINALES.contains(d.getEstado()))) {
+            throw conflicto("Aún hay paradas por atender; márcalas como entregadas o no entregadas, o cancela la ruta");
+        }
+        cerrarRutaSiTermino(ruta);
+        return mapearARutaResponse(ruta);
+    }
+
+    // =====================================================================
+    // Consulta
+    // =====================================================================
+
+    @Override
+    @Transactional
+    public List<RutaResponse> listarRutas() {
+        var rutas = rutaRepository.findAllByOrderByFechaCreacionDesc();
+        sincronizarConPedidos(rutas);
+        return rutas.stream().map(this::mapearARutaResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public List<RutaResponse> listarRutasPorChofer(UUID choferId) {
+        var rutas = rutaRepository.findByChoferIdOrderByFechaCreacionDesc(choferId);
+        sincronizarConPedidos(rutas);
+        return rutas.stream().map(this::mapearARutaResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public RutaResponse obtenerRutaPorId(UUID rutaId) {
+        Ruta ruta = ruta(rutaId);
+        sincronizarConPedidos(List.of(ruta));
+        return mapearARutaResponse(ruta);
+    }
+
+    @Override
+    @Transactional
+    public List<DespachoResponse> listarDespachos() {
+        sincronizarConPedidos(rutaRepository.findAllByOrderByFechaCreacionDesc());
+        return despachoRepository.findAllByOrderByFechaAsignacionDesc().stream()
+                .map(this::mapearADespachoResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public List<DespachoResponse> listarDespachosHoyChofer(UUID choferId) {
+        sincronizarConPedidos(rutaRepository.findByChoferIdOrderByFechaCreacionDesc(choferId));
+        return despachoRepository.findByChoferId(choferId).stream()
+                .map(this::mapearADespachoResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public EvidenciaPodResponse obtenerEvidenciaPod(UUID despachoId) {
+        Despacho d = despacho(despachoId);
+        if (d.getEstado() != EstadoDespacho.ENTREGADO) {
+            throw conflicto("La parada aún no ha sido entregada, por lo que no tiene prueba de entrega");
+        }
+        Chofer chofer = d.getChofer();
+        return EvidenciaPodResponse.builder()
+                .despachoId(d.getId())
+                .cliente(d.getPedido().getCliente())
+                .direccionCliente(d.getPedido().getDireccionTexto())
+                .choferNombre(chofer != null ? chofer.getNombre() : null)
+                .choferEmail(chofer != null ? chofer.getEmail() : null)
+                .fotoPodUrl(d.getFotoPodUrl())
+                .firmaUrl(d.getFirmaUrl())
+                .latitudEntrega(GeometryUtil.extraerLatitud(d.getCoordenadaEntrega()))
+                .longitudEntrega(GeometryUtil.extraerLongitud(d.getCoordenadaEntrega()))
+                .latitudCliente(GeometryUtil.extraerLatitud(d.getPedido().getCoordenadaDestino()))
+                .longitudCliente(GeometryUtil.extraerLongitud(d.getPedido().getCoordenadaDestino()))
+                .desviacionMetros(d.getDesviacionMetros())
+                .alertaDesviacion(d.getAlertaDesviacion())
+                .fechaEntrega(d.getFechaEntrega())
+                .comentarios(d.getComentarios())
+                .build();
+    }
+
+    // =====================================================================
+    // Operación del chofer en ruta
+    // =====================================================================
+
+    @Override
+    @Transactional
+    public DespachoResponse aceptarEIniciarRuta(UUID despachoId) {
+        Despacho despacho = despacho(despachoId);
+        if (despacho.getEstado() != EstadoDespacho.PENDIENTE) {
+            throw conflicto("La parada no está pendiente");
+        }
+        Ruta ruta = despacho.getRuta();
+        Chofer chofer = despacho.getChofer() != null ? despacho.getChofer() : ruta != null ? ruta.getChofer() : null;
+        if (chofer == null) throw conflicto("La parada no tiene chofer asignado");
+        if (ruta != null && ruta.getEstado() == EstadoRuta.PENDIENTE && ocupado(chofer.getId(), ruta.getId())) {
+            throw conflicto("Ya tienes otra ruta en curso; termínala antes de iniciar esta");
+        }
+        boolean otraEnCurso = despachoRepository.findByChoferId(chofer.getId()).stream()
+                .anyMatch(d -> d.getEstado() == EstadoDespacho.EN_CURSO && !d.getId().equals(despachoId));
+        if (otraEnCurso) {
+            throw conflicto("Ya tienes una parada en curso. Entrégala o márcala como no entregada antes de iniciar otra.");
+        }
+        commercialBridge.lock(despachoId, true);
+        despacho.setEstado(EstadoDespacho.EN_CURSO);
+        despacho.setFechaInicioRuta(LocalDateTime.now());
+        despacho.getPedido().setEstado(EstadoPedido.EN_RUTA);
+        pedidoRepository.save(despacho.getPedido());
+        chofer.setEstadoDisponibilidad(EstadoChofer.EN_RUTA);
+        choferRepository.save(chofer);
+        if (ruta != null && ruta.getEstado() == EstadoRuta.PENDIENTE) {
+            ruta.setEstado(EstadoRuta.EN_CURSO);
+            ruta.setFechaInicio(LocalDateTime.now());
+            rutaRepository.save(ruta);
+        }
+        Despacho actualizado = despachoRepository.save(despacho);
+        messagingTemplate.convertAndSend("/topic/despachos/" + despachoId + "/estado",
+                Map.of("despachoId", despachoId.toString(), "estado", "EN_CURSO", "mensaje", "Parada iniciada por el chofer"));
+        notificarActualizacionTablero();
+        return mapearADespachoResponse(actualizado);
+    }
+
+    /** El chofer no pudo entregar: la parada queda "no entregada" y puede reintentarse mientras la ruta siga en curso. */
+    @Override
+    @Transactional
+    public DespachoResponse cancelarRuta(UUID despachoId, String motivo) {
+        Despacho despacho = despacho(despachoId);
+        if (despacho.getEstado() == EstadoDespacho.ENTREGADO) {
+            throw conflicto("No se puede cancelar una entrega ya completada");
+        }
+        despacho.setEstado(EstadoDespacho.CANCELADA);
+        despacho.setComentarios(motivo != null && !motivo.isBlank() ? "No entregado: " + motivo.trim() : "No entregado");
+        despacho.getPedido().setEstado(EstadoPedido.CANCELADO);
+        pedidoRepository.save(despacho.getPedido());
+        Despacho actualizado = despachoRepository.save(despacho);
+
+        Ruta ruta = despacho.getRuta();
+        if (ruta != null) {
+            try {
+                optimizarRutaPorChofer(ruta.getId(),
+                        GeometryUtil.extraerLatitud(despacho.getPedido().getCoordenadaDestino()),
+                        GeometryUtil.extraerLongitud(despacho.getPedido().getCoordenadaDestino()));
+            } catch (Exception e) {
+                log.warn("No se pudo reoptimizar la ruta tras la cancelación: {}", e.getMessage());
+            }
+            cerrarRutaSiTermino(ruta);
+        }
+        messagingTemplate.convertAndSend("/topic/despachos/" + despachoId + "/estado",
+                Map.of("despachoId", despachoId.toString(), "estado", "CANCELADA", "mensaje", "Parada no entregada"));
+        notificarActualizacionTablero();
+        return mapearADespachoResponse(actualizado);
+    }
+
+    @Override
+    @Transactional
+    public DespachoResponse cerrarEntrega(UUID despachoId, CerrarEntregaRequest request) {
+        Despacho despacho = despacho(despachoId);
+        if (despacho.getEstado() == EstadoDespacho.ENTREGADO) {
+            return mapearADespachoResponse(despacho);
+        }
+        if (request.getFotoPodUrl() == null || request.getFotoPodUrl().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La foto de la entrega es obligatoria");
+        }
+        if (request.getFirmaUrl() == null || request.getFirmaUrl().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La firma del receptor es obligatoria");
+        }
+        if (request.getLatitud() == null || request.getLongitud() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La ubicación GPS de la entrega es obligatoria");
+        }
+        commercialBridge.lock(despachoId, false);
+
+        Point puntoEntrega = GeometryUtil.crearPunto(request.getLatitud(), request.getLongitud());
+        despacho.setCoordenadaEntrega(puntoEntrega);
+        despacho.setFotoPodUrl(request.getFotoPodUrl());
+        despacho.setFirmaUrl(request.getFirmaUrl());
+        despacho.setFechaEntrega(LocalDateTime.now());
+        despacho.setComentarios(request.getComentarios());
+
+        double distancia = GeoDistanceCalculator.calcularDistanciaPuntos(puntoEntrega, despacho.getPedido().getCoordenadaDestino());
+        despacho.setDesviacionMetros(distancia);
+        despacho.setAlertaDesviacion(distancia > UMBRAL_ALERTA_DESVIACION_METROS);
+
+        // Pedidos registra la entrega y mueve la custodia del material.
+        commercialBridge.delivered(despachoId);
+        despacho.setEstado(EstadoDespacho.ENTREGADO);
+        despacho.getPedido().setEstado(EstadoPedido.ENTREGADO);
+        pedidoRepository.save(despacho.getPedido());
+        Despacho guardado = despachoRepository.save(despacho);
+
+        cerrarRutaSiTermino(despacho.getRuta());
+        messagingTemplate.convertAndSend("/topic/despachos/" + despachoId + "/estado",
+                Map.of("despachoId", despachoId.toString(), "estado", "ENTREGADO", "mensaje", "Entrega completada"));
+        notificarActualizacionTablero();
+        return mapearADespachoResponse(guardado);
+    }
+
+    @Override
+    @Transactional
+    public DespachoResponse reintentarParada(UUID despachoId) {
+        Despacho despacho = despacho(despachoId);
+        if (despacho.getEstado() != EstadoDespacho.CANCELADA) {
+            throw conflicto("Solo se reintenta una parada no entregada");
+        }
+        Ruta ruta = despacho.getRuta();
+        if (ruta == null || ruta.getEstado() != EstadoRuta.EN_CURSO) {
+            throw conflicto("La ruta ya se cerró; el material de esta parada debe volver a bodega");
+        }
+        String estadoEnvio = commercialBridge.estados(List.of(despachoId)).get(despachoId);
+        if (estadoEnvio != null && !"EN_REPARTO".equals(estadoEnvio)) {
+            throw conflicto("El pedido fue cancelado o venció; no se puede reintentar la entrega");
+        }
+        despacho.setEstado(EstadoDespacho.PENDIENTE);
+        despacho.setComentarios(null);
+        despacho.getPedido().setEstado(EstadoPedido.PENDIENTE);
+        pedidoRepository.save(despacho.getPedido());
+        Despacho guardado = despachoRepository.save(despacho);
+        avisarChofer(ruta);
+        notificarActualizacionTablero();
+        return mapearADespachoResponse(guardado);
+    }
+
+    @Override
+    @Transactional
+    public RutaResponse optimizarRutaPorChofer(UUID rutaId, Double latChofer, Double lonChofer) {
+        Ruta ruta = ruta(rutaId);
+        List<Despacho> paradas = ruta.getParadas();
+        if (paradas.size() <= 1) return mapearARutaResponse(ruta);
+
+        List<Despacho> finalizadas = paradas.stream()
+                .filter(d -> FINALES.contains(d.getEstado()))
+                .sorted(Comparator.comparing(Despacho::getOrdenParada))
+                .collect(Collectors.toList());
+        List<Despacho> pendientes = paradas.stream()
+                .filter(d -> !FINALES.contains(d.getEstado()))
+                .collect(Collectors.toList());
+        if (pendientes.size() <= 1) return mapearARutaResponse(ruta);
+
+        double origenLat = latChofer != null ? latChofer : LAT_BODEGA_QUITO;
+        double origenLon = lonChofer != null ? lonChofer : LON_BODEGA_QUITO;
+        List<Pedido> optimizados = ordenarPedidosPorProximidad(
+                pendientes.stream().map(Despacho::getPedido).collect(Collectors.toList()), origenLat, origenLon);
+
+        int orden = finalizadas.size() + 1;
+        for (Pedido p : optimizados) {
+            for (Despacho d : pendientes) {
+                if (d.getPedido().getId().equals(p.getId())) {
+                    d.setOrdenParada(orden++);
+                    break;
+                }
+            }
+        }
+        paradas.sort(Comparator.comparing(Despacho::getOrdenParada));
+        rutaRepository.save(ruta);
+        avisarChofer(ruta);
+        notificarActualizacionTablero();
+        return mapearARutaResponse(ruta);
+    }
+
+    /** Vecino más cercano según duraciones viales (Google Routes, con respaldo OSRM/Haversine). */
+    private List<Pedido> ordenarPedidosPorProximidad(List<Pedido> pedidos, double latOrigen, double lonOrigen) {
+        if (pedidos == null || pedidos.size() <= 1) {
+            return pedidos != null ? new ArrayList<>(pedidos) : new ArrayList<>();
+        }
+        List<double[]> coordenadas = new ArrayList<>();
+        coordenadas.add(new double[]{latOrigen, lonOrigen});
+        List<Pedido> validos = new ArrayList<>();
+        for (Pedido p : pedidos) {
+            Double lat = GeometryUtil.extraerLatitud(p.getCoordenadaDestino());
+            Double lon = GeometryUtil.extraerLongitud(p.getCoordenadaDestino());
+            if (lat != null && lon != null) {
+                coordenadas.add(new double[]{lat, lon});
+                validos.add(p);
+            }
+        }
+        if (validos.size() <= 1) return validos;
+
+        double[][] duraciones = googleRoutesService.obtenerMatrizDuracionesViales(coordenadas);
+        int total = coordenadas.size();
+        boolean[] visitados = new boolean[total];
+        visitados[0] = true;
+        List<Pedido> resultado = new ArrayList<>();
+        int actual = 0;
+        for (int paso = 0; paso < validos.size(); paso++) {
+            int mejor = -1;
+            double menor = Double.MAX_VALUE;
+            for (int c = 1; c < total; c++) {
+                if (!visitados[c] && duraciones[actual][c] < menor) {
+                    menor = duraciones[actual][c];
+                    mejor = c;
+                }
+            }
+            if (mejor == -1) {
+                for (int c = 1; c < total; c++) {
+                    if (!visitados[c]) { mejor = c; break; }
+                }
+            }
+            visitados[mejor] = true;
+            resultado.add(validos.get(mejor - 1));
+            actual = mejor;
+        }
+        return resultado;
+    }
+
+    // =====================================================================
+    // Propiedad
+    // =====================================================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public UUID choferDeRuta(UUID rutaId) {
+        Ruta r = ruta(rutaId);
+        return r.getChofer() != null ? r.getChofer().getId() : null;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UUID choferDeDespacho(UUID despachoId) {
+        Despacho d = despacho(despachoId);
+        if (d.getChofer() != null) return d.getChofer().getId();
+        return d.getRuta() != null && d.getRuta().getChofer() != null ? d.getRuta().getChofer().getId() : null;
+    }
+
+    // =====================================================================
+    // Mapeo
+    // =====================================================================
 
     private PedidoResponse mapearAPedidoResponse(Pedido p) {
         return PedidoResponse.builder()
@@ -810,9 +840,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     }
 
     private ChoferResponse mapearAChoferResponse(Chofer c) {
-        if (c == null) {
-            return null;
-        }
+        if (c == null) return null;
         return ChoferResponse.builder()
                 .id(c.getId())
                 .nombre(c.getNombre())
@@ -821,6 +849,15 @@ public class LogisticaServiceImpl implements LogisticaService {
                 .estadoDisponibilidad(c.getEstadoDisponibilidad())
                 .createdAt(c.getCreatedAt())
                 .build();
+    }
+
+    private List<Map<String, Object>> carga(Despacho d) {
+        if (d.getCarga() == null || d.getCarga().isBlank()) return List.of();
+        try {
+            return json.readValue(d.getCarga(), new TypeReference<List<Map<String, Object>>>() {});
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     private DespachoResponse mapearADespachoResponse(Despacho d) {
@@ -841,447 +878,30 @@ public class LogisticaServiceImpl implements LogisticaService {
                 .alertaDesviacion(d.getAlertaDesviacion())
                 .estado(d.getEstado())
                 .comentarios(d.getComentarios())
+                .pedidoComercialId(d.getPedidoComercialId())
+                .numeroPedido(d.getNumeroPedido())
+                .envioComercialId(d.getEnvioComercialId())
+                .carga(carga(d))
                 .build();
     }
 
     private RutaResponse mapearARutaResponse(Ruta r) {
-        List<DespachoResponse> paradasList = r.getParadas() != null
-                ? r.getParadas().stream().map(this::mapearADespachoResponse).collect(Collectors.toList())
-                : Collections.emptyList();
-
+        List<DespachoResponse> paradas = r.getParadas().stream()
+                .sorted(Comparator.comparing(Despacho::getOrdenParada, Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(this::mapearADespachoResponse)
+                .collect(Collectors.toList());
         return RutaResponse.builder()
                 .id(r.getId())
                 .codigoRuta(r.getCodigoRuta())
                 .choferId(r.getChofer() != null ? r.getChofer().getId() : null)
-                .choferNombre(r.getChofer() != null ? r.getChofer().getNombre() : "Sin asignar")
+                .choferNombre(r.getChofer() != null ? r.getChofer().getNombre() : null)
                 .choferTelefono(r.getChofer() != null ? r.getChofer().getTelefono() : null)
                 .estado(r.getEstado())
                 .fechaCreacion(r.getFechaCreacion())
                 .fechaInicio(r.getFechaInicio())
                 .fechaFin(r.getFechaFin())
                 .comentarios(r.getComentarios())
-                .paradas(paradasList)
+                .paradas(paradas)
                 .build();
-    }
-
-    @Override
-    @Transactional
-    public RutaResponse crearRuta(CrearRutaSimpleRequest request) {
-        String codigoBase = (request.getCodigoRuta() != null && !request.getCodigoRuta().trim().isEmpty())
-                ? request.getCodigoRuta().trim()
-                : "Ruta 1";
-        String codigoRuta = codigoBase;
-        if (rutaRepository.existsByCodigoRuta(codigoRuta)) {
-            codigoRuta = codigoBase + " (" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")) + ")";
-        }
-
-        Chofer chofer = null;
-        if (request.getChoferId() != null) {
-            chofer = choferRepository.findById(request.getChoferId()).orElse(null);
-        }
-
-        Ruta ruta = Ruta.builder()
-                .codigoRuta(codigoRuta)
-                .chofer(chofer)
-                .estado(EstadoRuta.PENDIENTE)
-                .fechaCreacion(LocalDateTime.now())
-                .comentarios(request.getComentarios())
-                .paradas(new ArrayList<>())
-                .build();
-
-        Ruta guardada = rutaRepository.save(ruta);
-        notificarActualizacionTablero();
-        return mapearARutaResponse(guardada);
-    }
-
-    @Override
-    @Transactional
-    public RutaResponse asignarChoferRuta(UUID rutaId, UUID choferId) {
-        commercialBridge.immutableRoute(rutaId);
-        Ruta ruta = rutaRepository.findById(rutaId)
-                .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
-
-        if (ruta.getEstado() == EstadoRuta.COMPLETADA || ruta.getEstado() == EstadoRuta.CANCELADA) {
-            throw new IllegalStateException("No se puede modificar el chofer de una ruta completada o cancelada.");
-        }
-
-        Chofer chofer = null;
-        if (choferId != null) {
-            chofer = choferRepository.findById(choferId)
-                    .orElseThrow(() -> new IllegalArgumentException("Chofer no encontrado con ID: " + choferId));
-        }
-
-        ruta.setChofer(chofer);
-
-        if (ruta.getParadas() != null) {
-            for (Despacho d : ruta.getParadas()) {
-                d.setChofer(chofer);
-                despachoRepository.save(d);
-            }
-        }
-
-        Ruta guardada = rutaRepository.save(ruta);
-        if (chofer != null) {
-            RutaResponse res = mapearARutaResponse(guardada);
-            messagingTemplate.convertAndSend("/topic/choferes/" + chofer.getId() + "/rutas-asignadas", res);
-        }
-        notificarActualizacionTablero();
-        return mapearARutaResponse(guardada);
-    }
-
-    @Override
-    @Transactional
-    public RutaResponse agregarDestinoRuta(UUID rutaId, DestinoRutaRequest request) {
-        commercialBridge.immutableRoute(rutaId);
-        Ruta ruta = rutaRepository.findById(rutaId)
-                .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
-
-        if (ruta.getEstado() == EstadoRuta.COMPLETADA || ruta.getEstado() == EstadoRuta.CANCELADA) {
-            throw new IllegalStateException("No se pueden agregar destinos a una ruta completada o cancelada.");
-        }
-
-        Point puntoDestino = GeometryUtil.crearPunto(request.getLatitudDestino(), request.getLongitudDestino());
-        Pedido pedido = Pedido.builder()
-                .cliente(request.getCliente().trim())
-                .direccionTexto(request.getDireccionTexto().trim())
-                .coordenadaDestino(puntoDestino)
-                .estado(ruta.getEstado() == EstadoRuta.EN_CURSO ? EstadoPedido.EN_RUTA : EstadoPedido.PENDIENTE)
-                .fechaSolicitud(LocalDateTime.now())
-                .build();
-        Pedido pedidoGuardado = pedidoRepository.save(pedido);
-
-        int siguienteOrden = (ruta.getParadas() != null ? ruta.getParadas().size() : 0) + 1;
-
-        Despacho despacho = Despacho.builder()
-                .ruta(ruta)
-                .ordenParada(siguienteOrden)
-                .pedido(pedidoGuardado)
-                .chofer(ruta.getChofer())
-                .fechaAsignacion(LocalDateTime.now())
-                .estado(ruta.getEstado() == EstadoRuta.EN_CURSO ? EstadoDespacho.EN_CURSO : EstadoDespacho.PENDIENTE)
-                .comentarios(request.getComentarios())
-                .build();
-        despachoRepository.save(despacho);
-        marcarPiezaPreparada(request.getComentarios());
-
-        if (ruta.getParadas() == null) {
-            ruta.setParadas(new ArrayList<>());
-        }
-        ruta.getParadas().add(despacho);
-        Ruta guardada = rutaRepository.save(ruta);
-
-        if (ruta.getChofer() != null) {
-            RutaResponse res = mapearARutaResponse(guardada);
-            messagingTemplate.convertAndSend("/topic/choferes/" + ruta.getChofer().getId() + "/rutas-asignadas", res);
-        }
-        notificarActualizacionTablero();
-        return mapearARutaResponse(guardada);
-    }
-
-    @Override
-    @Transactional
-    public RutaResponse modificarDestinoRuta(UUID rutaId, UUID despachoId, DestinoRutaRequest request) {
-        commercialBridge.immutableRoute(rutaId);
-        Ruta ruta = rutaRepository.findById(rutaId)
-                .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
-
-        if (ruta.getEstado() == EstadoRuta.COMPLETADA || ruta.getEstado() == EstadoRuta.CANCELADA) {
-            throw new IllegalStateException("No se pueden modificar destinos de una ruta completada o cancelada.");
-        }
-
-        Despacho despacho = despachoRepository.findById(despachoId)
-                .orElseThrow(() -> new IllegalArgumentException("Parada no encontrada con ID: " + despachoId));
-
-        Pedido pedido = despacho.getPedido();
-        if (request.getCliente() != null && !request.getCliente().isBlank()) {
-            pedido.setCliente(request.getCliente().trim());
-        }
-        if (request.getDireccionTexto() != null && !request.getDireccionTexto().isBlank()) {
-            pedido.setDireccionTexto(request.getDireccionTexto().trim());
-        }
-        if (request.getLatitudDestino() != null && request.getLongitudDestino() != null) {
-            Point punto = GeometryUtil.crearPunto(request.getLatitudDestino(), request.getLongitudDestino());
-            pedido.setCoordenadaDestino(punto);
-        }
-        pedidoRepository.save(pedido);
-
-        if (request.getComentarios() != null) {
-            liberarPiezaPreparada(despacho.getComentarios());
-            marcarPiezaPreparada(request.getComentarios());
-            despacho.setComentarios(request.getComentarios());
-        }
-        despachoRepository.save(despacho);
-
-        Ruta guardada = rutaRepository.findById(rutaId).orElse(ruta);
-        if (guardada.getChofer() != null) {
-            RutaResponse res = mapearARutaResponse(guardada);
-            messagingTemplate.convertAndSend("/topic/choferes/" + guardada.getChofer().getId() + "/rutas-asignadas", res);
-        }
-        notificarActualizacionTablero();
-        return mapearARutaResponse(guardada);
-    }
-
-    @Override
-    @Transactional
-    public RutaResponse eliminarDestinoRuta(UUID rutaId, UUID despachoId) {
-        commercialBridge.immutableRoute(rutaId);
-        Ruta ruta = rutaRepository.findById(rutaId)
-                .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
-
-        if (ruta.getEstado() == EstadoRuta.COMPLETADA || ruta.getEstado() == EstadoRuta.CANCELADA) {
-            throw new IllegalStateException("No se pueden eliminar paradas de una ruta completada o cancelada.");
-        }
-
-        Despacho despacho = despachoRepository.findById(despachoId)
-                .orElseThrow(() -> new IllegalArgumentException("Parada no encontrada con ID: " + despachoId));
-
-        if (despacho.getEstado() == EstadoDespacho.ENTREGADO) {
-            throw new IllegalStateException("No se puede eliminar una parada que ya fue entregada y cuenta con e-PoD.");
-        }
-
-        liberarPiezaPreparada(despacho.getComentarios());
-        ruta.getParadas().remove(despacho);
-        despachoRepository.delete(despacho);
-
-        int orden = 1;
-        for (Despacho d : ruta.getParadas()) {
-            d.setOrdenParada(orden++);
-            despachoRepository.save(d);
-        }
-
-        Ruta guardada = rutaRepository.save(ruta);
-        if (guardada.getChofer() != null) {
-            RutaResponse res = mapearARutaResponse(guardada);
-            messagingTemplate.convertAndSend("/topic/choferes/" + guardada.getChofer().getId() + "/rutas-asignadas", res);
-        }
-        notificarActualizacionTablero();
-        return mapearARutaResponse(guardada);
-    }
-
-    @Override
-    @Transactional
-    public RutaResponse optimizarRutaPorChofer(UUID rutaId, Double latChofer, Double lonChofer) {
-        Ruta ruta = rutaRepository.findById(rutaId)
-                .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
-
-        List<Despacho> paradas = ruta.getParadas();
-        if (paradas == null || paradas.size() <= 1) {
-            return mapearARutaResponse(ruta);
-        }
-
-        // Paradas ya finalizadas (ENTREGADO o CANCELADA) conservan su orden cronológico previo
-        List<Despacho> finalizadas = paradas.stream()
-                .filter(d -> d.getEstado() == EstadoDespacho.ENTREGADO || d.getEstado() == EstadoDespacho.CANCELADA)
-                .sorted(Comparator.comparing(Despacho::getOrdenParada))
-                .collect(Collectors.toList());
-
-        // Paradas pendientes o en curso a ser reordenadas según la ubicación GPS actual del chofer
-        List<Despacho> pendientes = paradas.stream()
-                .filter(d -> d.getEstado() != EstadoDespacho.ENTREGADO && d.getEstado() != EstadoDespacho.CANCELADA)
-                .collect(Collectors.toList());
-
-        if (pendientes.size() <= 1) {
-            return mapearARutaResponse(ruta);
-        }
-
-        double origenLat = (latChofer != null) ? latChofer : LAT_BODEGA_QUITO;
-        double origenLon = (lonChofer != null) ? lonChofer : LON_BODEGA_QUITO;
-
-        List<Pedido> pedidosPendientes = pendientes.stream().map(Despacho::getPedido).collect(Collectors.toList());
-        List<Pedido> pedidosOptimizados = ordenarPedidosPorProximidad(pedidosPendientes, origenLat, origenLon);
-
-        int orden = finalizadas.size() + 1;
-        for (Pedido p : pedidosOptimizados) {
-            for (Despacho d : pendientes) {
-                if (d.getPedido().getId().equals(p.getId())) {
-                    d.setOrdenParada(orden++);
-                    despachoRepository.save(d);
-                    break;
-                }
-            }
-        }
-
-        Ruta guardada = rutaRepository.findById(rutaId).orElse(ruta);
-        if (guardada.getParadas() != null) {
-            guardada.getParadas().sort(Comparator.comparing(Despacho::getOrdenParada));
-        }
-        if (guardada.getChofer() != null) {
-            RutaResponse res = mapearARutaResponse(guardada);
-            messagingTemplate.convertAndSend("/topic/choferes/" + guardada.getChofer().getId() + "/rutas-asignadas", res);
-        }
-        notificarActualizacionTablero();
-        return mapearARutaResponse(guardada);
-    }
-
-    @Override
-    @Transactional
-    public void eliminarRuta(UUID rutaId) {
-        commercialBridge.immutableRoute(rutaId);
-        Ruta ruta = rutaRepository.findById(rutaId)
-                .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
-
-        if (ruta.getEstado() == EstadoRuta.COMPLETADA || ruta.getEstado() == EstadoRuta.CANCELADA) {
-            throw new IllegalStateException("No se puede eliminar una ruta completada o cancelada. El historial de auditoría es inmutable.");
-        }
-
-        if (ruta.getChofer() != null && ruta.getChofer().getEstadoDisponibilidad() == EstadoChofer.EN_RUTA) {
-            ruta.getChofer().setEstadoDisponibilidad(EstadoChofer.DISPONIBLE);
-            choferRepository.save(ruta.getChofer());
-        }
-
-        if (ruta.getParadas() != null) {
-            for (Despacho d : ruta.getParadas()) {
-                if (d.getPedido() != null && d.getEstado() != EstadoDespacho.ENTREGADO) {
-                    d.getPedido().setEstado(EstadoPedido.CANCELADO);
-                    pedidoRepository.save(d.getPedido());
-                }
-            }
-        }
-
-        rutaRepository.delete(ruta);
-        notificarActualizacionTablero();
-    }
-
-    @Override
-    @Transactional
-    public void eliminarChofer(UUID choferId) {
-        commercialBridge.immutableDriver(choferId);
-        choferRepository.findById(choferId).ifPresent(chofer -> {
-            List<Ruta> rutas = rutaRepository.findByChoferIdOrderByFechaCreacionDesc(choferId);
-            for (Ruta r : rutas) {
-                if (r.getEstado() == EstadoRuta.PENDIENTE) {
-                    r.setChofer(null);
-                    if (r.getParadas() != null) {
-                        for (Despacho d : r.getParadas()) {
-                            d.setChofer(null);
-                            despachoRepository.save(d);
-                        }
-                    }
-                    rutaRepository.save(r);
-                }
-            }
-            choferRepository.delete(chofer);
-            log.info("Chofer con ID {} eliminado del modulo logistico.", choferId);
-        });
-        notificarActualizacionTablero();
-    }
-
-    private void marcarPiezaPreparada(String comentarios) {
-        if (comentarios == null || !comentarios.contains("[META:")) return;
-        try {
-            java.util.regex.Pattern p = java.util.regex.Pattern.compile("PIECE=([a-fA-F0-9\\-]+)");
-            java.util.regex.Matcher m = p.matcher(comentarios);
-            while (m.find()) {
-                UUID pieceId = UUID.fromString(m.group(1));
-                jdbcTemplate.update("UPDATE retazos.piece SET state = 'PREPARADO' WHERE id = ? AND state = 'DISPONIBLE'", pieceId);
-                log.info("Pieza retazo {} reservada/preparada para parada de ruta", pieceId);
-            }
-        } catch (Exception e) {
-            log.warn("No se pudo marcar pieza como preparada: {}", e.getMessage());
-        }
-    }
-
-    private void liberarPiezaPreparada(String comentarios) {
-        if (comentarios == null || !comentarios.contains("[META:")) return;
-        try {
-            java.util.regex.Pattern p = java.util.regex.Pattern.compile("PIECE=([a-fA-F0-9\\-]+)");
-            java.util.regex.Matcher m = p.matcher(comentarios);
-            while (m.find()) {
-                UUID pieceId = UUID.fromString(m.group(1));
-                jdbcTemplate.update("UPDATE retazos.piece SET state = 'DISPONIBLE' WHERE id = ? AND state = 'PREPARADO'", pieceId);
-                log.info("Pieza retazo {} liberada a DISPONIBLE tras eliminación/cancelación de parada", pieceId);
-            }
-        } catch (Exception e) {
-            log.warn("No se pudo liberar pieza preparada: {}", e.getMessage());
-        }
-    }
-
-    private void descontarMaterialDespachoEntregado(Despacho despacho, Chofer chofer) {
-        if (despacho.getComentarios() == null || !despacho.getComentarios().contains("[META:")) return;
-
-        try {
-            String comentarios = despacho.getComentarios();
-            java.util.regex.Pattern metaPattern = java.util.regex.Pattern.compile("\\[META:([^\\]]+)\\]");
-            java.util.regex.Matcher metaMatcher = metaPattern.matcher(comentarios);
-
-            UUID actorId = chofer != null && chofer.getId() != null ? chofer.getId() : UUID.randomUUID();
-            String actorName = chofer != null && chofer.getNombre() != null ? chofer.getNombre().trim() : "Chofer Móvil";
-
-            while (metaMatcher.find()) {
-                String metaContent = metaMatcher.group(1);
-                Map<String, String> metaMap = new HashMap<>();
-                for (String pair : metaContent.split(";")) {
-                    String[] kv = pair.split("=");
-                    if (kv.length == 2) {
-                        metaMap.put(kv[0].trim().toUpperCase(Locale.ROOT), kv[1].trim());
-                    }
-                }
-
-                String productIdStr = metaMap.get("PID");
-                String qtyStr = metaMap.get("QTY");
-                String pieceIdStr = metaMap.get("PIECE");
-
-                // 1. Si era una pieza de retazo/vidrio/aluminio, marcarla ENTREGADO
-                if (pieceIdStr != null && !pieceIdStr.isBlank()) {
-                    try {
-                        UUID pieceId = UUID.fromString(pieceIdStr);
-                        int updated = jdbcTemplate.update(
-                            "UPDATE retazos.piece SET state = 'ENTREGADO' WHERE id = ? AND state IN ('DISPONIBLE', 'PREPARADO', 'TRANSFORMADO')",
-                            pieceId
-                        );
-                        log.info("Despacho {} completado: pieza {} marcada como ENTREGADO (filas: {})", despacho.getId(), pieceId, updated);
-                    } catch (Exception e) {
-                        log.error("Error al actualizar pieza retazo {} a ENTREGADO: {}", pieceIdStr, e.getMessage());
-                    }
-                }
-
-                // 2. Si hay producto y cantidad, registrar SALIDA en inventario
-                if (productIdStr != null && !productIdStr.isBlank() && qtyStr != null && !qtyStr.isBlank()) {
-                    try {
-                        UUID productId = UUID.fromString(productIdStr);
-                        java.math.BigDecimal qty = new java.math.BigDecimal(qtyStr);
-
-                        if (qty.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                                "SELECT stock FROM inventario.product WHERE id = ? FOR UPDATE",
-                                productId
-                            );
-                            if (!rows.isEmpty()) {
-                                java.math.BigDecimal stockBefore = (java.math.BigDecimal) rows.get(0).get("stock");
-                                if (stockBefore == null) stockBefore = java.math.BigDecimal.ZERO;
-                                java.math.BigDecimal stockAfter = stockBefore.subtract(qty);
-                                if (stockAfter.compareTo(java.math.BigDecimal.ZERO) < 0) {
-                                    stockAfter = java.math.BigDecimal.ZERO;
-                                }
-
-                                UUID movementId = UUID.randomUUID();
-                                UUID requestId = UUID.nameUUIDFromBytes(("despacho:" + despacho.getId() + ":" + productId + ":" + (pieceIdStr != null ? pieceIdStr : UUID.randomUUID())).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                                String reason = "Salida por entrega e-PoD parada #" + (despacho.getOrdenParada() != null ? despacho.getOrdenParada() : "1") +
-                                    " despacho " + despacho.getId();
-
-                                jdbcTemplate.update(
-                                    "INSERT INTO inventario.movement(id, request_id, product_id, type, quantity, delta, stock_before, stock_after, reason, reference, actor_id, actor_name) " +
-                                    "VALUES (?, ?, ?, 'SALIDA', ?, ?, ?, ?, ?, ?, ?, ?)",
-                                    movementId, requestId, productId, qty, qty.negate(), stockBefore, stockAfter,
-                                    reason, "e-PoD:" + despacho.getId(), actorId, actorName
-                                );
-
-                                jdbcTemplate.update(
-                                    "UPDATE inventario.product SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                                    stockAfter, productId
-                                );
-
-                                log.info("Despacho {}: Registrado movimiento de salida de inventario para producto {} (Qty: {}, Stock: {} -> {})",
-                                    despacho.getId(), productId, qty, stockBefore, stockAfter);
-                            }
-                        }
-                    } catch (Exception e) {
-                        log.error("Error al registrar movimiento inventario para producto {}: {}", productIdStr, e.getMessage());
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.error("Error al procesar descuento de material de despacho: {}", e.getMessage());
-        }
     }
 }

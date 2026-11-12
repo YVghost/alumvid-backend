@@ -31,6 +31,9 @@ class InventoryService {
     public InventoryRepository.Movement move(UUID id,InventoryApi.MovementInput r,AuthClient.Identity actor) {
         if(!actor.has("ADMINISTRADOR")&&!actor.has("BODEGUERO")) throw new InventoryError(403,"No tienes permisos para registrar movimientos");
         if(r.type()==InventoryRepository.MovementType.AJUSTE) admin(actor);
+        // Las salidas se generan solas al preparar o entregar pedidos; aquí solo
+        // se registran recepciones de compra (INGRESO) y conteos físicos (AJUSTE).
+        if(r.type()==InventoryRepository.MovementType.SALIDA) throw new InventoryError(409,"Las salidas se registran automáticamente al preparar o entregar pedidos");
         var product=products.get(id,true);
         var existing=products.request(id,r.requestId());
         if(existing.isPresent()) {

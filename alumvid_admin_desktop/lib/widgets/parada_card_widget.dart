@@ -111,17 +111,19 @@ class ParadaCardWidget extends StatelessWidget {
                     ),
                     if (parada.isEntregado && onVerEpod != null) ...[
                       const SizedBox(width: 6),
-                      IconButton(
-                        icon: const Icon(Icons.verified, color: AppTheme.statusCompletada, size: 20),
-                        tooltip: 'Ver Expediente e-PoD',
+                      TextButton.icon(
+                        style: TextButton.styleFrom(foregroundColor: AppTheme.statusCompletada, visualDensity: VisualDensity.compact),
+                        icon: const Icon(Icons.verified, size: 18),
+                        label: const Text('Ver evidencia', style: TextStyle(fontSize: 12)),
                         onPressed: onVerEpod,
                       ),
                     ],
                     if (onEliminar != null) ...[
                       const SizedBox(width: 4),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: AppTheme.statusAlerta, size: 20),
-                        tooltip: 'Eliminar Parada',
+                      TextButton.icon(
+                        style: TextButton.styleFrom(foregroundColor: AppTheme.statusAlerta, visualDensity: VisualDensity.compact),
+                        icon: const Icon(Icons.remove_circle_outline, size: 18),
+                        label: const Text('Quitar', style: TextStyle(fontSize: 12)),
                         onPressed: onEliminar,
                       ),
                     ],

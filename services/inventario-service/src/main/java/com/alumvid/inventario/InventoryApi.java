@@ -18,12 +18,8 @@ class InventoryApi {
     record MovementInput(@NotNull UUID requestId,@NotNull InventoryRepository.MovementType type,
         @NotNull @DecimalMin("0") @Digits(integer=15,fraction=4) BigDecimal quantity,
         @NotBlank @Size(max=500) String reason,@Size(max=100) String reference) {}
-    private final InventoryRepository products;private final InventoryService service;private final AuthClient auth;
-    InventoryApi(InventoryRepository products,InventoryService service,AuthClient auth) { this.products=products;this.service=service;this.auth=auth; }
-    @PostMapping("/auth/login") ResponseEntity<String> login(@RequestBody Map<String,Object> body) { return auth.forward("login",null,body); }
-    @GetMapping("/auth/me") AuthClient.Identity me(@AuthenticationPrincipal AuthClient.Identity actor) { return actor; }
-    @PostMapping("/auth/password") ResponseEntity<String> password(@RequestHeader("Authorization") String token,@RequestBody Map<String,Object> body) { return auth.forward("password",token,body); }
-    @PostMapping("/auth/logout") ResponseEntity<String> logout(@RequestHeader("Authorization") String token) { return auth.forward("logout",token,null); }
+    private final InventoryRepository products;private final InventoryService service;
+    InventoryApi(InventoryRepository products,InventoryService service) { this.products=products;this.service=service; }
     private void page(int page,int size) { if(page<0 || size<1 || size>100) throw new InventoryError(400,"Página >=0 y tamaño entre 1 y 100"); }
     @GetMapping("/products") InventoryRepository.Page<InventoryRepository.Product> list(
         @RequestParam(defaultValue="") String q,@RequestParam(defaultValue="") String category,

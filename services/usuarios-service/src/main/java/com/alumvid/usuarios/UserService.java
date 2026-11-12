@@ -16,10 +16,12 @@ public class UserService {
     private final Users users;
     private final PasswordEncoder passwords;
     private final JwtService jwtService;
+    private final AuditLog auditLog;
     private final SecureRandom random = new SecureRandom();
     private final String dummy;
 
-    public UserService(Users users, PasswordEncoder passwords, JwtService jwtService) {
+    public UserService(Users users, PasswordEncoder passwords, JwtService jwtService, AuditLog auditLog) {
+        this.auditLog = auditLog;
         this.users = users;
         this.passwords = passwords;
         this.jwtService = jwtService;
@@ -64,6 +66,13 @@ public class UserService {
         boolean matches = passwords.matches(password, candidate.map(Users.User::passwordHash).orElse(dummy));
 
         if (candidate.isEmpty() || !matches || !candidate.get().active()) {
+            // Sin referencias a app_user: login() mantiene bloqueada la fila maestra y
+            // la transacción independiente quedaría esperando al validar la FK.
+            String motivo = candidate.isEmpty() ? "usuario inexistente"
+                : !candidate.get().active() ? "cuenta desactivada" : "contraseña incorrecta";
+            String intento = loginInput.trim();
+            auditLog.independent(null, null, "LOGIN_FAILED",
+                "Intento con '" + (intento.length() > 60 ? intento.substring(0, 60) : intento) + "': " + motivo);
             throw new ApiError(401, "Identificación o contraseña incorrectas");
         }
 
@@ -208,10 +217,15 @@ public class UserService {
             }
         }
 
-        boolean removal = !request.roles().containsAll(target.roles()) || (target.active() && !request.active());
+        // Un ADMINISTRADOR gestiona por completo a quienes no son administradores
+        // (datos, roles, activar y desactivar). Otorgar o quitar el rol
+        // ADMINISTRADOR, o modificar a otro administrador, queda para la cuenta maestra.
         boolean adminChange = request.roles().contains(Users.Role.ADMINISTRADOR) != target.admin();
-        if (removal || adminChange || target.admin()) {
+        if (adminChange || (target.admin() && !actor.id().equals(target.id()))) {
             requireMaster(actor);
+        }
+        if (actor.id().equals(target.id()) && (!request.active() || !request.roles().contains(Users.Role.ADMINISTRADOR))) {
+            throw new ApiError(409, "No puedes desactivarte ni quitarte el rol de administrador");
         }
 
         String email = request.email() != null && !request.email().isBlank()
@@ -247,7 +261,9 @@ public class UserService {
         lock();
         actor = actor(actor);
         var target = users.byId(id);
-        requireMaster(actor);
+        if (target.admin()) {
+            requireMaster(actor);
+        }
 
         if (!target.active()) {
             throw new ApiError(409, "Reactiva la cuenta antes de restablecer la contraseña");
@@ -279,7 +295,9 @@ public class UserService {
         if (actor.id().equals(id)) {
             throw new ApiError(400, "No puedes eliminar tu propia cuenta en sesión");
         }
-        requireMaster(actor);
+        if (target.admin()) {
+            requireMaster(actor);
+        }
 
         users.db().update("UPDATE usuarios.app_user SET active = FALSE WHERE id = ?", id);
         users.revoke(id);

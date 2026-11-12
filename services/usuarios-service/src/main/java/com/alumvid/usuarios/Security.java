@@ -62,16 +62,9 @@ public class Security {
             }))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
-                    "/",
-                    "/index.html",
-                    "/style.css",
-                    "/app.js",
-                    "/favicon.ico",
-                    "/actuator/**",
+                    "/actuator/health",
                     "/api/auth/login",
-                    "/api/v1/auth/login",
-                    "/api/auth/register",
-                    "/api/v1/auth/register"
+                    "/api/v1/auth/login"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

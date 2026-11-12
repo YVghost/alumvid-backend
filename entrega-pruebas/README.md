@@ -2,7 +2,7 @@
 
 ```
 entrega-pruebas/
-├── android/AlumVid.apk               App móvil (todos los roles)         ← local, no se sube a Git
+├── android/AlumVid.apk               App Android (todos los roles)       ← local, no se sube a Git
 ├── AlumVidAdmin-Windows.zip          Administrador de Windows comprimido   ← local, no se sube a Git
 ├── windows/AlumVidAdmin/             Administrador de Windows (copiar la carpeta completa)
 │   └── alumvid_admin_desktop.exe
@@ -40,20 +40,36 @@ Se conecta a `http://localhost:8080`.
 
 > Las redes de invitados, universidades o algunos hotspots aíslan a los dispositivos entre sí; ahí ni la búsqueda ni la IP manual funcionan. Usa un hotspot del propio teléfono o una red doméstica.
 
-### Qué ve cada rol en la app móvil
-
-La app muestra la misma información que el administrador de escritorio, limitada por rol (las mismas reglas que aplica el backend):
+### Qué ve cada rol (Windows y Android usan los mismos módulos)
 
 | Rol | Módulos |
 |---|---|
-| ADMINISTRADOR | Inicio, Monitoreo GPS, Rutas, Pedidos, Inventario (+ alta/edición y ajustes), Retazos, Bodega, Usuarios |
-| Cuenta maestra | Además: auditoría de seguridad, restablecer claves y desactivar usuarios |
-| VENDEDOR | Inicio, Pedidos, Inventario (consulta), Retazos, Bodega |
-| BODEGUERO | Igual que vendedor + registrar ingresos y salidas de stock |
-| CHOFER | Entra directo a "Mis rutas" (navegación, entrega con foto y firma) |
-| Varios roles | Suma los módulos de cada rol; los que no caben van en "Más" |
+| ADMINISTRADOR | Monitoreo GPS, Rutas, Pedidos, Inventario, Piezas, Bodega, Usuarios (+ auditoría) |
+| Cuenta maestra | Además gestiona a otros administradores y otorga ese rol |
+| VENDEDOR | Pedidos y clientes; consulta Inventario, Piezas y Bodega |
+| BODEGUERO | Preparar y entregar pedidos, recepciones de compra, traslados en bodega, descartar piezas |
+| CHOFER | Entra directo a "Mis rutas": ve qué lleva en cada parada, entrega con foto y firma |
 
-La sesión queda guardada: al reabrir la app entra directo si el token sigue vigente.
+Todos pueden **cambiar su contraseña** desde el perfil (móvil) o el menú de usuario (Windows).
+Ya no hay paneles web: todo se hace desde las apps.
+
+### Recorrido sugerido (valida el feedback)
+
+1. **Pedido → ruta automática.** Con `DEMO-…-VENTAS` crea un pedido *A domicilio* (marca la ubicación buscando la
+   dirección). Aparece en **Rutas → Por asignar** como "En preparación".
+2. **Preparar (movimiento automático).** Con `DEMO-…-BODEGA` abre el pedido y pulsa **Preparar**: el stock baja solo
+   (Inventario → Movimientos muestra la salida con el motivo del pedido).
+3. **Crear ruta (separado de agregar).** Con el administrador, en *Por asignar* marca los pedidos listos (#16, #28, #29)
+   y pulsa **Crear ruta**. Solo puedes elegir choferes **disponibles**: CHOFER2 aparece "En ruta" y no se puede elegir.
+4. **Modificar carga / quitar / ver ubicación.** En el detalle de la ruta, cada parada tiene esos botones.
+5. **Reglas de chofer.** Intenta cambiar el chofer de la ruta en curso de CHOFER2: no se permite.
+6. **Entrega.** Inicia sesión en el teléfono con el chofer de la ruta, inicia la parada y entrégala con foto y firma.
+   La ruta se cierra sola al terminar y el pedido queda **Entregado**.
+7. **Inventario + piezas.** Abre *DEMO Perfil aluminio 6.40 m*: unidades completas, retazos por medida y ubicación,
+   y la ficha de cada pieza (medidas, ubicación, de qué pieza salió, pedido que la reserva).
+8. **Bodega.** Busca "aluminio" (muestra dónde está). En *Espacios* abre A3, marca varias cosas y **traslada en masa**.
+9. **Usuarios.** Con `DEMO-…-ADMIN` (no maestro) edita, desactiva y restablece la clave de un vendedor; revisa la
+   **Auditoría de seguridad** (incluye intentos de acceso fallidos).
 
 ## 4. Usuarios de prueba
 
@@ -96,6 +112,9 @@ Todo lleva el prefijo `DEMO-729717` y no reemplaza datos existentes.
 | 22 | Corte cancelado, devuelto al inventario | CANCELADO |
 | 23 | Reserva vencida | VENCIDO |
 | 24 | Entregado por logística (con evidencia) | ENTREGADO |
+| 28 | Listo para ruta (zona norte) | LISTO |
+| 29 | Listo para ruta (zona sur, vidrio cortado) | LISTO |
+| 30 | En preparación: bodega debe prepararlo | RESERVADO |
 
 ## Recompilar
 

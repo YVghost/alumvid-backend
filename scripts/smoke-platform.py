@@ -30,10 +30,14 @@ def run():
     token = None
     checks = []
     try:
-        for path in ['/', '/platform-info', '/retazos/', '/pedidos/', '/ubicaciones/', '/css/styles.css', '/js/app.js', '/maps-loader.js']:
+        # Solo API: los paneles web se eliminaron (todo se gestiona desde las apps).
+        status, _ = request('/platform-info')
+        assert status == 200, f'/platform-info: HTTP {status}'
+        checks.append('/platform-info')
+        for path in ['/', '/pedidos/', '/retazos/', '/ubicaciones/']:
             status, _ = request(path)
-            assert status == 200, f'{path}: HTTP {status}'
-            checks.append(path)
+            assert status == 404, f'{path}: el panel web debería estar eliminado (HTTP {status})'
+            checks.append(path + ' (sin panel web)')
         status, _ = request('/api/v1/admin/users')
         assert status == 401, f'Sin sesion se esperaba 401, recibido {status}'
         status, body = request('/api/v1/auth/login', 'POST', {

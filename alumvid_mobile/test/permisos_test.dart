@@ -95,7 +95,7 @@ void main() {
           .widgetList(find.byType(NavigationDestination))
           .map(etiqueta)
           .toList();
-      expect(labels, ['Inicio', 'Pedidos', 'Inventario', 'Retazos', 'Bodega']);
+      expect(labels, ['Inicio', 'Pedidos', 'Inventario', 'Piezas', 'Bodega']);
     });
 
     testWidgets('ADMINISTRADOR: módulos extra agrupados en "Más"', (t) async {

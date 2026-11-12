@@ -19,26 +19,26 @@ import org.springframework.http.HttpMethod;
 class PedidosSecurity {
     @Bean SecurityFilterChain pedidosChain(HttpSecurity http,AuthClient auth) throws Exception {
         var filter=new OncePerRequestFilter() {
-            protected boolean shouldNotFilter(HttpServletRequest r) {return !r.getRequestURI().startsWith("/api/")||r.getRequestURI().equals("/api/pedidos/auth/login");}
+            protected boolean shouldNotFilter(HttpServletRequest r) {return !r.getRequestURI().startsWith("/api/");}
             protected void doFilterInternal(HttpServletRequest q,HttpServletResponse r,FilterChain chain) throws IOException,ServletException {
                 String token=q.getHeader("Authorization");
                 if(token==null||!token.startsWith("Bearer ")) {fail(r,401,"Debes iniciar sesion");return;}
                 try {
                     var actor=auth.identity(token);
-                    if(actor.mustChangePassword()&&!Set.of("/api/pedidos/auth/me","/api/pedidos/auth/password","/api/pedidos/auth/logout").contains(q.getRequestURI())) {fail(r,403,"Debes cambiar la clave temporal");return;}
+                    if(actor.mustChangePassword()) {fail(r,403,"Debes cambiar la clave temporal");return;}
                     SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(actor,null,actor.roles().stream().map(role->new SimpleGrantedAuthority("ROLE_"+role)).toList()));
                 } catch(PedidosError e) {fail(r,e.status,e.getMessage());return;}
                 chain.doFilter(q,r);
             }
         };
         return http.csrf(c->c.disable()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(a->a.requestMatchers("/","/index.html","/app.js","/style.css","/api/pedidos/auth/login","/actuator/health").permitAll()
-                .requestMatchers("/api/pedidos/auth/**").authenticated()
+            .authorizeHttpRequests(a->a.requestMatchers("/actuator/health").permitAll()
                 .requestMatchers(HttpMethod.GET,"/api/**").hasAnyRole("ADMINISTRADOR","VENDEDOR","BODEGUERO")
                 .requestMatchers("/api/pedidos/availability").hasAnyRole("ADMINISTRADOR","VENDEDOR","BODEGUERO")
                 .requestMatchers("/api/pedidos/clients","/api/pedidos/clients/*").hasAnyRole("ADMINISTRADOR","VENDEDOR")
                 .requestMatchers("/api/pedidos/orders","/api/pedidos/orders/*/confirm","/api/pedidos/orders/*/retry","/api/pedidos/orders/*/cancel").hasAnyRole("ADMINISTRADOR","VENDEDOR")
-                .requestMatchers("/api/pedidos/orders/*/shipments","/api/pedidos/shipments/*/receive-return").hasAnyRole("ADMINISTRADOR","BODEGUERO")
+                .requestMatchers("/api/pedidos/orders/*/shipments","/api/pedidos/shipments/*/receive-return","/api/pedidos/shipments/*/release").hasAnyRole("ADMINISTRADOR","BODEGUERO")
+                .requestMatchers(HttpMethod.PUT,"/api/pedidos/shipments/driver").hasRole("ADMINISTRADOR")
                 .requestMatchers("/api/pedidos/orders/*/prepare","/api/pedidos/orders/*/dispatch","/api/pedidos/orders/*/deliver","/api/pedidos/orders/*/receive-return").hasAnyRole("ADMINISTRADOR","BODEGUERO")
                 .requestMatchers("/api/pedidos/orders/*/delay","/api/pedidos/orders/*/resume").hasAnyRole("ADMINISTRADOR","VENDEDOR","BODEGUERO")
                 .anyRequest().denyAll())

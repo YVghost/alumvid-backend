@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/ui.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
 import '../utils/app_toast.dart';
@@ -447,6 +448,46 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                                   ),
                                 ],
                               ),
+                              // Carga del pedido: lo que el chofer debe entregar en esta parada.
+                              if ((d['carga'] as List?)?.isNotEmpty == true) ...[
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0F172A),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFF334155)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        d['numeroPedido'] != null ? 'Entregar · pedido #${d['numeroPedido']}' : 'Entregar',
+                                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w700),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      for (final c in (d['carga'] as List))
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 2),
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.inventory_2_outlined, size: 14, color: Color(0xFF60A5FA)),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Text(
+                                                  '${c['product_name']} ${medidas(c['length_m'], c['width_cm'], c['height_cm'])}',
+                                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                                ),
+                                              ),
+                                              Text('× ${fmtNum(aNum(c['quantity']))}',
+                                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                               const SizedBox(height: 12),
 
                               // Boton de accion segun estado

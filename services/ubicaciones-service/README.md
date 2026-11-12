@@ -1,5 +1,8 @@
 # Ubicaciones físicas
 
+> **Sin portal web.** La interfaz de este servicio está en las apps (Windows y Android). Responsabilidad y datos: ver `ARQUITECTURA_SERVICIOS.md` en la raíz.
+
+
 Servicio Spring Boot independiente, Java 21, puerto 8086 y esquema `ubicaciones`. Portal administrativo: **http://localhost:8080/ubicaciones/**. API `/api/ubicaciones`.
 
 ## Funciones

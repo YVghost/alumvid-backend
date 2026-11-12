@@ -1,166 +1,179 @@
 package com.alumvid.logistica;
 
-import com.alumvid.logistica.dto.*;
+import com.alumvid.logistica.dto.CerrarEntregaRequest;
+import com.alumvid.logistica.dto.CrearRutaSimpleRequest;
 import com.alumvid.logistica.model.*;
-import com.alumvid.logistica.service.LogisticaService;
+import com.alumvid.logistica.repository.ChoferRepository;
+import com.alumvid.logistica.repository.DespachoRepository;
+import com.alumvid.logistica.repository.PedidoRepository;
+import com.alumvid.logistica.repository.RutaRepository;
+import com.alumvid.logistica.security.AuthClient;
+import com.alumvid.logistica.service.*;
+import com.alumvid.logistica.util.GeometryUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.util.UUID;
+import java.time.LocalDateTime;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
-@SpringBootTest
-@Transactional
+/** Reglas de planificación y operación de rutas (sin base de datos). */
 class LogisticaServiceTests {
 
-    @Autowired
-    private LogisticaService logisticaService;
+    private final ChoferRepository choferes = mock(ChoferRepository.class);
+    private final PedidoRepository destinos = mock(PedidoRepository.class);
+    private final DespachoRepository despachos = mock(DespachoRepository.class);
+    private final RutaRepository rutas = mock(RutaRepository.class);
+    private final CommercialOrderBridge bridge = mock(CommercialOrderBridge.class);
+    private final PedidosClient pedidos = mock(PedidosClient.class);
+    private final AuthClient auth = mock(AuthClient.class);
+    private LogisticaServiceImpl service;
+
+    private final Chofer chofer = Chofer.builder().id(UUID.randomUUID()).nombre("Chofer Uno").email("c1@test").estadoDisponibilidad(EstadoChofer.DISPONIBLE).build();
+
+    @BeforeEach
+    void setUp() {
+        service = new LogisticaServiceImpl(choferes, destinos, despachos, rutas, mock(SimpMessagingTemplate.class),
+                mock(GoogleRoutesService.class), mock(JdbcTemplate.class), bridge, pedidos, auth, new ObjectMapper());
+        var admin = new AuthClient.Identity(UUID.randomUUID(), "ADMIN", "Admin", Set.of("ADMINISTRADOR"), false, true, false);
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(admin, "Bearer test", List.of()));
+        when(choferes.findById(chofer.getId())).thenReturn(Optional.of(chofer));
+        when(choferes.findAll()).thenReturn(List.of(chofer));
+        when(rutas.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(despachos.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(rutas.existsByCodigoRuta(any())).thenReturn(false);
+    }
+
+    @AfterEach
+    void limpiar() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private void choferActivo() {
+        when(auth.activeDrivers(any())).thenReturn(List.of(Map.of("id", chofer.getId().toString(), "fullName", chofer.getNombre(), "email", "c1@test", "active", true, "mustChangePassword", false)));
+    }
+
+    private Ruta ruta(EstadoRuta estado) {
+        var r = Ruta.builder().id(UUID.randomUUID()).codigoRuta("R-1").chofer(chofer).estado(estado)
+                .fechaCreacion(LocalDateTime.now()).paradas(new ArrayList<>()).build();
+        when(rutas.findById(r.getId())).thenReturn(Optional.of(r));
+        return r;
+    }
+
+    private Despacho parada(Ruta r, int orden, EstadoDespacho estado) {
+        var destino = Pedido.builder().id(UUID.randomUUID()).cliente("Cliente").direccionTexto("Quito")
+                .coordenadaDestino(GeometryUtil.crearPunto(-0.18, -78.46)).estado(EstadoPedido.PENDIENTE).build();
+        var d = Despacho.builder().id(UUID.randomUUID()).ruta(r).ordenParada(orden).pedido(destino).chofer(chofer)
+                .fechaAsignacion(LocalDateTime.now()).estado(estado).build();
+        r.getParadas().add(d);
+        when(despachos.findById(d.getId())).thenReturn(Optional.of(d));
+        return d;
+    }
+
+    private static int status(Executable e) {
+        return assertThrows(ResponseStatusException.class, e::run).getStatusCode().value();
+    }
+
+    @FunctionalInterface
+    interface Executable { void run(); }
 
     @Test
-    @DisplayName("HU-04: Asignacion de ruta, consentimiento del chofer y cierre exitoso e-PoD")
-    void testFlujoCompletoConConsentimiento() {
-        ChoferResponse chofer = logisticaService.sincronizarOCrearChofer(SincronizarChoferRequest.builder()
-                .id(UUID.randomUUID())
-                .nombre("Chofer Test 1")
-                .email("chofer1.test@alumvid.com")
-                .telefono("+593988888888")
-                .build());
-
-        PedidoResponse pedido = logisticaService.crearPedido(CrearPedidoRequest.builder()
-                .cliente("Vidrieria Modelo")
-                .direccionTexto("Av. Amazonas y Orellana, Quito")
-                .latitud(-0.1807)
-                .longitud(-78.4678)
-                .build());
-
-        // 1. Asignar ruta (queda en estado PENDIENTE de aprobacion del chofer)
-        DespachoResponse despacho = logisticaService.asignarDespacho(AsignarDespachoRequest.builder()
-                .pedidoId(pedido.getId())
-                .choferId(chofer.getId())
-                .build());
-
-        assertEquals(EstadoDespacho.PENDIENTE, despacho.getEstado());
-
-        // 2. Chofer otorga consentimiento expreso para iniciar el viaje
-        despacho = logisticaService.aceptarEIniciarRuta(despacho.getId());
-        assertEquals(EstadoDespacho.EN_CURSO, despacho.getEstado());
-
-        // 3. Chofer cierra entrega con foto, firma y GPS en sitio
-        CerrarEntregaRequest cierre = CerrarEntregaRequest.builder()
-                .fotoPodUrl("https://storage.alumvid.com/pod/evidencia.jpg")
-                .firmaUrl("data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==")
-                .latitud(-0.1807)
-                .longitud(-78.4678)
-                .comentarios("Entregado conforme.")
-                .build();
-
-        DespachoResponse cerrado = logisticaService.cerrarEntrega(despacho.getId(), cierre);
-        assertEquals(EstadoDespacho.ENTREGADO, cerrado.getEstado());
-        assertFalse(cerrado.getAlertaDesviacion());
-        assertTrue(cerrado.getDesviacionMetros() < 10.0);
+    @DisplayName("No se cambia el chofer de una ruta en curso")
+    void choferNoCambiaEnCurso() {
+        var r = ruta(EstadoRuta.EN_CURSO);
+        assertEquals(409, status(() -> service.asignarChoferRuta(r.getId(), chofer.getId())));
     }
 
     @Test
-    @DisplayName("Cancelacion voluntaria de ruta por parte del chofer con corte de streaming")
-    void testCancelacionRutaPorChofer() {
-        ChoferResponse chofer = logisticaService.sincronizarOCrearChofer(SincronizarChoferRequest.builder()
-                .id(UUID.randomUUID())
-                .nombre("Chofer Cancelacion")
-                .email("cancel.chofer@alumvid.com")
-                .build());
-
-        PedidoResponse pedido = logisticaService.crearPedido(CrearPedidoRequest.builder()
-                .cliente("Cliente Cancelado")
-                .direccionTexto("Av. 6 de Diciembre")
-                .latitud(-0.1900)
-                .longitud(-78.4700)
-                .build());
-
-        DespachoResponse despacho = logisticaService.asignarDespacho(AsignarDespachoRequest.builder()
-                .pedidoId(pedido.getId())
-                .choferId(chofer.getId())
-                .build());
-
-        despacho = logisticaService.aceptarEIniciarRuta(despacho.getId());
-        assertEquals(EstadoDespacho.EN_CURSO, despacho.getEstado());
-
-        // Chofer cancela la ruta
-        DespachoResponse cancelado = logisticaService.cancelarRuta(despacho.getId(), "Falla mecanica en el vehiculo.");
-        assertEquals(EstadoDespacho.CANCELADA, cancelado.getEstado());
-        assertEquals(EstadoPedido.CANCELADO, cancelado.getPedido().getEstado());
-        assertEquals(EstadoChofer.DISPONIBLE, cancelado.getChofer().getEstadoDisponibilidad());
+    @DisplayName("Un chofer en ruta no recibe una ruta nueva")
+    void choferEnRutaNoSeAsigna() {
+        choferActivo();
+        var otra = Ruta.builder().id(UUID.randomUUID()).estado(EstadoRuta.EN_CURSO).paradas(new ArrayList<>()).build();
+        parada(otra, 1, EstadoDespacho.PENDIENTE);
+        when(rutas.findByChoferIdAndEstadoIn(eq(chofer.getId()), anyList())).thenReturn(List.of(otra));
+        var e = assertThrows(ResponseStatusException.class, () -> service.crearRuta(new CrearRutaSimpleRequest("R-2", chofer.getId(), null, null)));
+        assertEquals(HttpStatus.CONFLICT, e.getStatusCode());
+        assertTrue(e.getReason().contains("está en ruta"));
     }
 
     @Test
-    @DisplayName("CP-LOG-02: Deteccion de desvio geografico > 500m con alerta de auditoria PostGIS")
-    void testAlertaDesviacionGeografica() {
-        ChoferResponse chofer = logisticaService.sincronizarOCrearChofer(SincronizarChoferRequest.builder()
-                .id(UUID.randomUUID())
-                .nombre("Chofer Desvio")
-                .email("desvio@alumvid.com")
-                .build());
-
-        PedidoResponse pedido = logisticaService.crearPedido(CrearPedidoRequest.builder()
-                .cliente("Destino Quito Norte")
-                .direccionTexto("Av. Amazonas y Orellana")
-                .latitud(-0.1807)
-                .longitud(-78.4678)
-                .build());
-
-        DespachoResponse despacho = logisticaService.asignarDespacho(AsignarDespachoRequest.builder()
-                .pedidoId(pedido.getId())
-                .choferId(chofer.getId())
-                .build());
-
-        logisticaService.aceptarEIniciarRuta(despacho.getId());
-
-        // Entrega en Cumbaya (-0.2035, -78.4350) a mas de 4000m
-        CerrarEntregaRequest cierreDesvio = CerrarEntregaRequest.builder()
-                .fotoPodUrl("https://storage.alumvid.com/pod/foto.jpg")
-                .firmaUrl("data:image/png;base64,firma")
-                .latitud(-0.2035)
-                .longitud(-78.4350)
-                .build();
-
-        DespachoResponse cerrado = logisticaService.cerrarEntrega(despacho.getId(), cierreDesvio);
-        assertTrue(cerrado.getAlertaDesviacion(), "Debe activar alerta de desvio al superar 500m");
-        assertTrue(cerrado.getDesviacionMetros() > 500.0);
+    @DisplayName("Un chofer inactivo (o con clave temporal) no se asigna")
+    void choferInactivoNoSeAsigna() {
+        when(auth.activeDrivers(any())).thenReturn(List.of());
+        var e = assertThrows(ResponseStatusException.class, () -> service.crearRuta(new CrearRutaSimpleRequest("R-3", chofer.getId(), null, null)));
+        assertTrue(e.getReason().contains("inactivo"));
     }
 
     @Test
-    @DisplayName("CP-LOG-01: Rechazo si falta foto, firma o telemetria GPS")
-    void testRechazoSinEvidencias() {
-        ChoferResponse chofer = logisticaService.sincronizarOCrearChofer(SincronizarChoferRequest.builder()
-                .id(UUID.randomUUID())
-                .nombre("Chofer Sin Evidencia")
-                .email("sinevidencia@alumvid.com")
-                .build());
+    @DisplayName("Un chofer disponible recibe la ruta nueva")
+    void choferDisponibleSeAsigna() {
+        choferActivo();
+        var creada = service.crearRuta(new CrearRutaSimpleRequest("R-4", chofer.getId(), "Norte", null));
+        assertEquals(EstadoRuta.PENDIENTE, creada.getEstado());
+        assertEquals(chofer.getId(), creada.getChoferId());
+    }
 
-        PedidoResponse pedido = logisticaService.crearPedido(CrearPedidoRequest.builder()
-                .cliente("Cliente Test")
-                .direccionTexto("Direccion Test")
-                .latitud(-0.1800)
-                .longitud(-78.4600)
-                .build());
+    @Test
+    @DisplayName("Quitar una parada de una ruta pendiente devuelve el material a bodega")
+    void quitarParadaAnulaEnvio() {
+        var r = ruta(EstadoRuta.PENDIENTE);
+        var d = parada(r, 1, EstadoDespacho.PENDIENTE);
+        d.setEnvioComercialId(UUID.randomUUID());
+        service.eliminarDestinoRuta(r.getId(), d.getId());
+        verify(pedidos).anular(eq(d.getEnvioComercialId()), anyString());
+        assertTrue(r.getParadas().isEmpty());
+    }
 
-        DespachoResponse despacho = logisticaService.asignarDespacho(AsignarDespachoRequest.builder()
-                .pedidoId(pedido.getId())
-                .choferId(chofer.getId())
-                .build());
+    @Test
+    @DisplayName("No se agregan pedidos a una ruta en curso")
+    void noAgregarEnCurso() {
+        var r = ruta(EstadoRuta.EN_CURSO);
+        assertEquals(409, status(() -> service.agregarPedidos(r.getId(), new com.alumvid.logistica.dto.AgregarPedidosRequest(List.of()))));
+    }
 
-        logisticaService.aceptarEIniciarRuta(despacho.getId());
+    @Test
+    @DisplayName("La entrega exige foto, firma y GPS")
+    void entregaExigeEvidencia() {
+        var r = ruta(EstadoRuta.EN_CURSO);
+        var d = parada(r, 1, EstadoDespacho.EN_CURSO);
+        var sinFoto = CerrarEntregaRequest.builder().firmaUrl("data:x").latitud(-0.18).longitud(-78.46).build();
+        assertEquals(400, status(() -> service.cerrarEntrega(d.getId(), sinFoto)));
+        verify(bridge, never()).delivered(any());
+    }
 
-        assertThrows(IllegalArgumentException.class, () ->
-                logisticaService.cerrarEntrega(despacho.getId(), CerrarEntregaRequest.builder()
-                        .fotoPodUrl("")
-                        .firmaUrl("firma_ok")
-                        .latitud(-0.1800)
-                        .longitud(-78.4600)
-                        .build())
-        );
+    @Test
+    @DisplayName("La ruta se cierra sola al terminar sus paradas y lo no entregado vuelve a bodega")
+    void cierreAutomatico() {
+        var r = ruta(EstadoRuta.EN_CURSO);
+        var entregada = parada(r, 1, EstadoDespacho.ENTREGADO);
+        var ultima = parada(r, 2, EstadoDespacho.EN_CURSO);
+        service.cancelarRuta(ultima.getId(), "Cliente ausente");
+        assertEquals(EstadoDespacho.CANCELADA, ultima.getEstado());
+        assertEquals(EstadoRuta.COMPLETADA, r.getEstado());
+        verify(bridge).cancelled(eq(ultima.getId()), anyString());
+        verify(bridge, never()).cancelled(eq(entregada.getId()), anyString());
+    }
+
+    @Test
+    @DisplayName("Una parada no entregada puede reintentarse mientras la ruta sigue en curso")
+    void reintentoMientrasEnCurso() {
+        var r = ruta(EstadoRuta.EN_CURSO);
+        parada(r, 1, EstadoDespacho.PENDIENTE);
+        var fallida = parada(r, 2, EstadoDespacho.CANCELADA);
+        when(bridge.estados(any())).thenReturn(Map.of(fallida.getId(), "EN_REPARTO"));
+        service.reintentarParada(fallida.getId());
+        assertEquals(EstadoDespacho.PENDIENTE, fallida.getEstado());
     }
 }

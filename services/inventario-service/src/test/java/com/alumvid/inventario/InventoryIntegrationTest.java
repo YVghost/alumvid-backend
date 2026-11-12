@@ -65,10 +65,10 @@ class InventoryIntegrationTest {
     @Test void preservesDecimalStockAndLedger() {
         var p=product();
         service.move(p.id(),move(InventoryRepository.MovementType.INGRESO,"62.83"),warehouse);
-        var out=service.move(p.id(),move(InventoryRepository.MovementType.SALIDA,"0.33"),warehouse);
+        var out=service.move(p.id(),move(InventoryRepository.MovementType.AJUSTE,"62.50"),admin);
         assertEquals(0,new BigDecimal("62.50").compareTo(products.get(p.id(),false).stock()));
         assertEquals(0,new BigDecimal("62.83").compareTo(out.stockBefore()));
-        assertEquals(warehouse.id(),out.actorId());assertEquals("Motivo de prueba",out.reason());
+        assertEquals(admin.id(),out.actorId());assertEquals("Motivo de prueba",out.reason());
         assertEquals(2,products.movements(p.id(),0,20).total());
     }
     @Test void duplicateRequestsDoNotDoubleStockAndChangedPayloadIsRejected() {
@@ -78,9 +78,10 @@ class InventoryIntegrationTest {
         var changed=new InventoryApi.MovementInput(request.requestId(),request.type(),new BigDecimal("11"),request.reason(),request.reference());
         assertEquals(409,assertThrows(InventoryError.class,()->service.move(p.id(),changed,admin)).status);
     }
-    @Test void insufficientStockDoesNotCreateMovement() {
+    @Test void manualOutflowsAreRejectedBecauseOrdersMoveStock() {
         var p=product();service.move(p.id(),move(InventoryRepository.MovementType.INGRESO,"3"),admin);
-        assertEquals(409,assertThrows(InventoryError.class,()->service.move(p.id(),move(InventoryRepository.MovementType.SALIDA,"4"),warehouse)).status);
+        assertEquals(409,assertThrows(InventoryError.class,()->service.move(p.id(),move(InventoryRepository.MovementType.SALIDA,"1"),warehouse)).status);
+        assertEquals(409,assertThrows(InventoryError.class,()->service.move(p.id(),move(InventoryRepository.MovementType.SALIDA,"1"),admin)).status);
         assertEquals(0,new BigDecimal("3").compareTo(products.get(p.id(),false).stock()));
         assertEquals(1,products.movements(p.id(),0,20).total());
     }
@@ -111,15 +112,15 @@ class InventoryIntegrationTest {
         assertEquals(503,assertThrows(InventoryError.class,()->realClient.identity("Bearer test")).status);
     }
     @Test @Transactional(propagation=Propagation.NOT_SUPPORTED)
-    void simultaneousWithdrawalsCannotOversell() throws Exception {
+    void simultaneousReceiptsDoNotLoseUpdates() throws Exception {
         var p=product();var executor=Executors.newFixedThreadPool(2);var start=new CountDownLatch(1);
         try {
             service.move(p.id(),move(InventoryRepository.MovementType.INGRESO,"10"),admin);
-            Callable<Boolean> withdrawal=()->{start.await();try{service.move(p.id(),move(InventoryRepository.MovementType.SALIDA,"7"),warehouse);return true;}catch(InventoryError e){assertEquals(409,e.status);return false;}};
-            var a=executor.submit(withdrawal);var b=executor.submit(withdrawal);start.countDown();
-            assertNotEquals(a.get(10,TimeUnit.SECONDS),b.get(10,TimeUnit.SECONDS));
-            assertEquals(0,new BigDecimal("3").compareTo(products.get(p.id(),false).stock()));
-            assertEquals(2,products.movements(p.id(),0,20).total());
+            Callable<Boolean> receipt=()->{start.await();service.move(p.id(),move(InventoryRepository.MovementType.INGRESO,"7"),warehouse);return true;};
+            var a=executor.submit(receipt);var b=executor.submit(receipt);start.countDown();
+            assertTrue(a.get(10,TimeUnit.SECONDS));assertTrue(b.get(10,TimeUnit.SECONDS));
+            assertEquals(0,new BigDecimal("24").compareTo(products.get(p.id(),false).stock()));
+            assertEquals(3,products.movements(p.id(),0,20).total());
         } finally {
             executor.shutdownNow();executor.awaitTermination(5,TimeUnit.SECONDS);
             db.update("DELETE FROM inventario.movement WHERE product_id=?",p.id());

@@ -5,14 +5,15 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
 import 'login_screen.dart';
-import 'modulos/bodega_screen.dart';
+import 'package:alumvid_admin_desktop/modulos/bodega/bodega_modulo.dart';
+import 'package:alumvid_admin_desktop/modulos/inventario/inventario_modulo.dart';
+import 'package:alumvid_admin_desktop/modulos/pedidos/pedidos_modulo.dart';
+import 'package:alumvid_admin_desktop/modulos/piezas/piezas_modulo.dart';
+import 'package:alumvid_admin_desktop/modulos/rutas/rutas_modulo.dart';
+import 'package:alumvid_admin_desktop/modulos/usuarios/cambiar_clave.dart';
+import 'package:alumvid_admin_desktop/modulos/usuarios/usuarios_modulo.dart';
 import 'modulos/inicio_screen.dart';
-import 'modulos/inventario_screen.dart';
 import 'modulos/monitoreo_screen.dart';
-import 'modulos/pedidos_screen.dart';
-import 'modulos/retazos_screen.dart';
-import 'modulos/rutas_admin_screen.dart';
-import 'modulos/usuarios_screen.dart';
 import 'rutas_screen.dart';
 
 /// Pantalla de inicio tras el login: muestra solo los módulos que permiten
@@ -68,13 +69,13 @@ class _HomeShellState extends State<HomeShell> {
     return switch (m) {
       Modulo.inicio => InicioScreen(sesion: s, onIrA: _irA, onPerfil: _perfil),
       Modulo.misRutas => RutasScreen(choferData: s.datos),
-      Modulo.monitoreo => const MonitoreoScreen(),
-      Modulo.rutas => const RutasAdminScreen(),
-      Modulo.pedidos => const PedidosScreen(),
-      Modulo.inventario => InventarioScreen(sesion: s),
-      Modulo.retazos => const RetazosScreen(),
-      Modulo.bodega => const BodegaScreen(),
-      Modulo.usuarios => UsuariosScreen(sesion: s),
+      Modulo.monitoreo => MonitoreoScreen(permisos: s.permisos),
+      Modulo.rutas => RutasModulo(permisos: s.permisos),
+      Modulo.pedidos => PedidosModulo(permisos: s.permisos),
+      Modulo.inventario => InventarioModulo(permisos: s.permisos),
+      Modulo.retazos => PiezasModulo(permisos: s.permisos),
+      Modulo.bodega => BodegaModulo(permisos: s.permisos),
+      Modulo.usuarios => UsuariosModulo(permisos: s.permisos),
     };
   }
 
@@ -249,6 +250,19 @@ class _PerfilContenido extends StatelessWidget {
         DatoFila('Correo', u.email, icono: Icons.mail_outline),
         DatoFila('Servidor', servidor, icono: Icons.dns_outlined),
         const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => cambiarMiClave(context, alTerminar: () async {
+            await Sesion.cerrar();
+            if (!context.mounted) return;
+            Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              (_) => false,
+            );
+          }),
+          icon: const Icon(Icons.key_outlined),
+          label: const Text('Cambiar mi contraseña'),
+        ),
+        const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: onCerrarSesion,
           style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger),

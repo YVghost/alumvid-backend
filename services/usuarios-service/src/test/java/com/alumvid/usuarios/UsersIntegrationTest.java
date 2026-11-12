@@ -60,15 +60,20 @@ class UsersIntegrationTest {
         assertFalse(users.byId(u.id()).mustChangePassword());
     }
 
-    @Test void delegateCanAddOperationalRolesButCannotRemoveOrPromote() throws Exception {
+    @Test void delegateManagesOperationalUsersButCannotPromoteOrTouchAdmins() throws Exception {
         var delegate = employee(Set.of(Users.Role.ADMINISTRADOR));
         String token = permanentToken(delegate);
         var target = employee(Set.of(Users.Role.VENDEDOR));
         mvc.perform(put("/api/admin/users/" + target.id()).header("Authorization", "Bearer " + token).contentType("application/json")
             .content("{\"fullName\":\"Empleado\",\"roles\":[\"VENDEDOR\",\"BODEGUERO\"],\"active\":true}"))
             .andExpect(status().isOk());
+        // Puede quitar roles y desactivar a quienes no son administradores.
         mvc.perform(put("/api/admin/users/" + target.id()).header("Authorization", "Bearer " + token).contentType("application/json")
-            .content("{\"fullName\":\"Empleado\",\"roles\":[\"VENDEDOR\"],\"active\":true}"))
+            .content("{\"fullName\":\"Empleado\",\"roles\":[\"VENDEDOR\"],\"active\":false}"))
+            .andExpect(status().isOk());
+        var otherAdmin = employee(Set.of(Users.Role.ADMINISTRADOR));
+        mvc.perform(put("/api/admin/users/" + otherAdmin.id()).header("Authorization", "Bearer " + token).contentType("application/json")
+            .content("{\"fullName\":\"Otro\",\"roles\":[\"ADMINISTRADOR\"],\"active\":false}"))
             .andExpect(status().isForbidden());
         mvc.perform(put("/api/admin/users/" + target.id()).header("Authorization", "Bearer " + token).contentType("application/json")
             .content("{\"fullName\":\"Empleado\",\"roles\":[\"VENDEDOR\",\"BODEGUERO\",\"ADMINISTRADOR\"],\"active\":true}"))
@@ -124,12 +129,16 @@ class UsersIntegrationTest {
         mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token)).andExpect(status().isUnauthorized());
     }
 
-    @Test void delegateCannotDeactivateThroughDeleteEndpoint() throws Exception {
+    @Test void delegateDeactivatesOperationalUsersButNotAdmins() throws Exception {
         var delegate = employee(Set.of(Users.Role.ADMINISTRADOR));
         String token = permanentToken(delegate);
         var target = employee(Set.of(Users.Role.VENDEDOR));
         mvc.perform(delete("/api/admin/users/" + target.id()).header("Authorization", "Bearer " + token))
+            .andExpect(status().isNoContent());
+        assertFalse(users.byId(target.id()).active());
+        var otherAdmin = employee(Set.of(Users.Role.ADMINISTRADOR));
+        mvc.perform(delete("/api/admin/users/" + otherAdmin.id()).header("Authorization", "Bearer " + token))
             .andExpect(status().isForbidden());
-        assertTrue(users.byId(target.id()).active());
+        assertTrue(users.byId(otherAdmin.id()).active());
     }
 }

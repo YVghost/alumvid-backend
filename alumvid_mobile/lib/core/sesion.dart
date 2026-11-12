@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:alumvid_admin_desktop/models/user.dart';
 import 'package:alumvid_admin_desktop/services/api_service.dart' as adm;
+import 'package:alumvid_admin_desktop/shared/permisos.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -37,7 +38,7 @@ enum Modulo {
     'VENDEDOR',
     'BODEGUERO',
   }),
-  retazos('Retazos', Icons.content_cut_outlined, Icons.content_cut, {
+  retazos('Piezas', Icons.content_cut_outlined, Icons.content_cut, {
     'ADMINISTRADOR',
     'VENDEDOR',
     'BODEGUERO',
@@ -73,6 +74,9 @@ class Sesion {
       Sesion._(usuario, datos ?? {'id': usuario.id, 'nombre': usuario.fullName});
 
   List<String> get roles => usuario.roles;
+
+  /// Reglas de cada módulo (compartidas con el escritorio).
+  Permisos get permisos => Permisos(usuario);
   bool tiene(String rol) => roles.contains(rol);
   bool get esAdmin => tiene('ADMINISTRADOR');
 

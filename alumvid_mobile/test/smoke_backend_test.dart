@@ -9,6 +9,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:alumvid_admin_desktop/services/api_negocio.dart';
 import 'package:alumvid_admin_desktop/services/api_service.dart' as adm;
 import 'package:alumvid_mobile/core/sesion.dart';
 import 'package:alumvid_mobile/services/api_service.dart';
@@ -62,7 +63,21 @@ void main() {
       final c = await adm.ApiService.obtenerContenidoEspacio(e.first.id);
       expect(c, contains('space'));
     }
+    if (s.puede(Modulo.retazos)) {
+      final piezas = await Api.buscarPiezas(tipo: 'ALUMINIO');
+      if (piezas.isNotEmpty) {
+        final ficha = await Api.fichaPieza('${piezas.first['id']}');
+        expect(ficha['piece'], isNotNull);
+      }
+    }
+    if (s.puede(Modulo.bodega)) {
+      final materiales = await Api.materiales();
+      expect(materiales, isNotEmpty);
+      expect(await Api.ubicacionesDe('${materiales.first['id']}'), contains('product'));
+    }
     if (s.puede(Modulo.rutas)) {
+      expect(await Api.entregasPendientes(), isA<List>());
+      expect(await Api.choferes(), isNotEmpty);
       final r = await adm.ApiService.obtenerRutas();
       expect(r, isNotEmpty);
       await adm.ApiService.obtenerRutaPorId(r.first.id);
@@ -71,12 +86,8 @@ void main() {
     }
     if (s.puede(Modulo.usuarios)) {
       expect(await adm.ApiService.obtenerUsuariosAdmin(), isNotEmpty);
-      if (s.usuario.master) {
-        await adm.ApiService.obtenerAuditoriaSeguridad();
-      } else {
-        // La auditoría es exclusiva de la cuenta maestra.
-        await expectLater(adm.ApiService.obtenerAuditoriaSeguridad(), throwsException);
-      }
+      // La auditoría es visible para cualquier administrador.
+      expect(await Api.get('/api/v1/admin/audit'), isA<List>());
     }
     if (s.puede(Modulo.misRutas)) {
       await ApiService.obtenerRutasChofer(s.usuario.id);

@@ -1,5 +1,8 @@
 # Servicio de inventario
 
+> **Sin portal web.** La interfaz de este servicio está en las apps (Windows y Android). Responsabilidad y datos: ver `ARQUITECTURA_SERVICIOS.md` en la raíz.
+
+
 Portal administrativo: **http://localhost:8092**. API para web y futura app: `http://localhost:8092/api`.
 
 ## Alcance

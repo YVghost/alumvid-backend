@@ -205,8 +205,8 @@ class RutaCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       visualDensity: VisualDensity.compact,
                     ),
-                    icon: const Icon(Icons.add_location_alt, size: 14, color: AppTheme.primaryLight),
-                    label: const Text('+ Parada', style: TextStyle(fontSize: 11, color: AppTheme.primaryLight)),
+                    icon: const Icon(Icons.edit_location_alt_outlined, size: 14, color: AppTheme.primaryLight),
+                    label: const Text('Gestionar paradas', style: TextStyle(fontSize: 11, color: AppTheme.primaryLight)),
                     onPressed: onAgregarParada,
                   ),
 
