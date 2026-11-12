@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -954,6 +955,65 @@ class ApiService {
       }
     } catch (_) {}
     return [];
+  }
+
+  static Future<List<PiezaRetazo>> obtenerSugerenciasCorte(String productoId, double extent) async {
+    try {
+      final host = await getBaseHost();
+      final url = Uri.parse('$host/api/retazos/products/$productoId/suggestions?extent=$extent');
+      final headers = await _headers();
+      final res = await http.get(url, headers: headers).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        final List<dynamic> items = jsonDecode(res.body);
+        return items.map((i) => PiezaRetazo.fromJson(i)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<Map<String, dynamic>> cortarPiezaRetazo({
+    required String productoId,
+    required String pieceId,
+    double? usedLengthM,
+    double? usedWidthCm,
+    double? wasteLengthM,
+    double? wasteWidthCm,
+    required String reason,
+  }) async {
+    final host = await getBaseHost();
+    final url = Uri.parse('$host/api/retazos/products/$productoId/pieces/$pieceId/cut');
+    final headers = await _headers();
+    headers['Content-Type'] = 'application/json';
+
+    final random = math.Random();
+    String hex(int len) => List.generate(len, (_) => random.nextInt(16).toRadixString(16)).join();
+    final reqId = '${hex(8)}-${hex(4)}-4${hex(3)}-${(random.nextInt(4) + 8).toRadixString(16)}${hex(3)}-${hex(12)}';
+
+    final Map<String, dynamic> body = {
+      'requestId': reqId,
+      'reason': reason.trim(),
+    };
+    if (usedLengthM != null && usedLengthM > 0) {
+      body['usedLengthM'] = usedLengthM;
+      body['wasteLengthM'] = wasteLengthM ?? 0.0;
+    }
+    if (usedWidthCm != null && usedWidthCm > 0) {
+      body['usedWidthCm'] = usedWidthCm;
+      body['wasteWidthCm'] = wasteWidthCm ?? 0.0;
+    }
+
+    final res = await http.post(url, headers: headers, body: jsonEncode(body)).timeout(const Duration(seconds: 10));
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return jsonDecode(res.body);
+    } else {
+      try {
+        final err = jsonDecode(res.body);
+        throw Exception(err['message'] ?? 'Error al cortar retazo (${res.statusCode})');
+      } catch (e) {
+        if (e is Exception && !e.toString().contains('FormatException')) rethrow;
+        throw Exception('Error al cortar retazo en retazos-service (${res.statusCode})');
+      }
+    }
   }
 
   static Future<List<EspacioUbicacion>> obtenerEspaciosUbicacion({

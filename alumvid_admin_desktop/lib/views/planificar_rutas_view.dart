@@ -1414,7 +1414,7 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                                                 if (p.comentarios != null && p.comentarios!.isNotEmpty) ...[
                                                   const SizedBox(height: 2),
                                                   Text(
-                                                    'Material: ${p.comentarios}',
+                                                    'Material: ${_formatearMaterialVisible(p.comentarios)}',
                                                     style: const TextStyle(fontSize: 11, color: Color(0xFF38BDF8)),
                                                     maxLines: 1,
                                                     overflow: TextOverflow.ellipsis,
@@ -1497,5 +1497,10 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
         ],
       ),
     );
+  }
+
+  String _formatearMaterialVisible(String? text) {
+    if (text == null || text.trim().isEmpty) return '';
+    return text.replaceAll(RegExp(r'\s*\[META:[^\]]+\]'), '').trim();
   }
 }

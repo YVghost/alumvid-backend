@@ -52,6 +52,15 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
   List<PiezaRetazo> _piezasDisponibles = [];
   PiezaRetazo? _piezaSeleccionada;
 
+  // Estado de corte a medida
+  bool _modoCorteActivo = false;
+  bool _ejecutandoCorte = false;
+  final _longitudCorteCtrl = TextEditingController();
+  final _anchoCorteCtrl = TextEditingController();
+  final _mermaCorteCtrl = TextEditingController(text: '0.00');
+  PiezaRetazo? _piezaOrigenCorte;
+  String? _mensajeCorteExitoso;
+
   bool _cargandoProductos = true;
   bool _cargandoPiezas = false;
   bool _guardando = false;
@@ -68,6 +77,9 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
     _direccionCtrl.dispose();
     _cantidadCtrl.dispose();
     _observacionesCtrl.dispose();
+    _longitudCorteCtrl.dispose();
+    _anchoCorteCtrl.dispose();
+    _mermaCorteCtrl.dispose();
     super.dispose();
   }
 
@@ -110,10 +122,92 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
       setState(() {
         _piezasDisponibles = piezas;
         _piezaSeleccionada = piezas.isNotEmpty ? piezas.first : null;
+        _piezaOrigenCorte = piezas.isNotEmpty ? piezas.first : null;
         _cargandoPiezas = false;
       });
     } catch (_) {
       if (mounted) setState(() => _cargandoPiezas = false);
+    }
+  }
+
+  Future<void> _realizarCorte() async {
+    if (_productoRetazoSeleccionado == null) return;
+    if (_piezaOrigenCorte == null) {
+      AppToast.error(context, 'Seleccione la pieza física de origen para el corte');
+      return;
+    }
+
+    final kind = _productoRetazoSeleccionado!.kind?.toUpperCase() ?? 'ALUMINIO';
+    double? usedLength;
+    double? usedWidth;
+    double? wasteLength;
+    double? wasteWidth;
+
+    if (kind == 'ALUMINIO') {
+      final len = double.tryParse(_longitudCorteCtrl.text.replaceAll(',', '.'));
+      if (len == null || len <= 0) {
+        AppToast.error(context, 'Ingrese una longitud válida mayor a 0 m');
+        return;
+      }
+      final maxAvailable = _piezaOrigenCorte!.lengthM ?? 0;
+      if (len > maxAvailable) {
+        AppToast.error(context, 'La longitud requerida ($len m) supera la pieza origen ($maxAvailable m)');
+        return;
+      }
+      usedLength = len;
+      final waste = double.tryParse(_mermaCorteCtrl.text.replaceAll(',', '.'));
+      if (waste != null && waste > 0) wasteLength = waste;
+    } else {
+      final width = double.tryParse(_anchoCorteCtrl.text.replaceAll(',', '.'));
+      if (width == null || width <= 0) {
+        AppToast.error(context, 'Ingrese un ancho válido mayor a 0 cm');
+        return;
+      }
+      final maxAvailable = _piezaOrigenCorte!.widthCm ?? 0;
+      if (width > maxAvailable) {
+        AppToast.error(context, 'El ancho requerido ($width cm) supera la pieza origen ($maxAvailable cm)');
+        return;
+      }
+      usedWidth = width;
+      final waste = double.tryParse(_mermaCorteCtrl.text.replaceAll(',', '.'));
+      if (waste != null && waste > 0) wasteWidth = waste;
+    }
+
+    setState(() => _ejecutandoCorte = true);
+
+    try {
+      final res = await ApiService.cortarPiezaRetazo(
+        productoId: _productoRetazoSeleccionado!.id,
+        pieceId: _piezaOrigenCorte!.id,
+        usedLengthM: usedLength,
+        usedWidthCm: usedWidth,
+        wasteLengthM: wasteLength,
+        wasteWidthCm: wasteWidth,
+        reason: 'Corte de material para despacho en ruta ${widget.ruta.codigoRuta}',
+      );
+
+      final med = kind == 'ALUMINIO' ? '$usedLength m' : '$usedWidth cm';
+      final detail = res['detail'] as Map<String, dynamic>?;
+      final rem = detail?['remainingExtent'];
+      final remText = rem != null ? ' (Sobrante: $rem ${kind == 'ALUMINIO' ? 'm' : 'cm'} en bodega)' : '';
+
+      final piezasActualizadas = await ApiService.obtenerPiezasRetazo(_productoRetazoSeleccionado!.id, state: 'DISPONIBLE');
+
+      if (!mounted) return;
+      setState(() {
+        _piezasDisponibles = piezasActualizadas;
+        _piezaSeleccionada = piezasActualizadas.isNotEmpty ? piezasActualizadas.first : null;
+        _modoCorteActivo = false;
+        _mensajeCorteExitoso = '✓ Corte de $med registrado$remText y asignado a esta entrega.';
+        _ejecutandoCorte = false;
+      });
+
+      AppToast.success(context, 'Corte de material registrado y descontado en Bodega');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _ejecutandoCorte = false);
+        AppToast.error(context, 'Error al ejecutar corte: $e');
+      }
     }
   }
 
@@ -144,7 +238,7 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
 
     setState(() => _guardando = true);
 
-    // Formatear qué se va a entregar
+    // Formatear qué se va a entregar con metadatos para cierre e-PoD y descuento físico
     String queSeEntrega = '';
     if (_tipoEntrega == TipoEntregaMaterial.retazo && _piezaSeleccionada != null && _productoRetazoSeleccionado != null) {
       queSeEntrega = 'Retazo: [${_productoRetazoSeleccionado!.code}] ${_productoRetazoSeleccionado!.name} (${_piezaSeleccionada!.dimensionesTexto})';
@@ -154,12 +248,14 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
       if (_observacionesCtrl.text.trim().isNotEmpty) {
         queSeEntrega += ' - ${_observacionesCtrl.text.trim()}';
       }
+      queSeEntrega += ' [META:PID=${_productoRetazoSeleccionado!.id};QTY=1;PIECE=${_piezaSeleccionada!.id}]';
     } else if (_tipoEntrega == TipoEntregaMaterial.inventario && _productoSeleccionado != null) {
       final cant = _cantidadCtrl.text.trim().isNotEmpty ? _cantidadCtrl.text.trim() : '1';
       queSeEntrega = '${_productoSeleccionado!.name} ($cant ${_productoSeleccionado!.unit})';
       if (_observacionesCtrl.text.trim().isNotEmpty) {
         queSeEntrega += ' - ${_observacionesCtrl.text.trim()}';
       }
+      queSeEntrega += ' [META:PID=${_productoSeleccionado!.id};QTY=$cant]';
     } else if (_observacionesCtrl.text.trim().isNotEmpty) {
       queSeEntrega = _observacionesCtrl.text.trim();
     } else {
@@ -482,6 +578,93 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
                                   },
                                 ),
                                 const SizedBox(height: 10),
+
+                                // Selector Modo: Existente vs Corte a Medida
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: InkWell(
+                                        onTap: () => setState(() => _modoCorteActivo = false),
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: !_modoCorteActivo ? const Color(0xFF1E293B) : Colors.transparent,
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: !_modoCorteActivo ? const Color(0xFF38BDF8) : const Color(0xFF334155),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.inventory_2_outlined, size: 14, color: !_modoCorteActivo ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8)),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'Retazo Existente',
+                                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: !_modoCorteActivo ? Colors.white : const Color(0xFF94A3B8)),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: InkWell(
+                                        onTap: () => setState(() => _modoCorteActivo = true),
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: _modoCorteActivo ? const Color(0xFF1E293B) : Colors.transparent,
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: _modoCorteActivo ? const Color(0xFF10B981) : const Color(0xFF334155),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.content_cut_rounded, size: 14, color: _modoCorteActivo ? const Color(0xFF10B981) : const Color(0xFF94A3B8)),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'Corte a Medida',
+                                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _modoCorteActivo ? Colors.white : const Color(0xFF94A3B8)),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+
+                                if (_mensajeCorteExitoso != null) ...[
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF064E3B).withValues(alpha: 0.5),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFF10B981)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            _mensajeCorteExitoso!,
+                                            style: const TextStyle(color: Color(0xFFD1FAE5), fontSize: 11, fontWeight: FontWeight.w500),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                ],
+
                                 if (_cargandoPiezas)
                                   const Row(
                                     children: [
@@ -490,37 +673,190 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
                                       Text('Buscando retazos disponibles...', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
                                     ],
                                   )
-                                else if (_piezasDisponibles.isEmpty)
-                                  const Text(
-                                    'No hay retazos físicos individuales registrados para este material.',
-                                    style: TextStyle(color: Color(0xFFEF4444), fontSize: 11),
-                                  )
-                                else
-                                  DropdownButtonFormField<PiezaRetazo>(
-                                    initialValue: _piezaSeleccionada,
-                                    isExpanded: true,
-                                    dropdownColor: AppTheme.surfaceCard,
-                                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                                    decoration: const InputDecoration(
-                                      labelText: 'Seleccionar Retazo Disponible *',
-                                      isDense: true,
-                                      prefixIcon: Icon(Icons.straighten_rounded, size: 18),
-                                    ),
-                                    items: _piezasDisponibles.map((p) {
-                                      final loc = p.location != null && p.location!.isNotEmpty ? ' (${p.location})' : '';
-                                      return DropdownMenuItem<PiezaRetazo>(
-                                        value: p,
-                                        child: Text(
-                                          '${p.dimensionesTexto}$loc',
-                                          style: const TextStyle(fontSize: 12, color: Color(0xFF38BDF8), fontWeight: FontWeight.w600),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      );
-                                    }).toList(),
-                                    onChanged: (val) {
-                                      setState(() => _piezaSeleccionada = val);
-                                    },
-                                  ),
+                                else if (!_modoCorteActivo) ...[
+                                   if (_piezasDisponibles.isEmpty)
+                                     const Text(
+                                       'No hay retazos físicos individuales registrados para este material. Use "Corte a Medida" para seccionar una barra/plancha.',
+                                       style: TextStyle(color: Color(0xFFF59E0B), fontSize: 11),
+                                     )
+                                   else
+                                     DropdownButtonFormField<PiezaRetazo>(
+                                       initialValue: _piezaSeleccionada,
+                                       isExpanded: true,
+                                       dropdownColor: AppTheme.surfaceCard,
+                                       style: const TextStyle(color: Colors.white, fontSize: 12),
+                                       decoration: const InputDecoration(
+                                         labelText: 'Seleccionar Retazo Disponible *',
+                                         isDense: true,
+                                         prefixIcon: Icon(Icons.straighten_rounded, size: 18),
+                                       ),
+                                       items: _piezasDisponibles.map((p) {
+                                         final loc = p.location != null && p.location!.isNotEmpty ? ' (${p.location})' : '';
+                                         return DropdownMenuItem<PiezaRetazo>(
+                                           value: p,
+                                           child: Text(
+                                             '${p.dimensionesTexto}$loc',
+                                             style: const TextStyle(fontSize: 12, color: Color(0xFF38BDF8), fontWeight: FontWeight.w600),
+                                             overflow: TextOverflow.ellipsis,
+                                           ),
+                                         );
+                                       }).toList(),
+                                       onChanged: (val) {
+                                         setState(() => _piezaSeleccionada = val);
+                                       },
+                                     ),
+                                 ] else ...[
+                                   // Formulario de Corte a Medida en Directo
+                                   Container(
+                                     padding: const EdgeInsets.all(10),
+                                     decoration: BoxDecoration(
+                                       color: const Color(0xFF0F172A),
+                                       borderRadius: BorderRadius.circular(8),
+                                       border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                                     ),
+                                     child: Column(
+                                       crossAxisAlignment: CrossAxisAlignment.start,
+                                       children: [
+                                         Row(
+                                           children: [
+                                             const Icon(Icons.content_cut_rounded, size: 14, color: Color(0xFF10B981)),
+                                             const SizedBox(width: 6),
+                                             Text(
+                                               'Corte de ${_productoRetazoSeleccionado?.kind == "VIDRIO" ? "Vidrio" : "Aluminio"}',
+                                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF10B981)),
+                                             ),
+                                           ],
+                                         ),
+                                         const SizedBox(height: 8),
+
+                                         // Pieza origen a cortar
+                                         if (_piezasDisponibles.isNotEmpty) ...[
+                                           DropdownButtonFormField<PiezaRetazo>(
+                                             initialValue: _piezaOrigenCorte,
+                                             isExpanded: true,
+                                             dropdownColor: AppTheme.surfaceCard,
+                                             style: const TextStyle(color: Colors.white, fontSize: 11),
+                                             decoration: const InputDecoration(
+                                               labelText: 'Pieza física origen a cortar *',
+                                               isDense: true,
+                                               prefixIcon: Icon(Icons.crop_square_rounded, size: 16),
+                                             ),
+                                             items: _piezasDisponibles.map((p) {
+                                               final loc = p.location != null && p.location!.isNotEmpty ? ' (${p.location})' : '';
+                                               return DropdownMenuItem<PiezaRetazo>(
+                                                 value: p,
+                                                 child: Text(
+                                                   '${p.dimensionesTexto}$loc',
+                                                   style: const TextStyle(fontSize: 11, color: Colors.white),
+                                                   overflow: TextOverflow.ellipsis,
+                                                 ),
+                                               );
+                                             }).toList(),
+                                             onChanged: (val) => setState(() => _piezaOrigenCorte = val),
+                                           ),
+                                           const SizedBox(height: 8),
+                                         ],
+
+                                         if (_productoRetazoSeleccionado?.kind == 'VIDRIO') ...[
+                                           Row(
+                                             children: [
+                                               Expanded(
+                                                 child: TextFormField(
+                                                   controller: _anchoCorteCtrl,
+                                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                   style: const TextStyle(color: Colors.white, fontSize: 12),
+                                                   decoration: const InputDecoration(
+                                                     labelText: 'Ancho requerido *',
+                                                     hintText: 'Ej. 80.0',
+                                                     suffixText: 'cm',
+                                                     isDense: true,
+                                                     prefixIcon: Icon(Icons.straighten, size: 16),
+                                                   ),
+                                                 ),
+                                               ),
+                                               const SizedBox(width: 8),
+                                               Expanded(
+                                                 child: TextFormField(
+                                                   controller: _mermaCorteCtrl,
+                                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                   style: const TextStyle(color: Colors.white, fontSize: 12),
+                                                   decoration: const InputDecoration(
+                                                     labelText: 'Merma',
+                                                     hintText: '0.0',
+                                                     suffixText: 'cm',
+                                                     isDense: true,
+                                                     prefixIcon: Icon(Icons.delete_sweep_outlined, size: 16),
+                                                   ),
+                                                 ),
+                                               ),
+                                             ],
+                                           ),
+                                           const SizedBox(height: 4),
+                                           const Text(
+                                             '• Alto estándar de plancha: 150.0 cm',
+                                             style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                                           ),
+                                         ] else ...[
+                                           Row(
+                                             children: [
+                                               Expanded(
+                                                 child: TextFormField(
+                                                   controller: _longitudCorteCtrl,
+                                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                   style: const TextStyle(color: Colors.white, fontSize: 12),
+                                                   decoration: const InputDecoration(
+                                                     labelText: 'Longitud requerida *',
+                                                     hintText: 'Ej. 1.80',
+                                                     suffixText: 'm',
+                                                     isDense: true,
+                                                     prefixIcon: Icon(Icons.straighten, size: 16),
+                                                   ),
+                                                 ),
+                                               ),
+                                               const SizedBox(width: 8),
+                                               Expanded(
+                                                 child: TextFormField(
+                                                   controller: _mermaCorteCtrl,
+                                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                   style: const TextStyle(color: Colors.white, fontSize: 12),
+                                                   decoration: const InputDecoration(
+                                                     labelText: 'Merma',
+                                                     hintText: '0.00',
+                                                     suffixText: 'm',
+                                                     isDense: true,
+                                                     prefixIcon: Icon(Icons.delete_sweep_outlined, size: 16),
+                                                   ),
+                                                 ),
+                                               ),
+                                             ],
+                                           ),
+                                         ],
+                                         const SizedBox(height: 10),
+
+                                         SizedBox(
+                                           width: double.infinity,
+                                           height: 32,
+                                           child: ElevatedButton.icon(
+                                             icon: _ejecutandoCorte
+                                                 ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                                 : const Icon(Icons.content_cut, size: 15),
+                                             label: Text(
+                                               _ejecutandoCorte ? 'Procesando corte en Bodega...' : 'Ejecutar Corte y Asignar Pieza',
+                                               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                             ),
+                                             style: ElevatedButton.styleFrom(
+                                               backgroundColor: const Color(0xFF10B981),
+                                               foregroundColor: Colors.white,
+                                               padding: const EdgeInsets.symmetric(horizontal: 10),
+                                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                             ),
+                                             onPressed: _ejecutandoCorte ? null : _realizarCorte,
+                                           ),
+                                         ),
+                                       ],
+                                     ),
+                                   ),
+                                 ],
                                 const SizedBox(height: 10),
                                 TextFormField(
                                   controller: _observacionesCtrl,
