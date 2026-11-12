@@ -321,14 +321,7 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
     final int totalRutas = widget.rutas.length;
     final int enCaminoCount = widget.rutas.where((r) => r.isEnCurso).length;
     final int pendientesCount = widget.rutas.where((r) => r.isPendiente).length;
-
-    int canceladas = 0;
-    for (final r in widget.rutas) {
-      for (final p in r.paradas) {
-        if (p.isNoEntregado) canceladas++;
-      }
-      if (r.estado == 'CANCELADA') canceladas++;
-    }
+    final int canceladasCount = widget.rutas.where((r) => r.estado == 'CANCELADA').length;
 
     final bool esFiltroTotal = widget.rangoFiltro == null;
     final bool esHoy = !esFiltroTotal &&
@@ -356,7 +349,7 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
     } else if (_filtroEstadoCard == 'PENDIENTE') {
       rutasBase = rutasBase.where((r) => r.isPendiente).toList();
     } else if (_filtroEstadoCard == 'CANCELADA') {
-      rutasBase = rutasBase.where((r) => r.estado == 'CANCELADA' || r.paradas.any((p) => p.isNoEntregado)).toList();
+      rutasBase = rutasBase.where((r) => r.estado == 'CANCELADA').toList();
     }
 
     // Filtrado de rutas por texto de búsqueda
@@ -385,7 +378,7 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
               rutasTotales: totalRutas,
               enCaminoCount: enCaminoCount,
               pendientesCount: pendientesCount,
-              entregasCanceladas: canceladas,
+              entregasCanceladas: canceladasCount,
             ),
             const SizedBox(height: 16),
 
@@ -536,7 +529,7 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                     _filtroEstadoCard = null;
                   } else {
                     _filtroEstadoCard = 'CANCELADA';
-                    final canceladas = widget.rutas.where((r) => r.estado == 'CANCELADA' || r.paradas.any((p) => p.isNoEntregado)).map((r) => r.id);
+                    final canceladas = widget.rutas.where((r) => r.estado == 'CANCELADA').map((r) => r.id);
                     _expandedRutaIds.addAll(canceladas);
                   }
                 });

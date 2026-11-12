@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../utils/app_toast.dart';
 import 'login_screen.dart';
 import 'rutas_screen.dart';
 
@@ -67,12 +68,7 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
       final freshLogin = await ApiService.login(emailOrIdent, nueva);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Contraseña actualizada con éxito. ¡Bienvenido a AlumVid!'),
-          backgroundColor: Color(0xFF10B981),
-        ),
-      );
+      AppToast.success(context, 'Contraseña actualizada con éxito. ¡Bienvenido a AlumVid!');
 
       // 3. Redirigir directamente al panel de rutas
       Navigator.pushAndRemoveUntil(

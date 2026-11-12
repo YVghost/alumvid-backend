@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
+import '../utils/app_toast.dart';
 import 'navegacion_destino_screen.dart';
 
 /// Pantalla que presenta el itinerario completo de una Hoja de Ruta asignada (ej. Ruta 1).
@@ -82,20 +83,10 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
       setState(() {
         _rutaActual = res;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Paradas reordenadas con éxito por menor tiempo de viaje (Google Routes).'),
-          backgroundColor: Color(0xFF059669),
-        ),
-      );
+      AppToast.success(context, 'Paradas reordenadas con éxito por menor tiempo de viaje (Google Routes).');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al optimizar: ${e.toString().replaceAll('Exception: ', '')}'),
-          backgroundColor: const Color(0xFFE11D48),
-        ),
-      );
+      AppToast.error(context, 'Error al optimizar: ${e.toString().replaceAll('Exception: ', '')}');
     } finally {
       if (mounted) setState(() => _optimizando = false);
     }
@@ -119,39 +110,11 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
 
   void _mostrarToastDiscreto(String mensaje, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
-              color: Colors.white,
-              size: 16,
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                mensaje,
-                style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: isError ? const Color(0xFFDC2626) : const Color(0xFF1E293B),
-        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: isError ? const Color(0xFFEF4444) : const Color(0xFF334155)),
-        ),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    if (isError) {
+      AppToast.error(context, mensaje);
+    } else {
+      AppToast.success(context, mensaje);
+    }
   }
 
   Future<void> _reintentarParada(Map<String, dynamic> despacho) async {

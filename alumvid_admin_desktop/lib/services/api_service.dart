@@ -479,6 +479,20 @@ class ApiService {
     }
   }
 
+  static Future<void> reintentarParada(String despachoId) async {
+    final apiBase = await getApiBase();
+    final url = Uri.parse('$apiBase/logistica/despachos/$despachoId/reintentar');
+    final headers = await _headers();
+
+    final response = await http
+        .post(url, headers: headers)
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      final err = jsonDecode(response.body);
+      throw Exception(err['message'] ?? 'Error al reactivar la parada');
+    }
+  }
+
 
   static Future<Despacho> cerrarEntrega({
     required String despachoId,

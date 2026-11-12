@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
+import '../utils/app_toast.dart';
 import 'epod_screen.dart';
 
 /// Pantalla de navegacion vial en tiempo real por las calles de la ciudad.
@@ -298,39 +299,11 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
 
   void _mostrarToastDiscreto(String mensaje, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
-              color: Colors.white,
-              size: 16,
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                mensaje,
-                style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: isError ? const Color(0xFFDC2626) : const Color(0xFF1E293B),
-        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: isError ? const Color(0xFFEF4444) : const Color(0xFF334155)),
-        ),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    if (isError) {
+      AppToast.error(context, mensaje);
+    } else {
+      AppToast.success(context, mensaje);
+    }
   }
 
   Future<void> _reportarParadaFallida() async {
