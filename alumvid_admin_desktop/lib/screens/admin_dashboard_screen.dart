@@ -64,27 +64,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _estaEnRango(DateTime? dt, DateTimeRange? range) {
     if (range == null) return true;
     if (dt == null) return false;
+    // Ajustar a hora de Ecuador (UTC-5) para comparar fechas correctamente
+    final ecDt = dt.toUtc().subtract(const Duration(hours: 5));
     final start = DateTime(range.start.year, range.start.month, range.start.day, 0, 0, 0);
     final end = DateTime(range.end.year, range.end.month, range.end.day, 23, 59, 59);
-    return dt.isAfter(start.subtract(const Duration(seconds: 1))) &&
-        dt.isBefore(end.add(const Duration(seconds: 1)));
+    final localDt = DateTime(ecDt.year, ecDt.month, ecDt.day, ecDt.hour, ecDt.minute, ecDt.second);
+    return localDt.isAfter(start.subtract(const Duration(seconds: 1))) &&
+        localDt.isBefore(end.add(const Duration(seconds: 1)));
   }
 
   List<Ruta> get _rutasDelPeriodo {
     if (_rangoFiltro == null) {
       return List<Ruta>.from(_rutas);
     }
-    final bool esFiltroHoy = _rangoFiltro!.start.year == DateTime.now().year &&
-        _rangoFiltro!.start.month == DateTime.now().month &&
-        _rangoFiltro!.start.day == DateTime.now().day &&
-        _rangoFiltro!.end.year == DateTime.now().year &&
-        _rangoFiltro!.end.month == DateTime.now().month &&
-        _rangoFiltro!.end.day == DateTime.now().day;
 
     return _rutas.where((r) {
-      // Rutas operativas en curso o pendientes siempre están vigentes en el día a día
-      if (esFiltroHoy && (r.isEnCurso || r.isPendiente)) return true;
-      // Para rangos históricos o rutas finalizadas/canceladas, filtrar por fecha
+      // Filtrar estrictamente por fecha de creación, inicio o fin según el rango seleccionado
       return _estaEnRango(r.fechaCreacion, _rangoFiltro) ||
           _estaEnRango(r.fechaInicio, _rangoFiltro) ||
           _estaEnRango(r.fechaFin, _rangoFiltro);

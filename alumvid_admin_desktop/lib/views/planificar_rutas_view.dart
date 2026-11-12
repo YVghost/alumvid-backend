@@ -250,14 +250,11 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Opción para ver todas las rutas históricas (sin filtro de fecha)
               ListTile(
                 leading: const Icon(Icons.all_inclusive_rounded, color: Color(0xFF38BDF8)),
-                title: const Text('Todas las Rutas (Histórico completo)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                subtitle: const Text('Ver todas las rutas registradas sin restricción de fecha', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                title: const Text('Todas las Rutas', style: TextStyle(color: Colors.white)),
                 onTap: () => Navigator.pop(ctx, 'TODAS'),
               ),
-              const Divider(color: Color(0xFF1E293B)),
               ListTile(
                 leading: const Icon(Icons.today_rounded, color: Color(0xFF38BDF8)),
                 title: const Text('Hoy', style: TextStyle(color: Colors.white)),
@@ -335,12 +332,11 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
     // Cálculo de métricas
     final int totalRutas = widget.rutas.length;
     final int enCaminoCount = widget.rutas.where((r) => r.isEnCurso).length;
+    final int pendientesCount = widget.rutas.where((r) => r.isPendiente).length;
 
-    int exitosas = 0;
     int canceladas = 0;
     for (final r in widget.rutas) {
       for (final p in r.paradas) {
-        if (p.isEntregado) exitosas++;
         if (p.isNoEntregado) canceladas++;
       }
       if (r.estado == 'CANCELADA') canceladas++;
@@ -369,8 +365,8 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
     List<Ruta> rutasBase = widget.rutas;
     if (_filtroEstadoCard == 'EN_CURSO') {
       rutasBase = rutasBase.where((r) => r.isEnCurso).toList();
-    } else if (_filtroEstadoCard == 'COMPLETADA') {
-      rutasBase = rutasBase.where((r) => r.isCompletada || r.paradas.any((p) => p.isEntregado)).toList();
+    } else if (_filtroEstadoCard == 'PENDIENTE') {
+      rutasBase = rutasBase.where((r) => r.isPendiente).toList();
     } else if (_filtroEstadoCard == 'CANCELADA') {
       rutasBase = rutasBase.where((r) => r.estado == 'CANCELADA' || r.paradas.any((p) => p.isNoEntregado)).toList();
     }
@@ -400,7 +396,7 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
               diaNumero: diaNumero,
               rutasTotales: totalRutas,
               enCaminoCount: enCaminoCount,
-              entregasExitosas: exitosas,
+              pendientesCount: pendientesCount,
               entregasCanceladas: canceladas,
             ),
             const SizedBox(height: 16),
@@ -451,7 +447,7 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
     required String diaNumero,
     required int rutasTotales,
     required int enCaminoCount,
-    required int entregasExitosas,
+    required int pendientesCount,
     required int entregasCanceladas,
   }) {
     return LayoutBuilder(
@@ -493,22 +489,21 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
               },
             ),
 
-            // Tarjeta 3: En Camino (NUEVA)
+            // Tarjeta 3: En Camino (VERDE)
             _buildMetricItem(
               icon: Icons.local_shipping_rounded,
-              iconColor: const Color(0xFF38BDF8),
-              iconBg: const Color(0xFF0369A1).withValues(alpha: 0.3),
+              iconColor: const Color(0xFF10B981),
+              iconBg: const Color(0xFF065F46).withValues(alpha: 0.35),
               title: 'En Camino',
               value: '$enCaminoCount',
               isSelected: _filtroEstadoCard == 'EN_CURSO',
-              activeColor: const Color(0xFF38BDF8),
+              activeColor: const Color(0xFF10B981),
               onTap: () {
                 setState(() {
                   if (_filtroEstadoCard == 'EN_CURSO') {
                     _filtroEstadoCard = null;
                   } else {
                     _filtroEstadoCard = 'EN_CURSO';
-                    // Desplegar automáticamente todas las rutas en curso
                     final enCurso = widget.rutas.where((r) => r.isEnCurso).map((r) => r.id);
                     _expandedRutaIds.addAll(enCurso);
                   }
@@ -516,34 +511,34 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
               },
             ),
 
-            // Tarjeta 4: Entregas Exitosas
+            // Tarjeta 4: Pendientes (AMARILLO)
             _buildMetricItem(
-              icon: Icons.check_circle_rounded,
-              iconColor: const Color(0xFF10B981),
-              iconBg: const Color(0xFF065F46).withValues(alpha: 0.3),
-              title: 'Entregas Exitosas',
-              value: '$entregasExitosas',
-              isSelected: _filtroEstadoCard == 'COMPLETADA',
-              activeColor: const Color(0xFF10B981),
+              icon: Icons.hourglass_top_rounded,
+              iconColor: const Color(0xFFF59E0B),
+              iconBg: const Color(0xFF78350F).withValues(alpha: 0.35),
+              title: 'Pendientes',
+              value: '$pendientesCount',
+              isSelected: _filtroEstadoCard == 'PENDIENTE',
+              activeColor: const Color(0xFFF59E0B),
               onTap: () {
                 setState(() {
-                  if (_filtroEstadoCard == 'COMPLETADA') {
+                  if (_filtroEstadoCard == 'PENDIENTE') {
                     _filtroEstadoCard = null;
                   } else {
-                    _filtroEstadoCard = 'COMPLETADA';
-                    final completas = widget.rutas.where((r) => r.isCompletada || r.paradas.any((p) => p.isEntregado)).map((r) => r.id);
-                    _expandedRutaIds.addAll(completas);
+                    _filtroEstadoCard = 'PENDIENTE';
+                    final pend = widget.rutas.where((r) => r.isPendiente).map((r) => r.id);
+                    _expandedRutaIds.addAll(pend);
                   }
                 });
               },
             ),
 
-            // Tarjeta 5: Entregas Canceladas
+            // Tarjeta 5: Canceladas (ROJO)
             _buildMetricItem(
               icon: Icons.cancel_rounded,
               iconColor: const Color(0xFFEF4444),
-              iconBg: const Color(0xFF991B1B).withValues(alpha: 0.3),
-              title: 'Entregas Canceladas',
+              iconBg: const Color(0xFF991B1B).withValues(alpha: 0.35),
+              title: 'Canceladas',
               value: '$entregasCanceladas',
               isSelected: _filtroEstadoCard == 'CANCELADA',
               activeColor: const Color(0xFFEF4444),
@@ -907,24 +902,24 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildFleetBadge(
-                  label: 'Choferes',
-                  value: '${widget.choferes.length}',
-                  subvalue: '$choferesEnRuta en ruta',
-                  color: const Color(0xFF38BDF8),
+                  label: 'En Ruta',
+                  value: '$choferesEnRuta',
+                  subvalue: 'choferes activos',
+                  color: const Color(0xFF10B981),
                 ),
                 Container(height: 28, width: 1, color: const Color(0xFF1E293B)),
                 _buildFleetBadge(
                   label: 'Disponibles',
                   value: '$choferesDisponibles',
-                  subvalue: 'listos',
-                  color: const Color(0xFF10B981),
+                  subvalue: 'listos para asignar',
+                  color: const Color(0xFF38BDF8),
                 ),
                 Container(height: 28, width: 1, color: const Color(0xFF1E293B)),
                 _buildFleetBadge(
-                  label: 'Bodega Quito',
-                  value: 'Activa',
-                  subvalue: 'Calderón',
-                  color: const Color(0xFFF59E0B),
+                  label: 'Total Registrados',
+                  value: '${widget.choferes.length}',
+                  subvalue: 'flota de choferes',
+                  color: const Color(0xFF94A3B8),
                 ),
               ],
             ),
@@ -1110,17 +1105,20 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                 final r = rutas[idx];
                 final bool isExpanded = _expandedRutaIds.contains(r.id);
 
-                Color tagColor = const Color(0xFF10B981); // PENDIENTE verde
-                String tagTexto = 'PENDIENTE';
+                Color tagColor = const Color(0xFF64748B); // Neutro para otros estados
+                String tagTexto = r.estado;
                 if (r.isEnCurso) {
-                  tagColor = const Color(0xFF38BDF8); // EN CURSO azul
+                  tagColor = const Color(0xFF10B981); // EN CURSO: VERDE
                   tagTexto = 'EN CURSO';
-                } else if (r.isCompletada) {
-                  tagColor = const Color(0xFF059669);
-                  tagTexto = 'COMPLETADA';
-                } else if (r.estado == 'CANCELADA') {
-                  tagColor = const Color(0xFFEF4444);
+                } else if (r.isPendiente) {
+                  tagColor = const Color(0xFFF59E0B); // PENDIENTE: AMARILLO
+                  tagTexto = 'PENDIENTE';
+                } else if (r.estado == 'CANCELADA' || r.estado == 'CANCELADO') {
+                  tagColor = const Color(0xFFEF4444); // CANCELADA: ROJO
                   tagTexto = 'CANCELADA';
+                } else if (r.isCompletada) {
+                  tagColor = const Color(0xFF94A3B8); // Sin tono específico
+                  tagTexto = 'COMPLETADA';
                 }
 
                 final fechaTexto = _formatearFechaCreacion(r.fechaCreacion);
@@ -1325,54 +1323,48 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                                     late final List<BoxShadow> cardShadow;
                                     late final Color pTagColor;
 
-                                    if (p.isEntregado) {
-                                      // ENTREGADO: Verde Esmeralda
-                                      borderColor = const Color(0xFF10B981).withValues(alpha: 0.6);
+                                    if (p.isEnCurso) {
+                                      // EN CURSO: VERDE
+                                      borderColor = const Color(0xFF10B981).withValues(alpha: 0.85);
                                       cardBg = const Color(0xFF0C1F1A);
                                       cardShadow = [
                                         BoxShadow(
-                                          color: const Color(0xFF10B981).withValues(alpha: 0.10),
-                                          blurRadius: 6,
-                                          offset: const Offset(0, 1),
-                                        ),
-                                      ];
-                                      pTagColor = const Color(0xFF10B981);
-                                    } else if (p.isEnCurso) {
-                                      // EN CURSO: Azul / Cian Luminoso
-                                      borderColor = const Color(0xFF0EA5E9).withValues(alpha: 0.8);
-                                      cardBg = const Color(0xFF0B1B2B);
-                                      cardShadow = [
-                                        BoxShadow(
-                                          color: const Color(0xFF0EA5E9).withValues(alpha: 0.15),
+                                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
                                           blurRadius: 8,
                                           offset: const Offset(0, 1),
                                         ),
                                       ];
-                                      pTagColor = const Color(0xFF38BDF8);
+                                      pTagColor = const Color(0xFF10B981);
+                                    } else if (p.estado == 'PENDIENTE') {
+                                      // PENDIENTE: AMARILLO
+                                      borderColor = const Color(0xFFF59E0B).withValues(alpha: 0.7);
+                                      cardBg = const Color(0xFF1A160A);
+                                      cardShadow = [
+                                        BoxShadow(
+                                          color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ];
+                                      pTagColor = const Color(0xFFF59E0B);
                                     } else if (p.isNoEntregado) {
-                                      // CANCELADA / NO ENTREGADO: Rojo
-                                      borderColor = const Color(0xFFEF4444).withValues(alpha: 0.6);
+                                      // CANCELADA / NO ENTREGADO: ROJO
+                                      borderColor = const Color(0xFFEF4444).withValues(alpha: 0.7);
                                       cardBg = const Color(0xFF221114);
                                       cardShadow = [
                                         BoxShadow(
-                                          color: const Color(0xFFEF4444).withValues(alpha: 0.10),
+                                          color: const Color(0xFFEF4444).withValues(alpha: 0.12),
                                           blurRadius: 6,
                                           offset: const Offset(0, 1),
                                         ),
                                       ];
                                       pTagColor = const Color(0xFFEF4444);
                                     } else {
-                                      // PENDIENTE: Ámbar Cálido
-                                      borderColor = const Color(0xFFF59E0B).withValues(alpha: 0.5);
-                                      cardBg = const Color(0xFF1A160A);
-                                      cardShadow = [
-                                        BoxShadow(
-                                          color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
-                                          blurRadius: 5,
-                                          offset: const Offset(0, 1),
-                                        ),
-                                      ];
-                                      pTagColor = const Color(0xFFF59E0B);
+                                      // ENTREGADO Y OTROS: SIN TONO ESPECÍFICO (NEUTRO GRIS SLATE)
+                                      borderColor = const Color(0xFF1E293B);
+                                      cardBg = const Color(0xFF0D1424);
+                                      cardShadow = [];
+                                      pTagColor = const Color(0xFF94A3B8);
                                     }
 
                                     return Container(

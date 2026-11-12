@@ -3,11 +3,17 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/producto.dart';
 import '../models/pedido_comercial.dart';
+import '../models/retazo_pieza.dart';
 import '../models/ruta.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_toast.dart';
 import 'map_picker_dialog.dart';
+
+enum TipoEntregaMaterial {
+  inventario,
+  retazo,
+}
 
 class AgregarParadaDialog extends StatefulWidget {
   final Ruta ruta;
@@ -35,10 +41,19 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
   String _direccionResuelta = 'Quito Centro, Pichincha, Ecuador';
   bool _ubicacionSeleccionada = false;
 
+  // Catálogos
+  TipoEntregaMaterial _tipoEntrega = TipoEntregaMaterial.inventario;
   List<Producto> _productosInventario = [];
   List<PedidoComercial> _pedidosComerciales = [];
   Producto? _productoSeleccionado;
+
+  List<ProductoRetazo> _productosRetazo = [];
+  ProductoRetazo? _productoRetazoSeleccionado;
+  List<PiezaRetazo> _piezasDisponibles = [];
+  PiezaRetazo? _piezaSeleccionada;
+
   bool _cargandoProductos = true;
+  bool _cargandoPiezas = false;
   bool _guardando = false;
 
   @override
@@ -61,19 +76,44 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
       final res = await ApiService.obtenerProductos(size: 100);
       final List<Producto> prods = res['items'] as List<Producto>? ?? [];
       final pedidos = await ApiService.obtenerPedidosComerciales(size: 30);
+      final retazos = await ApiService.obtenerProductosRetazos();
+
       if (mounted) {
         setState(() {
           _productosInventario = prods;
           _pedidosComerciales = pedidos.where((p) => p.isEntregaDomicilio).toList();
+          _productosRetazo = retazos;
           if (prods.isNotEmpty) {
             _productoSeleccionado = prods.first;
           }
+          if (retazos.isNotEmpty) {
+            _productoRetazoSeleccionado = retazos.first;
+          }
           _cargandoProductos = false;
         });
+
+        if (retazos.isNotEmpty) {
+          _cargarPiezasDeRetazo(retazos.first.id);
+        }
       }
     } catch (e) {
       debugPrint('Error al cargar productos de inventario: $e');
       if (mounted) setState(() => _cargandoProductos = false);
+    }
+  }
+
+  Future<void> _cargarPiezasDeRetazo(String prodId) async {
+    setState(() => _cargandoPiezas = true);
+    try {
+      final piezas = await ApiService.obtenerPiezasRetazo(prodId, state: 'DISPONIBLE');
+      if (!mounted) return;
+      setState(() {
+        _piezasDisponibles = piezas;
+        _piezaSeleccionada = piezas.isNotEmpty ? piezas.first : null;
+        _cargandoPiezas = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _cargandoPiezas = false);
     }
   }
 
@@ -104,9 +144,17 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
 
     setState(() => _guardando = true);
 
-    // Formatear qué se va a entregar a partir del producto de inventario
+    // Formatear qué se va a entregar
     String queSeEntrega = '';
-    if (_productoSeleccionado != null) {
+    if (_tipoEntrega == TipoEntregaMaterial.retazo && _piezaSeleccionada != null && _productoRetazoSeleccionado != null) {
+      queSeEntrega = 'Retazo: [${_productoRetazoSeleccionado!.code}] ${_productoRetazoSeleccionado!.name} (${_piezaSeleccionada!.dimensionesTexto})';
+      if (_piezaSeleccionada!.location != null && _piezaSeleccionada!.location!.isNotEmpty) {
+        queSeEntrega += ' - Ubic: ${_piezaSeleccionada!.location}';
+      }
+      if (_observacionesCtrl.text.trim().isNotEmpty) {
+        queSeEntrega += ' - ${_observacionesCtrl.text.trim()}';
+      }
+    } else if (_tipoEntrega == TipoEntregaMaterial.inventario && _productoSeleccionado != null) {
       final cant = _cantidadCtrl.text.trim().isNotEmpty ? _cantidadCtrl.text.trim() : '1';
       queSeEntrega = '${_productoSeleccionado!.name} ($cant ${_productoSeleccionado!.unit})';
       if (_observacionesCtrl.text.trim().isNotEmpty) {
@@ -260,7 +308,7 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Qué se va a entregar (Selector desplegable de Inventario)
+                        // Qué se va a entregar (Selector Inventario / Retazos)
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -271,35 +319,87 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Row(
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Icon(Icons.inventory_2, color: AppTheme.primaryLight, size: 16),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'Qué se va a entregar (Catálogo de Inventario y Bodega)',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.primaryLight),
+                                  const Row(
+                                    children: [
+                                      Icon(Icons.inventory_2_rounded, color: AppTheme.primaryLight, size: 16),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Qué se va a entregar (Inventario & Retazos)',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.primaryLight),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1E293B),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        InkWell(
+                                          onTap: () => setState(() => _tipoEntrega = TipoEntregaMaterial.inventario),
+                                          borderRadius: BorderRadius.circular(6),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: _tipoEntrega == TipoEntregaMaterial.inventario ? const Color(0xFF1D72FE) : Colors.transparent,
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              'Inventario',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: _tipoEntrega == TipoEntregaMaterial.inventario ? Colors.white : const Color(0xFF94A3B8),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        InkWell(
+                                          onTap: () => setState(() => _tipoEntrega = TipoEntregaMaterial.retazo),
+                                          borderRadius: BorderRadius.circular(6),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: _tipoEntrega == TipoEntregaMaterial.retazo ? const Color(0xFF1D72FE) : Colors.transparent,
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              'Retazo Bodega',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: _tipoEntrega == TipoEntregaMaterial.retazo ? Colors.white : const Color(0xFF94A3B8),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 10),
+
                               if (_cargandoProductos)
                                 const Row(
                                   children: [
                                     SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
                                     SizedBox(width: 8),
-                                    Text('Cargando catálogo de productos...', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+                                    Text('Cargando catálogo...', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
                                   ],
                                 )
-                              else if (_productosInventario.isEmpty)
-                                const Text(
-                                  'No hay productos registrados en bodega. Ingrese una descripción manual abajo.',
-                                  style: TextStyle(color: AppTheme.statusAlerta, fontSize: 11),
-                                )
-                              else
+                              else if (_tipoEntrega == TipoEntregaMaterial.inventario) ...[
                                 DropdownButtonFormField<Producto>(
                                   initialValue: _productoSeleccionado,
                                   isExpanded: true,
                                   dropdownColor: AppTheme.surfaceCard,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12),
                                   decoration: const InputDecoration(
                                     labelText: 'Seleccionar Producto de Bodega *',
                                     isDense: true,
@@ -319,37 +419,120 @@ class _AgregarParadaDialogState extends State<AgregarParadaDialog> {
                                     setState(() => _productoSeleccionado = val);
                                   },
                                 ),
-                              const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  SizedBox(
-                                    width: 130,
-                                    child: TextFormField(
-                                      controller: _cantidadCtrl,
-                                      keyboardType: TextInputType.number,
-                                      decoration: InputDecoration(
-                                        labelText: 'Cantidad *',
-                                        suffixText: _productoSeleccionado?.unit ?? 'Unid',
-                                        isDense: true,
-                                        prefixIcon: const Icon(Icons.numbers, size: 16),
-                                      ),
-                                      validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: TextFormField(
-                                      controller: _observacionesCtrl,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Detalle adicional / Dimensiones',
-                                        hintText: 'Ej. Templado 10mm / Medidas especiales',
-                                        isDense: true,
-                                        prefixIcon: Icon(Icons.edit_note, size: 18),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 130,
+                                      child: TextFormField(
+                                        controller: _cantidadCtrl,
+                                        keyboardType: TextInputType.number,
+                                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                                        decoration: InputDecoration(
+                                          labelText: 'Cantidad *',
+                                          suffixText: _productoSeleccionado?.unit ?? 'Unid',
+                                          isDense: true,
+                                          prefixIcon: const Icon(Icons.numbers, size: 16),
+                                        ),
+                                        validator: (v) => v == null || v.trim().isEmpty ? 'Requerido' : null,
                                       ),
                                     ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _observacionesCtrl,
+                                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                                        decoration: const InputDecoration(
+                                          labelText: 'Detalle adicional / Dimensiones',
+                                          hintText: 'Ej. Templado 10mm / Medidas especiales',
+                                          isDense: true,
+                                          prefixIcon: Icon(Icons.edit_note, size: 18),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ] else ...[
+                                // Modo Retazos de Bodega
+                                DropdownButtonFormField<ProductoRetazo>(
+                                  initialValue: _productoRetazoSeleccionado,
+                                  isExpanded: true,
+                                  dropdownColor: AppTheme.surfaceCard,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Material de Corte *',
+                                    isDense: true,
+                                    prefixIcon: Icon(Icons.content_cut_rounded, size: 18),
                                   ),
-                                ],
-                              ),
+                                  items: _productosRetazo.map((prod) {
+                                    return DropdownMenuItem<ProductoRetazo>(
+                                      value: prod,
+                                      child: Text(
+                                        '[${prod.code}] ${prod.name} (${prod.kind ?? "Corte"})',
+                                        style: const TextStyle(fontSize: 12, color: Colors.white),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() => _productoRetazoSeleccionado = val);
+                                      _cargarPiezasDeRetazo(val.id);
+                                    }
+                                  },
+                                ),
+                                const SizedBox(height: 10),
+                                if (_cargandoPiezas)
+                                  const Row(
+                                    children: [
+                                      SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                                      SizedBox(width: 8),
+                                      Text('Buscando retazos disponibles...', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                                    ],
+                                  )
+                                else if (_piezasDisponibles.isEmpty)
+                                  const Text(
+                                    'No hay retazos físicos individuales registrados para este material.',
+                                    style: TextStyle(color: Color(0xFFEF4444), fontSize: 11),
+                                  )
+                                else
+                                  DropdownButtonFormField<PiezaRetazo>(
+                                    initialValue: _piezaSeleccionada,
+                                    isExpanded: true,
+                                    dropdownColor: AppTheme.surfaceCard,
+                                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Seleccionar Retazo Disponible *',
+                                      isDense: true,
+                                      prefixIcon: Icon(Icons.straighten_rounded, size: 18),
+                                    ),
+                                    items: _piezasDisponibles.map((p) {
+                                      final loc = p.location != null && p.location!.isNotEmpty ? ' (${p.location})' : '';
+                                      return DropdownMenuItem<PiezaRetazo>(
+                                        value: p,
+                                        child: Text(
+                                          '${p.dimensionesTexto}$loc',
+                                          style: const TextStyle(fontSize: 12, color: Color(0xFF38BDF8), fontWeight: FontWeight.w600),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      );
+                                    }).toList(),
+                                    onChanged: (val) {
+                                      setState(() => _piezaSeleccionada = val);
+                                    },
+                                  ),
+                                const SizedBox(height: 10),
+                                TextFormField(
+                                  controller: _observacionesCtrl,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Detalle adicional / Nota de corte',
+                                    hintText: 'Ej. Despacho directo de sobrante de bodega',
+                                    isDense: true,
+                                    prefixIcon: Icon(Icons.edit_note_rounded, size: 18),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
