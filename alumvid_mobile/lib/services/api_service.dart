@@ -44,28 +44,41 @@ class ApiService {
     _serverOverride = next;
   }
 
-  /// Comprueba si [host] responde como el API Gateway de AlumVid en el puerto 8080.
+  /// Comprueba si [host] responde como el API Gateway de AlumVid en el puerto 8080 o 8085.
+  static Future<int?> _obtenerPuertoGatewayAlumVid(
+    String host, {
+    Duration timeout = const Duration(milliseconds: 900),
+  }) async {
+    for (final port in [8085, 8080]) {
+      final client = HttpClient()..connectionTimeout = timeout;
+      try {
+        final request = await client
+            .getUrl(Uri.parse('http://$host:$port/platform-info'))
+            .timeout(timeout);
+        final response = await request.close().timeout(timeout);
+        if (response.statusCode == 200) {
+          final body = await response
+              .transform(utf8.decoder)
+              .join()
+              .timeout(timeout);
+          if (body.contains('AlumVid API Gateway')) {
+            return port;
+          }
+        }
+      } catch (_) {
+      } finally {
+        client.close(force: true);
+      }
+    }
+    return null;
+  }
+
   static Future<bool> _esGatewayAlumVid(
     String host, {
     Duration timeout = const Duration(milliseconds: 900),
   }) async {
-    final client = HttpClient()..connectionTimeout = timeout;
-    try {
-      final request = await client
-          .getUrl(Uri.parse('http://$host:8080/platform-info'))
-          .timeout(timeout);
-      final response = await request.close().timeout(timeout);
-      if (response.statusCode != 200) return false;
-      final body = await response
-          .transform(utf8.decoder)
-          .join()
-          .timeout(timeout);
-      return body.contains('AlumVid API Gateway');
-    } catch (_) {
-      return false;
-    } finally {
-      client.close(force: true);
-    }
+    final p = await _obtenerPuertoGatewayAlumVid(host, timeout: timeout);
+    return p != null;
   }
 
   /// Busca el backend en la red local del teléfono (misma Wi-Fi que la PC).
@@ -111,7 +124,8 @@ class ApiService {
         final resultados = await Future.wait(grupo.map(_esGatewayAlumVid));
         final idx = resultados.indexOf(true);
         if (idx >= 0) {
-          await setServer('http://${grupo[idx]}:8080');
+          final foundPort = await _obtenerPuertoGatewayAlumVid(grupo[idx]) ?? 8085;
+          await setServer('http://${grupo[idx]}:$foundPort');
           return baseUrl;
         }
       }
@@ -124,7 +138,7 @@ class ApiService {
       e is TimeoutException ||
       e is http.ClientException;
 
-  // --dart-define=API_BASE_URL=http://IP-del-servidor:8080/api/v1
+  // --dart-define=API_BASE_URL=http://IP-del-servidor:8085/api/v1
   static String get baseUrl {
     if (_serverOverride != null) return _serverOverride!;
     const configured = String.fromEnvironment('API_BASE_URL');
@@ -132,9 +146,9 @@ class ApiService {
       return configured.replaceFirst(RegExp(r'/+$'), '');
     }
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080/api/v1';
+      return 'http://10.0.2.2:8085/api/v1';
     }
-    return 'http://localhost:8080/api/v1';
+    return 'http://localhost:8085/api/v1';
   }
 
   static Future<String?> getToken() async {

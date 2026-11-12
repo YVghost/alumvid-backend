@@ -37,10 +37,10 @@ class ApiService {
         defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.linux ||
         defaultTargetPlatform == TargetPlatform.macOS) {
-      return 'http://localhost:8080';
+      return 'http://localhost:8085';
     }
     // Para emulador Android
-    return 'http://10.0.2.2:8080';
+    return 'http://10.0.2.2:8085';
   }
 
   static Future<void> setBaseHost(String host) async {
