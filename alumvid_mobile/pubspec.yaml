@@ -43,6 +43,10 @@ dependencies:
   flutter_map: ^8.3.2
   latlong2: ^0.10.1
   web_socket_channel: ^3.0.3
+  url_launcher: ^6.3.3
+  # Modelos y API compartidos con el administrador de escritorio (misma información).
+  alumvid_admin_desktop:
+    path: ../alumvid_admin_desktop
 
 dev_dependencies:
   flutter_test:

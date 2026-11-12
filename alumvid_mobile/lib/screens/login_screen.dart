@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'cambiar_password_screen.dart';
-import 'rutas_screen.dart';
+import '../core/sesion.dart';
+import 'home_shell.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -154,9 +155,11 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       } else {
+        final sesion = await Sesion.establecer(res);
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => RutasScreen(choferData: res)),
+          MaterialPageRoute(builder: (_) => pantallaInicial(sesion)),
         );
       }
     } catch (e) {
@@ -229,7 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
               const Text(
-                'AlumVid Chofer',
+                'AlumVid',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white,
@@ -239,7 +242,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const Text(
-                'Modulo Movil de Rutas & e-PoD',
+                'Operación móvil: pedidos, inventario y rutas',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
               ),

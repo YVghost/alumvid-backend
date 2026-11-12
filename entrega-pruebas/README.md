@@ -2,7 +2,7 @@
 
 ```
 entrega-pruebas/
-├── android/AlumVid-Chofer.apk        App móvil del chofer (release)      ← local, no se sube a Git
+├── android/AlumVid.apk               App móvil (todos los roles)         ← local, no se sube a Git
 ├── AlumVidAdmin-Windows.zip          Administrador de Windows comprimido   ← local, no se sube a Git
 ├── windows/AlumVidAdmin/             Administrador de Windows (copiar la carpeta completa)
 │   └── alumvid_admin_desktop.exe
@@ -31,7 +31,7 @@ Se conecta a `http://localhost:8080`.
 
 ## 3. App móvil en un teléfono Android real
 
-1. Copiar `android/AlumVid-Chofer.apk` al teléfono e instalarlo (permitir "instalar apps de origen desconocido").
+1. Copiar `android/AlumVid.apk` al teléfono e instalarlo (permitir "instalar apps de origen desconocido").
 2. Conectar el teléfono **a la misma Wi‑Fi que la PC**.
 3. En el login, la línea superior muestra el servidor actual. Si cambiaste de red:
    - **Servidor → Buscar automáticamente**: la app recorre la red Wi‑Fi y encuentra la PC con el backend.
@@ -39,6 +39,21 @@ Se conecta a `http://localhost:8080`.
 4. Si inicias sesión y el servidor guardado no responde (porque cambió la IP), la app busca el servidor sola y reintenta.
 
 > Las redes de invitados, universidades o algunos hotspots aíslan a los dispositivos entre sí; ahí ni la búsqueda ni la IP manual funcionan. Usa un hotspot del propio teléfono o una red doméstica.
+
+### Qué ve cada rol en la app móvil
+
+La app muestra la misma información que el administrador de escritorio, limitada por rol (las mismas reglas que aplica el backend):
+
+| Rol | Módulos |
+|---|---|
+| ADMINISTRADOR | Inicio, Monitoreo GPS, Rutas, Pedidos, Inventario (+ alta/edición y ajustes), Retazos, Bodega, Usuarios |
+| Cuenta maestra | Además: auditoría de seguridad, restablecer claves y desactivar usuarios |
+| VENDEDOR | Inicio, Pedidos, Inventario (consulta), Retazos, Bodega |
+| BODEGUERO | Igual que vendedor + registrar ingresos y salidas de stock |
+| CHOFER | Entra directo a "Mis rutas" (navegación, entrega con foto y firma) |
+| Varios roles | Suma los módulos de cada rol; los que no caben van en "Más" |
+
+La sesión queda guardada: al reabrir la app entra directo si el token sigue vigente.
 
 ## 4. Usuarios de prueba
 

@@ -595,6 +595,9 @@ class ApiService {
         'driver_id',
         'driver_name',
         'driver_email',
+        // Sesión compartida con los módulos administrativos (ver core/sesion.dart).
+        'admin_auth_token',
+        'admin_user_data',
       ]) {
         await prefs.remove(key);
       }

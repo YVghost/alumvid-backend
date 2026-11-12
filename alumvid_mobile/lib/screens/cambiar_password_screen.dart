@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../utils/app_toast.dart';
 import 'login_screen.dart';
-import 'rutas_screen.dart';
+import '../core/sesion.dart';
+import 'home_shell.dart';
 
 class CambiarPasswordScreen extends StatefulWidget {
   final String tempPassword;
@@ -67,13 +68,14 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
       final emailOrIdent = widget.choferData['email'] ?? widget.choferData['identification'] ?? '';
       final freshLogin = await ApiService.login(emailOrIdent, nueva);
 
+      final sesion = await Sesion.establecer(freshLogin);
       if (!mounted) return;
       AppToast.success(context, 'Contraseña actualizada con éxito. ¡Bienvenido a AlumVid!');
 
       // 3. Redirigir directamente al panel de rutas
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => RutasScreen(choferData: freshLogin)),
+        MaterialPageRoute(builder: (_) => pantallaInicial(sesion)),
         (route) => false,
       );
     } catch (e) {

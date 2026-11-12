@@ -5,7 +5,7 @@ import 'package:alumvid_mobile/main.dart';
 void main() {
   testWidgets('Login renders without embedded credentials', (tester) async {
     await tester.pumpWidget(const AlumVidApp());
-    expect(find.text('AlumVid Chofer'), findsOneWidget);
+    expect(find.text('AlumVid'), findsOneWidget);
     expect(find.byType(TextField), findsNWidgets(2));
     for (final field in tester.widgetList<TextField>(find.byType(TextField))) {
       expect(field.controller!.text, isEmpty);
