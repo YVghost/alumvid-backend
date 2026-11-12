@@ -1,5 +1,7 @@
 # Aplicación móvil AlumVid
 
+[Guia de inicio y apagado seguro](../README_INICIO_Y_APAGADO.md): comandos diarios para abrir la ventana Android y cerrar servicios antes de apagar el equipo.
+
 Aplicación Flutter para conductores: login, consulta de rutas y paradas, navegación, ubicación y registro e-PoD. Esta rama es `services`; las modificaciones móviles posteriores de `develop` no se mezclaron al actualizar referencias.
 
 ## Entorno preparado en Windows

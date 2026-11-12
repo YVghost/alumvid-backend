@@ -1,19 +1,140 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // --dart-define=API_BASE_URL=http://IP-del-servidor:8085/api/v1
+  static String? _serverOverride;
+  static String normalizeServer(String input) {
+    final uri = Uri.tryParse(input.trim());
+    if (uri == null ||
+        !['http', 'https'].contains(uri.scheme) ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment ||
+        !['', '/', '/api/v1', '/api/v1/'].contains(uri.path)) {
+      throw const FormatException(
+        'Usa una dirección como http://192.168.1.10:8080',
+      );
+    }
+    return uri.replace(path: '/api/v1').toString();
+  }
+
+  static Future<void> initialize() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('api_base_url');
+    _serverOverride = null;
+    if (saved != null) {
+      try {
+        _serverOverride = normalizeServer(saved);
+      } on FormatException {
+        /* Usar configuración inicial. */
+      }
+    }
+  }
+
+  static Future<void> setServer(String input) async {
+    final next = normalizeServer(input);
+    await logout();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('api_base_url', next);
+    _serverOverride = next;
+  }
+
+  /// Comprueba si [host] responde como el API Gateway de AlumVid en el puerto 8080.
+  static Future<bool> _esGatewayAlumVid(
+    String host, {
+    Duration timeout = const Duration(milliseconds: 900),
+  }) async {
+    final client = HttpClient()..connectionTimeout = timeout;
+    try {
+      final request = await client
+          .getUrl(Uri.parse('http://$host:8080/platform-info'))
+          .timeout(timeout);
+      final response = await request.close().timeout(timeout);
+      if (response.statusCode != 200) return false;
+      final body = await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(timeout);
+      return body.contains('AlumVid API Gateway');
+    } catch (_) {
+      return false;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  /// Busca el backend en la red local del teléfono (misma Wi-Fi que la PC).
+  /// Devuelve la URL encontrada (ya guardada como servidor) o null.
+  static Future<String?> descubrirServidor() async {
+    // 1) El servidor actual sigue funcionando: no hace falta buscar.
+    final actual = Uri.tryParse(baseUrl);
+    if (actual != null &&
+        actual.host.isNotEmpty &&
+        await _esGatewayAlumVid(actual.host)) {
+      return baseUrl;
+    }
+
+    // 2) Recorrer las subredes /24 privadas de las interfaces del teléfono.
+    final interfaces = await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+      includeLoopback: false,
+    );
+    final propias = <String>{};
+    final prefijos = <String>{};
+    for (final iface in interfaces) {
+      for (final addr in iface.addresses) {
+        final p = addr.address.split('.');
+        if (p.length != 4) continue;
+        final a = int.tryParse(p[0]) ?? 0, b = int.tryParse(p[1]) ?? 0;
+        final privada =
+            a == 10 ||
+            (a == 172 && b >= 16 && b <= 31) ||
+            (a == 192 && b == 168);
+        if (!privada) continue;
+        propias.add(addr.address);
+        prefijos.add('${p[0]}.${p[1]}.${p[2]}');
+      }
+    }
+
+    for (final prefijo in prefijos) {
+      final candidatos = [
+        for (var i = 1; i < 255; i++) '$prefijo.$i',
+      ].where((h) => !propias.contains(h)).toList();
+      const lote = 48;
+      for (var i = 0; i < candidatos.length; i += lote) {
+        final grupo = candidatos.skip(i).take(lote).toList();
+        final resultados = await Future.wait(grupo.map(_esGatewayAlumVid));
+        final idx = resultados.indexOf(true);
+        if (idx >= 0) {
+          await setServer('http://${grupo[idx]}:8080');
+          return baseUrl;
+        }
+      }
+    }
+    return null;
+  }
+
+  static bool esErrorDeConexion(Object e) =>
+      e is SocketException ||
+      e is TimeoutException ||
+      e is http.ClientException;
+
+  // --dart-define=API_BASE_URL=http://IP-del-servidor:8080/api/v1
   static String get baseUrl {
+    if (_serverOverride != null) return _serverOverride!;
     const configured = String.fromEnvironment('API_BASE_URL');
     if (configured.isNotEmpty) {
       return configured.replaceFirst(RegExp(r'/+$'), '');
     }
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8085/api/v1';
+      return 'http://10.0.2.2:8080/api/v1';
     }
-    return 'http://localhost:8085/api/v1';
+    return 'http://localhost:8080/api/v1';
   }
 
   static Future<String?> getToken() async {
@@ -31,21 +152,36 @@ class ApiService {
     return prefs.getString('driver_name');
   }
 
-  static Future<Map<String, dynamic>> login(String email, String password) async {
+  static Future<Map<String, dynamic>> login(
+    String email,
+    String password,
+  ) async {
     final url = Uri.parse('$baseUrl/auth/login');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'identification': email, 'email': email, 'password': password}),
-    );
+    final response = await http
+        .post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'identification': email,
+            'email': email,
+            'password': password,
+          }),
+        )
+        .timeout(const Duration(seconds: 8));
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final prefs = await SharedPreferences.getInstance();
       final token = data['token'] ?? data['accessToken'] ?? '';
-      final driverId = data['id'] ?? (data['user'] != null ? data['user']['id'] : '');
-      final driverName = data['nombre'] ?? data['fullName'] ?? (data['user'] != null ? data['user']['fullName'] : '');
-      final driverEmail = data['email'] ?? (data['user'] != null ? data['user']['email'] : email);
+      final driverId =
+          data['id'] ?? (data['user'] != null ? data['user']['id'] : '');
+      final driverName =
+          data['nombre'] ??
+          data['fullName'] ??
+          (data['user'] != null ? data['user']['fullName'] : '');
+      final driverEmail =
+          data['email'] ??
+          (data['user'] != null ? data['user']['email'] : email);
 
       await prefs.setString('auth_token', token.toString());
       await prefs.setString('driver_id', driverId.toString());
@@ -64,17 +200,23 @@ class ApiService {
           }
         }
       } catch (e) {
-        if (e is Exception && !e.toString().contains('FormatException') && !e.toString().contains('FormatSyntaxError')) {
+        if (e is Exception &&
+            !e.toString().contains('FormatException') &&
+            !e.toString().contains('FormatSyntaxError')) {
           rethrow;
         }
       }
-      throw Exception('Credenciales invalidas o cuenta no registrada en el sistema.');
+      throw Exception(
+        'Credenciales invalidas o cuenta no registrada en el sistema.',
+      );
     }
   }
 
   static Future<List<dynamic>> obtenerDespachosHoy(String choferId) async {
     final token = await getToken();
-    final url = Uri.parse('$baseUrl/logistica/choferes/$choferId/despachos-hoy');
+    final url = Uri.parse(
+      '$baseUrl/logistica/choferes/$choferId/despachos-hoy',
+    );
     final response = await http.get(
       url,
       headers: {
@@ -126,9 +268,15 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> optimizarRutaChofer(String rutaId, {required double latitud, required double longitud}) async {
+  static Future<Map<String, dynamic>> optimizarRutaChofer(
+    String rutaId, {
+    required double latitud,
+    required double longitud,
+  }) async {
     final token = await getToken();
-    final url = Uri.parse('$baseUrl/logistica/rutas/$rutaId/optimizar-chofer?latitud=$latitud&longitud=$longitud');
+    final url = Uri.parse(
+      '$baseUrl/logistica/rutas/$rutaId/optimizar-chofer?latitud=$latitud&longitud=$longitud',
+    );
     final response = await http.post(
       url,
       headers: {
@@ -157,33 +305,40 @@ class ApiService {
     try {
       final token = await getToken();
       final url = Uri.parse('$baseUrl/logistica/telemetria');
-      await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'choferId': choferId,
-          'despachoId': despachoId,
-          'latitud': lat,
-          'longitud': lon,
-          'velocidadKmh': velocidad,
-          'rumbo': rumbo,
-          'choferNombre': choferNombre,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        }),
-      ).timeout(const Duration(seconds: 4));
+      await http
+          .post(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              if (token != null) 'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'choferId': choferId,
+              'despachoId': despachoId,
+              'latitud': lat,
+              'longitud': lon,
+              'velocidadKmh': velocidad,
+              'rumbo': rumbo,
+              'choferNombre': choferNombre,
+              'timestamp': DateTime.now().millisecondsSinceEpoch,
+            }),
+          )
+          .timeout(const Duration(seconds: 4));
     } catch (e) {
       debugPrint('Error enviando telemetria GPS: $e');
     }
   }
 
   static Future<Map<String, dynamic>> obtenerRutaVialOsrm(
-      double origenLat, double origenLon, double destLat, double destLon) async {
+    double origenLat,
+    double origenLon,
+    double destLat,
+    double destLon,
+  ) async {
     try {
       final url = Uri.parse(
-          'https://router.project-osrm.org/route/v1/driving/$origenLon,$origenLat;$destLon,$destLat?overview=full&geometries=geojson');
+        'https://router.project-osrm.org/route/v1/driving/$origenLon,$origenLat;$destLon,$destLat?overview=full&geometries=geojson',
+      );
       final response = await http.get(url).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -246,9 +401,13 @@ class ApiService {
     };
   }
 
-  static Future<Map<String, dynamic>> aceptarEIniciarRuta(String despachoId) async {
+  static Future<Map<String, dynamic>> aceptarEIniciarRuta(
+    String despachoId,
+  ) async {
     final token = await getToken();
-    final url = Uri.parse('$baseUrl/logistica/despachos/$despachoId/aceptar-inicio');
+    final url = Uri.parse(
+      '$baseUrl/logistica/despachos/$despachoId/aceptar-inicio',
+    );
     final response = await http.post(
       url,
       headers: {
@@ -298,7 +457,10 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> cancelarRuta(String despachoId, String motivo) async {
+  static Future<Map<String, dynamic>> cancelarRuta(
+    String despachoId,
+    String motivo,
+  ) async {
     final token = await getToken();
     final url = Uri.parse('$baseUrl/logistica/despachos/$despachoId/cancelar');
     final response = await http.post(
@@ -326,7 +488,9 @@ class ApiService {
     String? comentarios,
   }) async {
     final token = await getToken();
-    final url = Uri.parse('$baseUrl/logistica/despachos/$despachoId/cerrar-entrega');
+    final url = Uri.parse(
+      '$baseUrl/logistica/despachos/$despachoId/cerrar-entrega',
+    );
     final response = await http.post(
       url,
       headers: {
@@ -338,7 +502,8 @@ class ApiService {
         'firmaUrl': firmaUrl,
         'latitud': latitud,
         'longitud': longitud,
-        'comentarios': comentarios ?? 'Entrega registrada desde aplicacion movil',
+        'comentarios':
+            comentarios ?? 'Entrega registrada desde aplicacion movil',
       }),
     );
 
@@ -346,7 +511,9 @@ class ApiService {
       return jsonDecode(response.body);
     } else {
       final err = jsonDecode(response.body);
-      throw Exception(err['message'] ?? 'Error al cerrar la entrega con prueba e-PoD');
+      throw Exception(
+        err['message'] ?? 'Error al cerrar la entrega con prueba e-PoD',
+      );
     }
   }
 
@@ -385,13 +552,15 @@ class ApiService {
 
     try {
       final url = Uri.parse('$baseUrl/auth/me');
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(const Duration(seconds: 4));
+      final response = await http
+          .get(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(const Duration(seconds: 4));
 
       return response.statusCode == 200;
     } catch (_) {
@@ -405,16 +574,27 @@ class ApiService {
     final token = prefs.getString('auth_token');
     try {
       if (token != null && token.isNotEmpty) {
-        await http.post(
-          Uri.parse('$baseUrl/auth/logout'),
-          headers: {'Authorization': 'Bearer $token'},
-        ).timeout(const Duration(seconds: 4));
+        await http
+            .post(
+              Uri.parse('$baseUrl/auth/logout'),
+              headers: {'Authorization': 'Bearer $token'},
+            )
+            .timeout(const Duration(seconds: 4));
       }
     } catch (_) {
       // Sin red se cierra la sesion local; el servidor conserva su vencimiento.
-      debugPrint('No se pudo revocar la sesion remota; se borro la sesion local.');
+      debugPrint(
+        'No se pudo revocar la sesion remota; se borro la sesion local.',
+      );
     } finally {
-      await prefs.clear();
+      for (final key in [
+        'auth_token',
+        'driver_id',
+        'driver_name',
+        'driver_email',
+      ]) {
+        await prefs.remove(key);
+      }
     }
   }
 }

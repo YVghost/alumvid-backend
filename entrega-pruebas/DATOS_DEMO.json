@@ -1,0 +1,304 @@
+{
+  "prefix": "DEMO-729717",
+  "createdAt": "2026-11-12T02:14:08.691687+00:00",
+  "clients": [
+    {
+      "id": "6fa988dc-9eff-46ec-836b-523926e9e0c2",
+      "name": "DEMO Ana Pruebas",
+      "identification": "DEMO-729717-CLIENTE0",
+      "phone": "0990000000",
+      "email": "",
+      "address": "Dirección ficticia Quito",
+      "active": true,
+      "created_at": "2026-11-12T02:14:11.828+00:00",
+      "updated_at": "2026-11-12T02:14:11.828+00:00"
+    },
+    {
+      "id": "c5948633-1c75-4a3e-9707-214eb9711512",
+      "name": "DEMO Constructora Ejemplo",
+      "identification": "DEMO-729717-CLIENTE1",
+      "phone": "0990000000",
+      "email": "",
+      "address": "Dirección ficticia Quito",
+      "active": true,
+      "created_at": "2026-11-12T02:14:11.841+00:00",
+      "updated_at": "2026-11-12T02:14:11.841+00:00"
+    },
+    {
+      "id": "1d856dbb-c30b-47a9-a8b5-74bb640cb6b1",
+      "name": "DEMO Carlos Demostración",
+      "identification": "DEMO-729717-CLIENTE2",
+      "phone": "0990000000",
+      "email": "",
+      "address": "Dirección ficticia Quito",
+      "active": true,
+      "created_at": "2026-11-12T02:14:11.870+00:00",
+      "updated_at": "2026-11-12T02:14:11.870+00:00"
+    }
+  ],
+  "products": {
+    "tornillos": {
+      "id": "53a59539-2e72-4443-9a5c-0277f2fdf53d",
+      "code": "DEMO-729717-TOR",
+      "name": "DEMO Tornillos",
+      "category": "ACCESORIOS",
+      "unit": "UNIDAD",
+      "description": "Material ficticio para pruebas manuales",
+      "supplier": "Proveedor ficticio",
+      "externalCode": "",
+      "location": "",
+      "minStock": "20.0000",
+      "stock": "0.000000000000",
+      "active": true,
+      "piecesManaged": false,
+      "createdAt": "2026-11-12T02:14:11.888699Z",
+      "updatedAt": "2026-11-12T02:14:11.888699Z"
+    },
+    "silicona": {
+      "id": "6799f020-9802-449e-a397-3bf41f99cabd",
+      "code": "DEMO-729717-SIL",
+      "name": "DEMO Silicona - stock bajo",
+      "category": "ACCESORIOS",
+      "unit": "UNIDAD",
+      "description": "Material ficticio para pruebas manuales",
+      "supplier": "Proveedor ficticio",
+      "externalCode": "",
+      "location": "",
+      "minStock": "5.0000",
+      "stock": "0.000000000000",
+      "active": true,
+      "piecesManaged": false,
+      "createdAt": "2026-11-12T02:14:11.918021Z",
+      "updatedAt": "2026-11-12T02:14:11.918021Z"
+    },
+    "faltante": {
+      "id": "3b8225c8-310f-45bc-a443-9e5b3ee49360",
+      "code": "DEMO-729717-CER",
+      "name": "DEMO Cerradura - sin stock",
+      "category": "ACCESORIOS",
+      "unit": "UNIDAD",
+      "description": "Material ficticio para pruebas manuales",
+      "supplier": "Proveedor ficticio",
+      "externalCode": "",
+      "location": "",
+      "minStock": "2.0000",
+      "stock": "0.000000000000",
+      "active": true,
+      "piecesManaged": false,
+      "createdAt": "2026-11-12T02:14:11.97855Z",
+      "updatedAt": "2026-11-12T02:14:11.97855Z"
+    },
+    "vidrio": {
+      "id": "40ebbfe8-7421-4af3-908f-ea9babeb8757",
+      "code": "DEMO-729717-VID-MAR",
+      "name": "DEMO Vidrio marrón 183 x 244 cm",
+      "category": "VIDRIO",
+      "unit": "UNIDAD",
+      "description": "Material ficticio para pruebas manuales",
+      "supplier": "Proveedor ficticio",
+      "externalCode": "",
+      "location": "",
+      "minStock": "0.0000",
+      "stock": "0.000000000000",
+      "active": true,
+      "piecesManaged": false,
+      "createdAt": "2026-11-12T02:14:12.010358Z",
+      "updatedAt": "2026-11-12T02:14:12.010358Z"
+    },
+    "aluminio": {
+      "id": "0f99150b-210e-4649-af96-f9a97271a8c6",
+      "code": "DEMO-729717-ALU-PER",
+      "name": "DEMO Perfil aluminio 6.40 m",
+      "category": "ALUMINIO",
+      "unit": "UNIDAD",
+      "description": "Material ficticio para pruebas manuales",
+      "supplier": "Proveedor ficticio",
+      "externalCode": "",
+      "location": "",
+      "minStock": "0.0000",
+      "stock": "0.000000000000",
+      "active": true,
+      "piecesManaged": false,
+      "createdAt": "2026-11-12T02:14:12.022322Z",
+      "updatedAt": "2026-11-12T02:14:12.022322Z"
+    }
+  },
+  "spaces": {
+    "A3": {
+      "id": "d93ab6f1-8bfe-42e8-ae1f-3e30177c6703",
+      "code": "DEMO-729717-A3",
+      "description": "Espacio mixto ficticio A3",
+      "active": true,
+      "created_at": "2026-11-12T02:14:11.725+00:00"
+    },
+    "B3": {
+      "id": "9bb7178c-ac28-4e2b-92d0-e600608cbba7",
+      "code": "DEMO-729717-B3",
+      "description": "Espacio mixto ficticio B3",
+      "active": true,
+      "created_at": "2026-11-12T02:14:11.762+00:00"
+    },
+    "C1": {
+      "id": "093bb42f-dada-4af8-bbe2-b38c575e443b",
+      "code": "DEMO-729717-C1",
+      "description": "Espacio mixto ficticio C1",
+      "active": true,
+      "created_at": "2026-11-12T02:14:11.794+00:00"
+    }
+  },
+  "scenarios": {
+    "RESERVADO": {
+      "orderId": "480665c1-3f2f-483d-9737-a4c7da15f2df",
+      "number": 12,
+      "state": "RESERVADO"
+    },
+    "PENDIENTE_MATERIAL": {
+      "orderId": "0a29c6cf-b21c-4d2b-84a1-0205d5f2bdd9",
+      "number": 13,
+      "state": "PENDIENTE_MATERIAL"
+    },
+    "RETIRO_LISTO": {
+      "orderId": "2ed477e4-61fd-4ab2-a0cf-361fa0e5f876",
+      "number": 14,
+      "state": "LISTO"
+    },
+    "RETIRO_PARCIAL": {
+      "orderId": "179448e5-8fca-4ea0-a69b-bb51c9206345",
+      "number": 15,
+      "state": "PARCIAL"
+    },
+    "LISTO_PARA_DESPACHAR": {
+      "orderId": "25b944ee-6047-4db4-9bda-e3a401be11ab",
+      "number": 16,
+      "state": "LISTO"
+    },
+    "RUTA_PENDIENTE_CHOFER1": {
+      "orderId": "c7a333fd-3dc3-4a04-b335-06ecd5f833b8",
+      "number": 17,
+      "shipmentId": "1d5bfedd-fcea-434f-8b4d-9476addc489d",
+      "dispatchId": "42eb12d2-f367-413f-a495-c4012cee22f2",
+      "routeId": "99692eea-098f-449b-98dc-2b8c2071c219",
+      "state": "EN_REPARTO"
+    },
+    "EN_RUTA_CHOFER2": {
+      "orderId": "a0d88f44-e31d-48ce-8711-58b341519206",
+      "number": 18,
+      "shipmentId": "374d5a71-ac97-451a-a647-69b021b7351f",
+      "dispatchId": "f40bc076-3e94-47dd-898c-eed2b1d8987a",
+      "routeId": "1fa7a32f-6a0a-44ac-b567-231ddd113d63",
+      "state": "EN_REPARTO"
+    },
+    "RETORNO_PENDIENTE": {
+      "orderId": "748bccb3-2e48-426c-b959-dbb226d59cbd",
+      "number": 19,
+      "shipmentId": "42dabf20-2aa1-43a3-9542-f9984b2ebca5",
+      "dispatchId": "067e623c-4273-4e96-8388-8ba85ed6228e",
+      "routeId": "cdd440e5-2ef6-419f-851e-409c6216a6f1",
+      "state": "CANCELADO"
+    },
+    "RETRASADO": {
+      "orderId": "fb232f8f-c55d-4767-82d9-506c4492f697",
+      "number": 20,
+      "state": "RETRASADO"
+    },
+    "ENTREGADO_RETIRO": {
+      "orderId": "a998f31e-f96f-4678-8cca-e86aa19c09cd",
+      "number": 21,
+      "state": "ENTREGADO"
+    },
+    "CORTE_DEVUELTO_AL_INVENTARIO": {
+      "orderId": "ca02c722-b95d-40c2-a75f-04de86b8976e",
+      "number": 22,
+      "state": "CANCELADO"
+    },
+    "VENCIDO": {
+      "orderId": "837684ba-dcb9-4a4f-9adc-5968bbec43f8",
+      "number": 23,
+      "state": "VENCIDO"
+    },
+    "ENTREGADO_LOGISTICA": {
+      "orderId": "d4f50624-549c-4302-818b-eac722e610a2",
+      "number": 24,
+      "shipmentId": "92ab96ab-d509-460b-b45f-318f62ef1998",
+      "dispatchId": "9a734043-ddec-4b17-91ac-8ec596df3f53",
+      "routeId": "937c4abc-9a58-450e-b45a-f57bb2fbbddc",
+      "state": "ENTREGADO"
+    }
+  },
+  "users": [
+    {
+      "id": "8c7573f7-7547-4a05-82c3-c9271bac0cae",
+      "identification": "DEMO-729717-ADMIN",
+      "roles": [
+        "ADMINISTRADOR"
+      ],
+      "temporary": false,
+      "inactive": false
+    },
+    {
+      "id": "9f0c3eae-c233-4fed-b4e3-6bf0bccff45b",
+      "identification": "DEMO-729717-VENTAS",
+      "roles": [
+        "VENDEDOR"
+      ],
+      "temporary": false,
+      "inactive": false
+    },
+    {
+      "id": "8899569a-593a-40f1-be48-5e22f9a6f05f",
+      "identification": "DEMO-729717-BODEGA",
+      "roles": [
+        "BODEGUERO"
+      ],
+      "temporary": false,
+      "inactive": false
+    },
+    {
+      "id": "4341f421-baf5-4754-bc55-ac9453b5b310",
+      "identification": "DEMO-729717-CHOFER1",
+      "roles": [
+        "CHOFER"
+      ],
+      "temporary": false,
+      "inactive": false
+    },
+    {
+      "id": "62332d6a-f807-48be-ac83-96fa99a3a06a",
+      "identification": "DEMO-729717-CHOFER2",
+      "roles": [
+        "CHOFER"
+      ],
+      "temporary": false,
+      "inactive": false
+    },
+    {
+      "id": "758485c9-7cc4-4da9-9615-7dea41d0f1bc",
+      "identification": "DEMO-729717-MULTI",
+      "roles": [
+        "VENDEDOR",
+        "BODEGUERO",
+        "CHOFER"
+      ],
+      "temporary": false,
+      "inactive": false
+    },
+    {
+      "id": "551ea59d-fed9-4692-991d-bef0232177de",
+      "identification": "DEMO-729717-TEMP",
+      "roles": [
+        "CHOFER"
+      ],
+      "temporary": true,
+      "inactive": false
+    },
+    {
+      "id": "bca20a69-8b82-48b3-8fb2-d125a8865398",
+      "identification": "DEMO-729717-INACTIVO",
+      "roles": [
+        "VENDEDOR"
+      ],
+      "temporary": false,
+      "inactive": true
+    }
+  ]
+}

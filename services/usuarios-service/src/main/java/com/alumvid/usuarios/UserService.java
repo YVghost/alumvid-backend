@@ -164,9 +164,6 @@ public class UserService {
         }
 
         String ident = request.identification().trim();
-        if (!validarCedulaEcuatoriana(ident)) {
-            throw new ApiError(400, "Cédula ecuatoriana inválida según el algoritmo del Registro Civil");
-        }
 
         if (users.byIdentification(ident).isPresent()) {
             throw new ApiError(409, "Ya existe un colaborador registrado con la cédula " + ident);
@@ -196,39 +193,6 @@ public class UserService {
         users.insert(u);
         users.audit(actor.id(), u.id(), "USER_CREATED", "Roles: " + Users.encode(u.roles()));
         return u.view();
-    }
-
-    public static boolean validarCedulaEcuatoriana(String cedula) {
-        if (cedula == null) return false;
-        String limpia = cedula.trim();
-        if ("1700000000".equals(limpia)) return true;
-        if (!limpia.matches("^\\d{10}$")) return false;
-
-        int prov;
-        try {
-            prov = Integer.parseInt(limpia.substring(0, 2));
-        } catch (NumberFormatException e) {
-            return false;
-        }
-        if ((prov < 1 || prov > 24) && prov != 30) return false;
-
-        int tercerDigito = Character.getNumericValue(limpia.charAt(2));
-        if (tercerDigito >= 6) return false;
-
-        int[] coeficientes = {2, 1, 2, 1, 2, 1, 2, 1, 2};
-        int suma = 0;
-        for (int i = 0; i < 9; i++) {
-            int val = Character.getNumericValue(limpia.charAt(i)) * coeficientes[i];
-            if (val >= 10) val -= 9;
-            suma += val;
-        }
-
-        int digitoVerificador = Character.getNumericValue(limpia.charAt(9));
-        int decenaSuperior = (suma % 10 == 0) ? suma : ((suma / 10) + 1) * 10;
-        int validador = decenaSuperior - suma;
-        if (validador == 10) validador = 0;
-
-        return validador == digitoVerificador;
     }
 
     @Transactional
@@ -317,10 +281,8 @@ public class UserService {
         }
         requireMaster(actor);
 
+        users.db().update("UPDATE usuarios.app_user SET active = FALSE WHERE id = ?", id);
         users.revoke(id);
-        users.db().update("UPDATE usuarios.audit_event SET actor_id = NULL WHERE actor_id = ?", id);
-        users.db().update("UPDATE usuarios.audit_event SET target_id = NULL WHERE target_id = ?", id);
-        users.db().update("DELETE FROM usuarios.app_user WHERE id = ?", id);
-        users.audit(actor.id(), null, "USER_DELETED", "Usuario eliminado: " + target.identification() + " - " + target.fullName());
+        users.audit(actor.id(), id, "USER_DEACTIVATED", "Cuenta desactivada; historial conservado");
     }
 }

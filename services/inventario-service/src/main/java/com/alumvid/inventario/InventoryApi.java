@@ -74,6 +74,6 @@ class InventoryApi {
             return isStart ? d.atStartOfDay(zone).toOffsetDateTime()
                            : d.atTime(23, 59, 59, 999000000).atZone(zone).toOffsetDateTime();
         } catch (Exception ignored) {}
-        return null;
+        throw new InventoryError(400, "Fecha inválida; utiliza formato ISO-8601");
     }
 }

@@ -38,6 +38,7 @@ class PedidosSecurity {
                 .requestMatchers("/api/pedidos/availability").hasAnyRole("ADMINISTRADOR","VENDEDOR","BODEGUERO")
                 .requestMatchers("/api/pedidos/clients","/api/pedidos/clients/*").hasAnyRole("ADMINISTRADOR","VENDEDOR")
                 .requestMatchers("/api/pedidos/orders","/api/pedidos/orders/*/confirm","/api/pedidos/orders/*/retry","/api/pedidos/orders/*/cancel").hasAnyRole("ADMINISTRADOR","VENDEDOR")
+                .requestMatchers("/api/pedidos/orders/*/shipments","/api/pedidos/shipments/*/receive-return").hasAnyRole("ADMINISTRADOR","BODEGUERO")
                 .requestMatchers("/api/pedidos/orders/*/prepare","/api/pedidos/orders/*/dispatch","/api/pedidos/orders/*/deliver","/api/pedidos/orders/*/receive-return").hasAnyRole("ADMINISTRADOR","BODEGUERO")
                 .requestMatchers("/api/pedidos/orders/*/delay","/api/pedidos/orders/*/resume").hasAnyRole("ADMINISTRADOR","VENDEDOR","BODEGUERO")
                 .anyRequest().denyAll())

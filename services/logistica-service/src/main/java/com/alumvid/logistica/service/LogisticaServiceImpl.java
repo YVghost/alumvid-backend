@@ -39,6 +39,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     private final SimpMessagingTemplate messagingTemplate;
     private final GoogleRoutesService googleRoutesService;
     private final JdbcTemplate jdbcTemplate;
+    private final CommercialOrderBridge commercialBridge;
 
     @Override
     @Transactional
@@ -122,6 +123,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public DespachoResponse asignarDespacho(AsignarDespachoRequest request) {
+        commercialBridge.immutableLogisticsOrder(request.getPedidoId());
         Pedido pedido = pedidoRepository.findById(request.getPedidoId())
                 .orElseThrow(() -> new IllegalArgumentException("Pedido no encontrado con ID: " + request.getPedidoId()));
 
@@ -170,6 +172,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public RutaResponse crearRutaConsolidada(CrearRutaConsolidadaRequest request) {
+        request.getPedidoIds().forEach(commercialBridge::immutableLogisticsOrder);
         Chofer chofer = choferRepository.findById(request.getChoferId())
                 .orElseThrow(() -> new IllegalArgumentException("Chofer no encontrado con ID: " + request.getChoferId()));
 
@@ -391,6 +394,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public RutaResponse aceptarEIniciarRutaConsolidada(UUID rutaId) {
+        commercialBridge.route(rutaId,true);
         Ruta ruta = rutaRepository.findById(rutaId)
                 .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
 
@@ -425,6 +429,8 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public RutaResponse cancelarRutaConsolidada(UUID rutaId, String motivo) {
+        commercialBridge.route(rutaId,false);
+        commercialBridge.cancelRoute(rutaId,motivo);
         Ruta ruta = rutaRepository.findById(rutaId)
                 .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
 
@@ -464,6 +470,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public RutaResponse completarRutaConsolidada(UUID rutaId) {
+        commercialBridge.route(rutaId,false);
         Ruta ruta = rutaRepository.findById(rutaId)
                 .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
 
@@ -501,6 +508,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public DespachoResponse aceptarEIniciarRuta(UUID despachoId) {
+        commercialBridge.lock(despachoId,true);
         Despacho despacho = despachoRepository.findById(despachoId)
                 .orElseThrow(() -> new IllegalArgumentException("Despacho no encontrado con ID: " + despachoId));
 
@@ -557,6 +565,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public DespachoResponse cancelarRuta(UUID despachoId, String motivo) {
+        commercialBridge.lock(despachoId,false);
         Despacho despacho = despachoRepository.findById(despachoId)
                 .orElseThrow(() -> new IllegalArgumentException("Despacho no encontrado con ID: " + despachoId));
 
@@ -564,6 +573,7 @@ public class LogisticaServiceImpl implements LogisticaService {
             throw new IllegalStateException("No se puede cancelar una entrega ya completada y documentada.");
         }
 
+        commercialBridge.cancelled(despachoId,motivo);
         despacho.setEstado(EstadoDespacho.CANCELADA);
         String comentarioPrevio = despacho.getComentarios() != null ? despacho.getComentarios() : "";
         StringBuilder sbTags = new StringBuilder();
@@ -621,11 +631,12 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public DespachoResponse cerrarEntrega(UUID despachoId, CerrarEntregaRequest request) {
+        commercialBridge.lock(despachoId,false);
         Despacho despacho = despachoRepository.findById(despachoId)
                 .orElseThrow(() -> new IllegalArgumentException("Despacho no encontrado con ID: " + despachoId));
 
         if (despacho.getEstado() == EstadoDespacho.ENTREGADO) {
-            throw new IllegalStateException("La entrega ya fue registrada previamente.");
+            return mapearADespachoResponse(despacho);
         }
 
         if (request.getFotoPodUrl() == null || request.getFotoPodUrl().trim().isEmpty()) {
@@ -653,6 +664,7 @@ public class LogisticaServiceImpl implements LogisticaService {
         boolean desvioExcesivo = distanciaCalculada > UMBRAL_ALERTA_DESVIACION_METROS;
         despacho.setAlertaDesviacion(desvioExcesivo);
 
+        commercialBridge.delivered(despachoId);
         despacho.setEstado(EstadoDespacho.ENTREGADO);
 
         Pedido pedido = despacho.getPedido();
@@ -885,6 +897,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public RutaResponse asignarChoferRuta(UUID rutaId, UUID choferId) {
+        commercialBridge.immutableRoute(rutaId);
         Ruta ruta = rutaRepository.findById(rutaId)
                 .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
 
@@ -919,6 +932,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public RutaResponse agregarDestinoRuta(UUID rutaId, DestinoRutaRequest request) {
+        commercialBridge.immutableRoute(rutaId);
         Ruta ruta = rutaRepository.findById(rutaId)
                 .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
 
@@ -967,6 +981,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public RutaResponse modificarDestinoRuta(UUID rutaId, UUID despachoId, DestinoRutaRequest request) {
+        commercialBridge.immutableRoute(rutaId);
         Ruta ruta = rutaRepository.findById(rutaId)
                 .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
 
@@ -1009,6 +1024,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public RutaResponse eliminarDestinoRuta(UUID rutaId, UUID despachoId) {
+        commercialBridge.immutableRoute(rutaId);
         Ruta ruta = rutaRepository.findById(rutaId)
                 .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
 
@@ -1100,6 +1116,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public void eliminarRuta(UUID rutaId) {
+        commercialBridge.immutableRoute(rutaId);
         Ruta ruta = rutaRepository.findById(rutaId)
                 .orElseThrow(() -> new IllegalArgumentException("Ruta no encontrada con ID: " + rutaId));
 
@@ -1128,6 +1145,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public void eliminarChofer(UUID choferId) {
+        commercialBridge.immutableDriver(choferId);
         choferRepository.findById(choferId).ifPresent(chofer -> {
             List<Ruta> rutas = rutaRepository.findByChoferIdOrderByFechaCreacionDesc(choferId);
             for (Ruta r : rutas) {

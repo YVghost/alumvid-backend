@@ -23,7 +23,7 @@ class PlaceSearchResult {
 /// y un mecanismo de respaldo automático hacia Photon / OpenStreetMap para máxima resiliencia.
 class LocationSearchService {
   static const String _prefGoogleKey = 'google_maps_api_key_custom';
-  static const String defaultGoogleKey = 'AIzaSyDYqJ2TbM6UD5GIHt6wTDRrhpzdQx2QsmQ';
+  static const String defaultGoogleKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
 
   static Future<String> getApiKey() async {
     final prefs = await SharedPreferences.getInstance();

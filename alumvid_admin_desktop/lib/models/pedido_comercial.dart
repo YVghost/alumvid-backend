@@ -33,15 +33,15 @@ class PedidoComercial {
   factory PedidoComercial.fromJson(Map<String, dynamic> json) {
     return PedidoComercial(
       id: json['id']?.toString() ?? '',
-      number: (json['number'] as num?)?.toInt() ?? 0,
+      number: int.tryParse(json['number']?.toString() ?? '') ?? 0,
       clientId: json['client_id']?.toString() ?? json['clientId']?.toString() ?? '',
       clientName: json['client_name']?.toString() ?? json['clientName']?.toString() ?? 'Cliente',
       state: json['state']?.toString() ?? 'RESERVADO',
       deliveryMode: json['delivery_mode']?.toString() ?? json['deliveryMode']?.toString() ?? 'ENTREGA',
       deliveryAddress: json['delivery_address']?.toString() ?? json['deliveryAddress']?.toString(),
       receiverName: json['receiver_name']?.toString() ?? json['receiverName']?.toString(),
-      total: (json['total'] as num?)?.toDouble() ?? 0.0,
-      expiresAt: json['expires_at'] != null ? DateTime.tryParse(json['expires_at'].toString()) : null,
+      total: double.tryParse(json['total']?.toString() ?? '') ?? 0.0,
+      expiresAt: DateTime.tryParse((json['expires_at'] ?? json['expiresAt'] ?? '').toString()),
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
       notes: json['notes']?.toString(),
     );
@@ -79,4 +79,3 @@ class ClienteComercial {
     );
   }
 }
-

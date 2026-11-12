@@ -1,3 +1,4 @@
+import 'screens/cambiar_password_screen.dart';
 import 'package:flutter/material.dart';
 import 'models/user.dart';
 import 'screens/admin_dashboard_screen.dart';
@@ -30,7 +31,9 @@ class AlumVidAdminApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       home: usuarioInicial != null && usuarioInicial!.isAdmin
-          ? AdminDashboardScreen(user: usuarioInicial!)
+          ? (usuarioInicial!.mustChangePassword
+                ? const CambiarPasswordScreen()
+                : AdminDashboardScreen(user: usuarioInicial!))
           : const LoginScreen(),
     );
   }

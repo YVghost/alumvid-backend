@@ -1,3 +1,4 @@
+import 'cambiar_password_screen.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
@@ -11,11 +12,18 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _identCtrl = TextEditingController(text: '1700000000');
-  final _passCtrl = TextEditingController(text: 'AlumVidAdmin2026!');
+  final _identCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
   bool _ocultarPass = true;
   bool _cargando = false;
   String _hostActual = 'http://localhost:8080';
+
+  @override
+  void dispose() {
+    _identCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -38,7 +46,11 @@ class _LoginScreenState extends State<LoginScreen> {
         backgroundColor: AppTheme.surface,
         title: const Row(
           children: [
-            Icon(Icons.settings_ethernet, color: AppTheme.primaryLight, size: 20),
+            Icon(
+              Icons.settings_ethernet,
+              color: AppTheme.primaryLight,
+              size: 20,
+            ),
             SizedBox(width: 8),
             Text('Conexión con el Servidor', style: TextStyle(fontSize: 15)),
           ],
@@ -64,7 +76,10 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar', style: TextStyle(color: AppTheme.textMuted)),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: AppTheme.textMuted),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, hostCtrl.text.trim()),
@@ -82,11 +97,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _iniciarSesion() async {
     final ident = _identCtrl.text.trim();
-    final pass = _passCtrl.text.trim();
+    final pass = _passCtrl.text;
 
     if (ident.isEmpty || pass.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor complete su identificación y contraseña.')),
+        const SnackBar(
+          content: Text('Por favor complete su identificación y contraseña.'),
+        ),
       );
       return;
     }
@@ -99,20 +116,24 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => AdminDashboardScreen(user: user)),
+        MaterialPageRoute(
+          builder: (_) => user.mustChangePassword
+              ? const CambiarPasswordScreen()
+              : AdminDashboardScreen(user: user),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _cargando = false);
       String msg = e.toString().replaceAll('Exception: ', '');
-      if (msg.contains('SocketException') || msg.contains('rechazó la conexión') || msg.contains('errno = 1225')) {
-        msg = 'Error de conexión con el API Gateway (http://localhost:8080). Espere unos segundos a que los microservicios terminen de iniciar o verifique Docker.';
+      if (msg.contains('SocketException') ||
+          msg.contains('rechazó la conexión') ||
+          msg.contains('errno = 1225')) {
+        msg =
+            'Error de conexión con el API Gateway (http://localhost:8080). Espere unos segundos a que los microservicios terminen de iniciar o verifique Docker.';
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: AppTheme.statusAlerta,
-        ),
+        SnackBar(content: Text(msg), backgroundColor: AppTheme.statusAlerta),
       );
     }
   }
@@ -132,7 +153,11 @@ class _LoginScreenState extends State<LoginScreen> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppTheme.border),
               boxShadow: const [
-                BoxShadow(color: Colors.black54, blurRadius: 24, offset: Offset(0, 8)),
+                BoxShadow(
+                  color: Colors.black54,
+                  blurRadius: 24,
+                  offset: Offset(0, 8),
+                ),
               ],
             ),
             child: Column(
@@ -160,14 +185,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   alignment: Alignment.center,
                   child: const Text(
                     'AV',
-                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.white),
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
 
                 const Text(
                   'AlumVid — Centro de Control',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
@@ -185,7 +218,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Identificación o Correo',
                     hintText: '1700000000 o admin@alumvid.com',
-                    prefixIcon: Icon(Icons.badge, size: 20, color: AppTheme.primaryLight),
+                    prefixIcon: Icon(
+                      Icons.badge,
+                      size: 20,
+                      color: AppTheme.primaryLight,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -196,7 +233,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: _ocultarPass,
                   decoration: InputDecoration(
                     labelText: 'Contraseña de Administrador',
-                    prefixIcon: const Icon(Icons.lock, size: 20, color: AppTheme.primaryLight),
+                    prefixIcon: const Icon(
+                      Icons.lock,
+                      size: 20,
+                      color: AppTheme.primaryLight,
+                    ),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _ocultarPass ? Icons.visibility_off : Icons.visibility,
@@ -218,17 +259,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: double.infinity,
                   height: 46,
                   child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                    ),
                     onPressed: _cargando ? null : _iniciarSesion,
                     child: _cargando
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Text(
                             'Ingresar al Panel Administrativo',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
                   ),
                 ),
@@ -251,12 +300,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     Flexible(
                       child: Text(
                         'Servidor: $_hostActual',
-                        style: const TextStyle(color: AppTheme.textDim, fontSize: 11),
+                        style: const TextStyle(
+                          color: AppTheme.textDim,
+                          fontSize: 11,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.settings, size: 16, color: AppTheme.primaryLight),
+                      icon: const Icon(
+                        Icons.settings,
+                        size: 16,
+                        color: AppTheme.primaryLight,
+                      ),
                       tooltip: 'Cambiar dirección del servidor',
                       onPressed: _abrirConfiguracionHost,
                     ),

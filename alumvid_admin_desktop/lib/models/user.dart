@@ -7,6 +7,7 @@ class AppUser {
   final List<String> roles;
   final bool master;
   final bool active;
+  final bool mustChangePassword;
 
   AppUser({
     required this.id,
@@ -17,6 +18,7 @@ class AppUser {
     required this.roles,
     required this.master,
     required this.active,
+    this.mustChangePassword = false,
   });
 
   bool get isAdmin => roles.contains('ADMINISTRADOR');
@@ -26,18 +28,25 @@ class AppUser {
     if (json['roles'] is List) {
       parsedRoles = (json['roles'] as List).map((r) => r.toString()).toList();
     } else if (json['roles'] is String) {
-      parsedRoles = (json['roles'] as String).split(',').map((r) => r.trim()).toList();
+      parsedRoles = (json['roles'] as String)
+          .split(',')
+          .map((r) => r.trim())
+          .toList();
     }
 
     return AppUser(
       id: json['id']?.toString() ?? '',
       identification: json['identification']?.toString() ?? '',
-      fullName: json['fullName']?.toString() ?? json['nombre']?.toString() ?? 'Usuario',
+      fullName:
+          json['fullName']?.toString() ??
+          json['nombre']?.toString() ??
+          'Usuario',
       email: json['email']?.toString() ?? '',
       telefono: json['telefono']?.toString(),
       roles: parsedRoles,
       master: json['master'] == true,
       active: json['active'] != false,
+      mustChangePassword: json['mustChangePassword'] == true,
     );
   }
 }

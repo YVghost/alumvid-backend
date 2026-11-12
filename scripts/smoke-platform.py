@@ -1,62 +1,59 @@
-"""Prueba integral de la plataforma AlumVid a través del API Gateway (puerto 8080)."""
+"""Consulta la plataforma integrada sin crear datos de negocio ni imprimir secretos."""
 import json
+import os
+from pathlib import Path
 import urllib.request
 from urllib.error import HTTPError
 
-GATEWAY_URL = "http://localhost:8080"
+ROOT = Path(__file__).resolve().parents[1]
+config = {}
+if (ROOT / '.env').exists():
+    for line in (ROOT / '.env').read_text(encoding='utf-8-sig').splitlines():
+        if line.strip() and not line.lstrip().startswith('#') and '=' in line:
+            key, value = line.split('=', 1)
+            config[key] = value.strip().strip('"').strip("'")
+config.update(os.environ)
+BASE = config.get('SMOKE_GATEWAY_URL', 'http://localhost:' + config.get('GATEWAY_PORT', '8080'))
 
-def do_request(path, method="GET", body=None, token=None):
-    url = f"{GATEWAY_URL}{path}"
-    headers = {"Content-Type": "application/json"}
+def request(path, method='GET', body=None, token=None):
+    headers = {'Content-Type': 'application/json'}
     if token:
-        headers["Authorization"] = f"Bearer {token}"
-    data = json.dumps(body).encode("utf-8") if body is not None else None
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        headers['Authorization'] = 'Bearer ' + token
+    req = urllib.request.Request(BASE + path, data=None if body is None else json.dumps(body).encode(), headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            content = resp.read().decode("utf-8")
-            return resp.status, content
-    except HTTPError as e:
-        content = e.read().decode("utf-8")
-        return e.code, content
+        with urllib.request.urlopen(req, timeout=15) as res:
+            return res.status, res.read().decode()
+    except HTTPError as exc:
+        return exc.code, exc.read().decode()
 
-print("[1/5] Verificando estado del API Gateway en puerto 8080...")
-status, body = do_request("/")
-assert status == 200, f"Error respondiendo Gateway: {status}"
-assert "AlumVid" in body, "El Gateway no contiene la identidad AlumVid"
-print(" -> OK: API Gateway AlumVid respondiendo correctamente en puerto 8080.")
+def run():
+    token = None
+    checks = []
+    try:
+        for path in ['/', '/platform-info', '/retazos/', '/pedidos/', '/ubicaciones/', '/css/styles.css', '/js/app.js', '/maps-loader.js']:
+            status, _ = request(path)
+            assert status == 200, f'{path}: HTTP {status}'
+            checks.append(path)
+        status, _ = request('/api/v1/admin/users')
+        assert status == 401, f'Sin sesion se esperaba 401, recibido {status}'
+        status, body = request('/api/v1/auth/login', 'POST', {
+            'identification': config['MASTER_IDENTIFICATION'], 'password': config['MASTER_PASSWORD']})
+        assert status == 200, f'Login HTTP {status}; revisa las credenciales locales sin publicarlas.'
+        login = json.loads(body)
+        token = login.get('accessToken') or login['token']
+        if login.get('mustChangePassword'):
+            raise AssertionError('La cuenta de prueba necesita cambiar la contraseña temporal; hacerlo desde el portal antes del smoke.')
+        for path in ['/api/v1/auth/me', '/api/v1/admin/users', '/api/products', '/api/products/movements', '/api/retazos/products', '/api/pedidos/clients', '/api/pedidos/orders', '/api/ubicaciones/spaces', '/api/v1/logistica/rutas']:
+            status, _ = request(path, token=token)
+            assert status == 200, f'{path}: HTTP {status}'
+            checks.append(path)
+        status, _ = request('/api/products/movements?from=invalid-date', token=token)
+        assert status == 400, f'Fecha invalida HTTP {status}'
+        print(json.dumps({'passed': True, 'checks': len(checks) + 2, 'businessDataCreated': False}, indent=2))
+    finally:
+        if token:
+            status, _ = request('/api/v1/auth/logout', 'POST', token=token)
+            assert status == 204, 'No se pudo revocar la sesion de prueba'
 
-print("[2/5] Probando autenticación JWT unificada (Master Admin por cédula)...")
-status, resp_str = do_request("/api/v1/auth/login", method="POST", body={
-    "identification": "1700000000",
-    "password": "AlumVidAdmin2026!"
-})
-assert status == 200, f"Error en login: {status} - {resp_str}"
-auth_data = json.loads(resp_str)
-token = auth_data.get("accessToken") or auth_data.get("token")
-assert token, "No se recibió accessToken ni token"
-print(f" -> OK: Login exitoso para {auth_data.get('fullName')}, roles: {auth_data.get('roles')}")
-
-print("[3/5] Probando autenticación con email alternativo...")
-status_email, resp_email_str = do_request("/api/v1/auth/login", method="POST", body={
-    "email": "admin@alumvid.com",
-    "password": "AlumVidAdmin2026!"
-})
-assert status_email == 200, f"Error en login por email: {status_email} - {resp_email_str}"
-print(" -> OK: Login dual (por correo electronico) validado.")
-
-print("[4/5] Probando inventario-service a través del Gateway...")
-status_inv, inv_str = do_request("/api/products", method="GET", token=token)
-assert status_inv == 200, f"Error obteniendo productos de inventario: {status_inv} - {inv_str}"
-products = json.loads(inv_str)
-print(f" -> OK: Inventario respondió vía Gateway. Productos listados: {len(products)}")
-
-print("[5/5] Probando logistica-service (PostGIS) a través del Gateway...")
-status_log, log_str = do_request("/api/v1/logistica/pedidos", method="GET", token=token)
-assert status_log == 200, f"Error obteniendo pedidos de logística: {status_log} - {log_str}"
-pedidos = json.loads(log_str)
-print(f" -> OK: Logística PostGIS respondió vía Gateway. Pedidos en base de datos: {len(pedidos)}")
-
-print("\n=======================================================")
-print("¡TODAS LAS PRUEBAS INTEGRALES DE ALUMVID PASARON AL 100%!")
-print("=======================================================")
+if __name__ == '__main__':
+    run()

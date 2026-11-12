@@ -352,11 +352,13 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                   const SizedBox(height: 12),
                   ...motivos.map((m) => RadioListTile<String>(
                         value: m,
+                        // ignore: deprecated_member_use
                         groupValue: motivoSeleccionado,
                         activeColor: const Color(0xFFEF4444),
                         contentPadding: EdgeInsets.zero,
                         dense: true,
                         title: Text(m, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                        // ignore: deprecated_member_use
                         onChanged: (val) {
                           if (val != null) setDialogState(() => motivoSeleccionado = val);
                         },

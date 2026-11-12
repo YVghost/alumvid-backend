@@ -137,7 +137,7 @@ started_content = False
 
 for line in lines:
     raw = line.rstrip('\r\n')
-    
+
     if not started_content:
         if raw.startswith('## 1. Contexto'):
             started_content = True

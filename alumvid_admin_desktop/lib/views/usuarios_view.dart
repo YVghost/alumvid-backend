@@ -4,7 +4,6 @@ import '../models/audit_event.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
-import '../utils/cedula_validator.dart';
 
 class UsuariosView extends StatefulWidget {
   final AppUser currentUser;
@@ -48,7 +47,7 @@ class _UsuariosViewState extends State<UsuariosView> {
     final nameCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
-    final tempPassCtrl = TextEditingController(text: 'AlumVid2026!');
+    final tempPassCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
     List<String> rolesSeleccionados = ['CHOFER'];
@@ -75,14 +74,14 @@ class _UsuariosViewState extends State<UsuariosView> {
                   TextFormField(
                     controller: identCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'Cédula Ecuatoriana',
-                      hintText: '10 dígitos (Algoritmo Módulo 10)',
+                      labelText: 'Identificación',
+                      hintText: 'Cédula o identificación del trabajador',
                     ),
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) return 'Requerido';
                       final ced = v.trim();
-                      if (!validarCedulaEcuatoriana(ced)) {
-                        return 'Cédula ecuatoriana inválida (verifique dígitos y provincia)';
+                      if (!RegExp(r'^[A-Za-z0-9-]{3,30}$').hasMatch(ced)) {
+                        return 'Usa entre 3 y 30 letras, números o guiones';
                       }
                       if (_usuarios.any((u) => u.identification == ced)) {
                         return 'Esta cédula ya se encuentra registrada en el sistema';
@@ -343,9 +342,9 @@ class _UsuariosViewState extends State<UsuariosView> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
-        title: Text('Eliminar Usuario: ${u.fullName}'),
+        title: Text('Desactivar Usuario: ${u.fullName}'),
         content: Text(
-          '¿Está seguro de que desea eliminar permanentemente al usuario "${u.fullName}" (${u.identification}) de la base de datos?\n\nEsta acción no se puede deshacer.',
+          '¿Está seguro de que desea desactivar al usuario "${u.fullName}" (${u.identification}) del sistema?\n\nSe conservarán su cuenta y todo su historial.',
           style: const TextStyle(fontSize: 13, color: AppTheme.textMuted),
         ),
         actions: [
@@ -356,7 +355,7 @@ class _UsuariosViewState extends State<UsuariosView> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.statusAlerta),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar Definitivamente'),
+            child: const Text('Desactivar cuenta'),
           ),
         ],
       ),
@@ -369,12 +368,12 @@ class _UsuariosViewState extends State<UsuariosView> {
         if (!mounted) return;
         _cargarUsuarios();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Usuario eliminado de la base de datos'), backgroundColor: AppTheme.statusCompletada),
+          const SnackBar(content: Text('Cuenta desactivada; historial conservado'), backgroundColor: AppTheme.statusCompletada),
         );
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al eliminar usuario: ${e.toString().replaceAll("Exception: ", "")}'), backgroundColor: AppTheme.statusAlerta),
+          SnackBar(content: Text('Error al desactivar usuario: ${e.toString().replaceAll("Exception: ", "")}'), backgroundColor: AppTheme.statusAlerta),
         );
       }
     }
@@ -605,7 +604,7 @@ class _UsuariosViewState extends State<UsuariosView> {
                                       if (widget.currentUser.master && !u.master)
                                         IconButton(
                                           icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.statusAlerta),
-                                          tooltip: 'Eliminar colaborador de la BD',
+                                          tooltip: 'Desactivar colaborador',
                                           onPressed: () => _eliminarUsuario(u),
                                         ),
                                     ],

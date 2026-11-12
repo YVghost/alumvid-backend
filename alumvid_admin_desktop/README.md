@@ -53,4 +53,27 @@ flutter run -d android
 ## 3. Credenciales de Acceso
 
 * **Identificación:** `1700000000` (o `admin@alumvid.com`)
-* **Contraseña:** `AlumVidAdmin2026!`
+* **Contraseña:** `MASTER_PASSWORD` de tu `.env` local
+
+## Rama integrada
+
+Usar `..\scripts\iniciar-admin.ps1` desde esta carpeta, o `.\scripts\iniciar-admin.ps1` desde la raíz. Inyecta la configuración Maps desde `config/flutter.local.json` (ignorado por Git). Gateway: 8080. El usuario y la contraseña se ingresan manualmente; una contraseña temporal exige cambio antes de administrar.
+
+Las pantallas de pedidos, retazos y ubicaciones incluyen el botón **Abrir gestión completa** para ejecutar los flujos en sus portales web. Ver [informe de integración](../INTEGRACION_MATEO.md).
+
+## Windows instalado y prueba nativa
+
+El equipo cuenta con Visual Studio Build Tools 2022, C++, CMake y Windows SDK. El Modo de desarrollador está habilitado para los enlaces simbólicos de Flutter.
+
+Desde la raíz:
+
+```powershell
+. .\scripts\mobile-env.ps1
+.\scripts\test-admin-windows.ps1
+cd alumvid_admin_desktop
+flutter build windows --release --dart-define-from-file=../config/flutter.local.json
+```
+
+Ejecutable: `build/windows/x64/runner/Release/alumvid_admin_desktop.exe`. Para distribuirlo conservar toda la carpeta Release, incluyendo DLL y `data`; el `.exe` por sí solo no contiene todos los recursos. La configuración de Maps se inyecta desde el archivo privado local.
+
+La prueba nativa lee las credenciales del `.env` mediante variables de proceso, ingresa a la plataforma, consulta los tres módulos y cierra la sesión. No crea ni modifica productos o pedidos.

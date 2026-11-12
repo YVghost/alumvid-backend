@@ -43,10 +43,12 @@ class GoogleRoutesServiceTest {
     }
 
     @Test
-    @DisplayName("Debe consultar Google Routes API v2 exitosamente con la API Key activa")
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named="GOOGLE_ROUTES_LIVE_TEST", matches="true")
+    @DisplayName("Consulta externa opcional de Google Routes con clave del entorno")
     void testGoogleRoutesApiConClaveActiva() {
         GoogleRoutesService service = new GoogleRoutesService(objectMapper);
-        ReflectionTestUtils.setField(service, "googleApiKey", "AIzaSyDYqJ2TbM6UD5GIHt6wTDRrhpzdQx2QsmQ");
+        assertNotNull(System.getenv("GOOGLE_MAPS_API_KEY"), "Configura la clave para esta prueba opcional");
+        ReflectionTestUtils.setField(service, "googleApiKey", System.getenv("GOOGLE_MAPS_API_KEY"));
 
         List<double[]> coordenadas = new ArrayList<>();
         coordenadas.add(new double[]{-0.089290, -78.439607}); // Bodega Central Arq-AlumVid

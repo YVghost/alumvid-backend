@@ -28,7 +28,7 @@ public class Pedido {
     @Column(nullable = false, length = 150)
     private String cliente;
 
-    @Column(name = "direccion_texto", nullable = false, length = 255)
+    @Column(name = "direccion_texto", nullable = false, length = 500)
     private String direccionTexto;
 
     @Column(name = "coordenada_destino", columnDefinition = "geometry(Point, 4326)", nullable = false)

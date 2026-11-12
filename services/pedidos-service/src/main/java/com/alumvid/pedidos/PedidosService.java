@@ -82,6 +82,7 @@ class PedidosService {
         close(id,"VENCIDO",action,SYSTEM);event(id,"VENCIMIENTO",action.reason(),SYSTEM,map("expiresAt",order.get("expires_at"),"transit","Lo no recibido fisicamente permanece pendiente de retorno"));
     }
     private void close(UUID id,String state,PedidosApi.Action action,AuthClient.Identity actor) {
+        db.queryForObject("SELECT pedidos.cancel_order_shipments(?,?) IS NULL",Boolean.class,id,action.reason());
         fulfillment.returnToStock(id,action,actor,false);release(id,"LIBERADA");
         db.update("UPDATE pedidos.order_line SET state=CASE WHEN delivered_quantity=quantity THEN 'ENTREGADO' ELSE ? END,reserved_quantity=0 WHERE order_id=?",state,id);state(id,state);
     }
@@ -95,6 +96,8 @@ class PedidosService {
         }
         String key=key(action+":"+id,r,actor);var old=previous(r.requestId(),key);if(old!=null)return old;
         var order=order(id,true);String before=order.get("state").toString();var rows=lines(id);lockProducts(rows);
+        if(Set.of("deliver","receive-return").contains(action)&&db.queryForObject("SELECT count(*) FROM pedidos.commercial_shipment WHERE order_id=? AND state IN ('EN_REPARTO','RETORNO_PENDIENTE')",Long.class,id)>0)
+            throw new PedidosError(409,"Gestiona la entrega desde logística o recibe cada despacho vinculado en bodega");
         if(!terminal(before)&&overdue(order))throw new PedidosError(409,"La reserva vencio; no puede ampliarse ni entregarse. El proceso automatico devolvera el pendiente a bodega.");
         switch(action) {
             case "confirm"->{

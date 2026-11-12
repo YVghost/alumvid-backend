@@ -24,7 +24,7 @@ class ProductoRetazo {
       id: json['id']?.toString() ?? '',
       code: json['code']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
-      stock: (json['stock'] as num?)?.toDouble() ?? 0.0,
+      stock: double.tryParse(json['stock']?.toString() ?? '') ?? 0.0,
       unit: json['unit']?.toString() ?? 'UNIDAD',
       active: json['active'] != false,
       piecesManaged: json['piecesManaged'] == true || json['pieces_managed'] == true,
@@ -65,13 +65,12 @@ class PiezaRetazo {
   factory PiezaRetazo.fromJson(Map<String, dynamic> json) {
     return PiezaRetazo(
       id: json['id']?.toString() ?? '',
-      lengthM: (json['lengthM'] as num?)?.toDouble() ?? (json['length_m'] as num?)?.toDouble(),
-      widthCm: (json['widthCm'] as num?)?.toDouble() ?? (json['width_cm'] as num?)?.toDouble(),
-      heightCm: (json['heightCm'] as num?)?.toDouble() ?? (json['height_cm'] as num?)?.toDouble(),
+      lengthM: double.tryParse(json['lengthM']?.toString() ?? '') ?? double.tryParse(json['length_m']?.toString() ?? ''),
+      widthCm: double.tryParse(json['widthCm']?.toString() ?? '') ?? double.tryParse(json['width_cm']?.toString() ?? ''),
+      heightCm: double.tryParse(json['heightCm']?.toString() ?? '') ?? double.tryParse(json['height_cm']?.toString() ?? ''),
       state: json['state']?.toString() ?? 'DISPONIBLE',
       location: json['location']?.toString(),
       code: json['code']?.toString(),
     );
   }
 }
-

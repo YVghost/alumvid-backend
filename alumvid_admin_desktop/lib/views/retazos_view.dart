@@ -1,3 +1,4 @@
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import '../models/retazo_pieza.dart';
 import '../services/api_service.dart';
@@ -19,6 +20,12 @@ class _RetazosViewState extends State<RetazosView> {
   final TextEditingController _searchCtrl = TextEditingController();
 
   @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
     _cargarProductos();
@@ -26,15 +33,25 @@ class _RetazosViewState extends State<RetazosView> {
 
   Future<void> _cargarProductos() async {
     setState(() => _cargando = true);
-    final list = await ApiService.obtenerProductosRetazos(q: _searchCtrl.text.trim());
-    if (!mounted) return;
-    setState(() {
-      _productos = list;
-      _cargando = false;
-      if (list.isNotEmpty && _productoSeleccionado == null) {
-        _seleccionarProducto(list.first);
-      }
-    });
+    try {
+      final list = await ApiService.obtenerProductosRetazos(
+        q: _searchCtrl.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _productos = list;
+        _cargando = false;
+        if (list.isNotEmpty && _productoSeleccionado == null) {
+          _seleccionarProducto(list.first);
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _cargando = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('No se pudo cargar: $e')));
+    }
   }
 
   Future<void> _seleccionarProducto(ProductoRetazo prod) async {
@@ -42,12 +59,20 @@ class _RetazosViewState extends State<RetazosView> {
       _productoSeleccionado = prod;
       _cargandoPiezas = true;
     });
-    final piezas = await ApiService.obtenerPiezasRetazo(prod.id);
-    if (!mounted) return;
-    setState(() {
-      _piezas = piezas;
-      _cargandoPiezas = false;
-    });
+    try {
+      final piezas = await ApiService.obtenerPiezasRetazo(prod.id);
+      if (!mounted) return;
+      setState(() {
+        _piezas = piezas;
+        _cargandoPiezas = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _cargandoPiezas = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('No se pudo consultar: $e')));
+    }
   }
 
   @override
@@ -81,12 +106,28 @@ class _RetazosViewState extends State<RetazosView> {
                   ),
                 ],
               ),
+              TextButton.icon(
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('Abrir gestión completa'),
+                onPressed: () async {
+                  final host = await ApiService.getBaseHost();
+                  await launchUrl(
+                    Uri.parse('$host/retazos/'),
+                    mode: LaunchMode.externalApplication,
+                  );
+                },
+              ),
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: const Text('Actualizar'),
@@ -116,19 +157,38 @@ class _RetazosViewState extends State<RetazosView> {
                       children: [
                         const Text(
                           'Materiales Configurables',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
                         ),
                         const SizedBox(height: 10),
                         TextField(
                           controller: _searchCtrl,
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
                           decoration: InputDecoration(
                             hintText: 'Buscar material...',
-                            prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppTheme.textMuted),
+                            prefixIcon: const Icon(
+                              Icons.search_rounded,
+                              size: 18,
+                              color: AppTheme.textMuted,
+                            ),
                             filled: true,
                             fillColor: const Color(0xFF0F172A),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF1E293B))),
-                            contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 10),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 0,
+                              horizontal: 10,
+                            ),
                           ),
                           onSubmitted: (_) => _cargarProductos(),
                         ),
@@ -137,49 +197,78 @@ class _RetazosViewState extends State<RetazosView> {
                           child: _cargando
                               ? const Center(child: CircularProgressIndicator())
                               : _productos.isEmpty
-                                  ? const Center(
-                                      child: Text('No hay materiales con piezas', style: TextStyle(color: Colors.white60)),
-                                    )
-                                  : ListView.builder(
-                                      itemCount: _productos.length,
-                                      itemBuilder: (context, idx) {
-                                        final prod = _productos[idx];
-                                        final isSel = _productoSeleccionado?.id == prod.id;
-                                        final bool isAluminio = prod.kind == 'ALUMINIO' || prod.name.toUpperCase().contains('ALUMINIO');
-
-                                        return Container(
-                                          margin: const EdgeInsets.only(bottom: 8),
-                                          decoration: BoxDecoration(
-                                            color: isSel ? AppTheme.primary.withValues(alpha: 0.18) : const Color(0xFF0F172A),
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: isSel ? AppTheme.primaryLight : const Color(0xFF1E293B)),
-                                          ),
-                                          child: ListTile(
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                            leading: Icon(
-                                              isAluminio ? Icons.view_column_rounded : Icons.crop_square_rounded,
-                                              color: isAluminio ? const Color(0xFF38BDF8) : const Color(0xFF34D399),
-                                              size: 24,
-                                            ),
-                                            title: Text(
-                                              prod.name,
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: isSel ? FontWeight.bold : FontWeight.w600,
-                                                fontSize: 13,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            subtitle: Text(
-                                              'Código: ${prod.code} • Stock: ${prod.stock} ${prod.unit}',
-                                              style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
-                                            ),
-                                            onTap: () => _seleccionarProducto(prod),
-                                          ),
+                              ? const Center(
+                                  child: Text(
+                                    'No hay materiales con piezas',
+                                    style: TextStyle(color: Colors.white60),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  itemCount: _productos.length,
+                                  itemBuilder: (context, idx) {
+                                    final prod = _productos[idx];
+                                    final isSel =
+                                        _productoSeleccionado?.id == prod.id;
+                                    final bool isAluminio =
+                                        prod.kind == 'ALUMINIO' ||
+                                        prod.name.toUpperCase().contains(
+                                          'ALUMINIO',
                                         );
-                                      },
-                                    ),
+
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      decoration: BoxDecoration(
+                                        color: isSel
+                                            ? AppTheme.primary.withValues(
+                                                alpha: 0.18,
+                                              )
+                                            : const Color(0xFF0F172A),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: isSel
+                                              ? AppTheme.primaryLight
+                                              : const Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                      child: ListTile(
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 4,
+                                            ),
+                                        leading: Icon(
+                                          isAluminio
+                                              ? Icons.view_column_rounded
+                                              : Icons.crop_square_rounded,
+                                          color: isAluminio
+                                              ? const Color(0xFF38BDF8)
+                                              : const Color(0xFF34D399),
+                                          size: 24,
+                                        ),
+                                        title: Text(
+                                          prod.name,
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: isSel
+                                                ? FontWeight.bold
+                                                : FontWeight.w600,
+                                            fontSize: 13,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        subtitle: Text(
+                                          'Código: ${prod.code} • Stock: ${prod.stock} ${prod.unit}',
+                                          style: const TextStyle(
+                                            color: AppTheme.textMuted,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                        onTap: () => _seleccionarProducto(prod),
+                                      ),
+                                    );
+                                  },
+                                ),
                         ),
                       ],
                     ),
@@ -207,19 +296,36 @@ class _RetazosViewState extends State<RetazosView> {
                               _productoSeleccionado != null
                                   ? 'Piezas Físicas Disponibles: ${_productoSeleccionado!.name}'
                                   : 'Piezas Físicas en Bodega',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
                             ),
                             if (_piezas.isNotEmpty)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                                  color: const Color(
+                                    0xFF38BDF8,
+                                  ).withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+                                  border: Border.all(
+                                    color: const Color(
+                                      0xFF38BDF8,
+                                    ).withValues(alpha: 0.4),
+                                  ),
                                 ),
                                 child: Text(
                                   '${_piezas.length} disponibles para corte',
-                                  style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),
+                                  style: const TextStyle(
+                                    color: Color(0xFF38BDF8),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                           ],
@@ -229,79 +335,118 @@ class _RetazosViewState extends State<RetazosView> {
                           child: _cargandoPiezas
                               ? const Center(child: CircularProgressIndicator())
                               : _piezas.isEmpty
-                                  ? Center(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
+                              ? Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.content_cut_rounded,
+                                        size: 54,
+                                        color: AppTheme.textMuted.withValues(
+                                          alpha: 0.4,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      const Text(
+                                        'No hay retazos individuales registrados para este material',
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Los retazos se generan automáticamente al realizar cortes en taller o registrar sobrantes.',
+                                        style: TextStyle(
+                                          color: AppTheme.textMuted,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ListView.builder(
+                                  itemCount: _piezas.length,
+                                  itemBuilder: (context, idx) {
+                                    final p = _piezas[idx];
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0F172A),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: const Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                      child: Row(
                                         children: [
-                                          Icon(Icons.content_cut_rounded, size: 54, color: AppTheme.textMuted.withValues(alpha: 0.4)),
-                                          const SizedBox(height: 12),
-                                          const Text(
-                                            'No hay retazos individuales registrados para este material',
-                                            style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600),
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.primary
+                                                  .withValues(alpha: 0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: const Icon(
+                                              Icons.straighten_rounded,
+                                              color: AppTheme.primaryLight,
+                                              size: 20,
+                                            ),
                                           ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Los retazos se generan automáticamente al realizar cortes en taller o registrar sobrantes.',
-                                            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                                          const SizedBox(width: 14),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  p.dimensionesTexto,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 13,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  'Ubicación: ${p.location ?? "Sin asignar"} • Estado: ${p.state}',
+                                                  style: TextStyle(
+                                                    color: AppTheme.textMuted,
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.statusCompletada
+                                                  .withValues(alpha: 0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: const Text(
+                                              'LISTA PARA CORTE',
+                                              style: TextStyle(
+                                                color:
+                                                    AppTheme.statusCompletada,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 10,
+                                              ),
+                                            ),
                                           ),
                                         ],
                                       ),
-                                    )
-                                  : ListView.builder(
-                                      itemCount: _piezas.length,
-                                      itemBuilder: (context, idx) {
-                                        final p = _piezas[idx];
-                                        return Container(
-                                          margin: const EdgeInsets.only(bottom: 8),
-                                          padding: const EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF0F172A),
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: const Color(0xFF1E293B)),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.all(8),
-                                                decoration: BoxDecoration(
-                                                  color: AppTheme.primary.withValues(alpha: 0.15),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: const Icon(Icons.straighten_rounded, color: AppTheme.primaryLight, size: 20),
-                                              ),
-                                              const SizedBox(width: 14),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      p.dimensionesTexto,
-                                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      'Ubicación: ${p.location ?? "Sin asignar"} • Estado: ${p.state}',
-                                                      style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                                decoration: BoxDecoration(
-                                                  color: AppTheme.statusCompletada.withValues(alpha: 0.15),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: const Text(
-                                                  'LISTA PARA CORTE',
-                                                  style: TextStyle(color: AppTheme.statusCompletada, fontWeight: FontWeight.bold, fontSize: 10),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      },
-                                    ),
+                                    );
+                                  },
+                                ),
                         ),
                       ],
                     ),
@@ -315,4 +460,3 @@ class _RetazosViewState extends State<RetazosView> {
     );
   }
 }
-

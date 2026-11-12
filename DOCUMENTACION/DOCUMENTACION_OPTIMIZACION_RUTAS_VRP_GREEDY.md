@@ -1,19 +1,19 @@
 # Documentación Técnica: Optimización de Rutas Logísticas en AlumVid
 ## De la Teoría del Vehicle Routing Problem (VRP) a la Heurística Voraz (Greedy Search) con Google Routes API y Re-enrutado Dinámico (VRSP)
 
-**Institución:** Universidad de Las Américas (UDLA)  
-**Facultad:** Facultad de Ingeniería y Ciencias Aplicadas – Carrera de Ingeniería de Software  
-**Proyecto de Titulación:** Plataforma de control y monitoreo en tiempo real para la optimización de inventario muerto y rutas logísticas en una microempresa de vidrios (AlumVid)  
-**Estudiantes:** Anthonny Jossue Mosquera Rivadeneira, Mateo Michael Ortega Vacas  
-**Tutor Guía:** Prof. Mario Salvador González Rodríguez  
-**Ubicación de la Bodega Central:** Arq-AlumVid (Coordenadas: Latitud -0.089290, Longitud -78.439607, Sector Calderón / Llano Grande, Quito Norte)  
-**Fecha:** Octubre 2026 – Quito, Ecuador  
+**Institución:** Universidad de Las Américas (UDLA)
+**Facultad:** Facultad de Ingeniería y Ciencias Aplicadas – Carrera de Ingeniería de Software
+**Proyecto de Titulación:** Plataforma de control y monitoreo en tiempo real para la optimización de inventario muerto y rutas logísticas en una microempresa de vidrios (AlumVid)
+**Estudiantes:** Anthonny Jossue Mosquera Rivadeneira, Mateo Michael Ortega Vacas
+**Tutor Guía:** Prof. Mario Salvador González Rodríguez
+**Ubicación de la Bodega Central:** Arq-AlumVid (Coordenadas: Latitud -0.089290, Longitud -78.439607, Sector Calderón / Llano Grande, Quito Norte)
+**Fecha:** Octubre 2026 – Quito, Ecuador
 
 ---
 
 ## 1. Contexto y Objetivos del Requerimiento
 
-Durante la sesión de seguimiento y asesoría del proyecto de titulación con el tutor guía Prof. Mario Salvador González Rodríguez, se identificó la necesidad imperativa de elevar el rigor técnico, científico y operativo del subsistema de distribución logística de AlumVid. 
+Durante la sesión de seguimiento y asesoría del proyecto de titulación con el tutor guía Prof. Mario Salvador González Rodríguez, se identificó la necesidad imperativa de elevar el rigor técnico, científico y operativo del subsistema de distribución logística de AlumVid.
 
 El tutor instruyó articular las siguientes directrices en la ingeniería del software y en el marco conceptual de la memoria técnica:
 
@@ -166,14 +166,14 @@ El desarrollo del módulo logístico de AlumVid se sustenta y articula directame
 > **Chávez-García, N., Salinas-Carrión, J., Navas-Perrone, A., & González-Rodríguez, M. (2026).** *Spatiotemporal Analysis and Forecasting of Traffic Accidents in Ecuador Using DBSCAN and Ensemble Time Series Modeling*. Urban Science, 10(5), 280. https://doi.org/10.3390/urbansci10050280
 
 ### Vinculación con la Distribución de Vidrios en AlumVid:
-1. **Evitación de Picos Horarios Críticos de Congestión y Siniestros:**  
+1. **Evitación de Picos Horarios Críticos de Congestión y Siniestros:**
    El estudio del tutor demostró empíricamente que en las vías urbanas de Quito existen dos ventanas horarias diarias consistentes de alta siniestralidad y saturación:
    * **Pico Matutino (07:00 a 09:00):** Desplazamiento laboral masivo y alta congestión en los accesos norte y sur.
-   * **Pico Vespertino (18:00 a 20:00):** Retorno de la población hacia zonas residenciales.  
+   * **Pico Vespertino (18:00 a 20:00):** Retorno de la población hacia zonas residenciales.
    Al optimizar el itinerario de AlumVid por **menor tiempo de conducción**, el algoritmo evita saturar las horas pico en vías colapsadas, sugiriendo despachos en horas valle y protegiendo el material vidriero.
-2. **Protección de la Carga de Alta Fragilidad:**  
+2. **Protección de la Carga de Alta Fragilidad:**
    A diferencia del transporte de mercancías sólidas (paquetería, textiles, alimentos), el vidrio plano presenta un riesgo inminente de estallido ante frenados bruscos o choques por alcance, los cuales son más frecuentes en vías congestionadas identificadas en el estudio. Minimizar el tiempo de permanencia en el tráfico reduce directamente la probabilidad de accidentes.
-3. **Respeto a Corredores Troncales Seguros:**  
+3. **Respeto a Corredores Troncales Seguros:**
    El artículo identifica sectores de alta concentración de incidentes (hotspots). Al emplear Google Routes API, el sistema guía a los conductores por vías arteriales principales y señalizadas, evitando desvíos peligrosos por laderas o atajos no aptos para camiones con estructuras tipo caballete.
 
 ---
