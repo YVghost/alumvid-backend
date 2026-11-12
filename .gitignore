@@ -52,3 +52,9 @@ config/flutter.local.json
 
 __pycache__/
 *.pyc
+
+# Entrega manual: binarios y credenciales se distribuyen fuera del historial Git.
+entrega-pruebas/android/
+entrega-pruebas/windows/
+entrega-pruebas/*.zip
+entrega-pruebas/*.local.*

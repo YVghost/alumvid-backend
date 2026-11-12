@@ -14,11 +14,55 @@ void main() {
     expect(ApiService.baseUrl, 'http://localhost:8080/api/v1');
   });
   test('Logout conserva la configuracion ajena a la sesion', () async {
-    SharedPreferences.setMockInitialValues({'driver_id': 'test', 'driver_name': 'Chofer', 'server_host_custom': 'http://example.test'});
+    SharedPreferences.setMockInitialValues({
+      'driver_id': 'test',
+      'driver_name': 'Chofer',
+      'server_host_custom': 'http://example.test',
+    });
     await ApiService.logout();
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('driver_id'), isNull);
     expect(prefs.getString('driver_name'), isNull);
     expect(prefs.getString('server_host_custom'), 'http://example.test');
   });
+  test('El servidor del teléfono admite una IP y rechaza URLs ambiguas', () {
+    expect(
+      ApiService.normalizeServer('http://192.168.1.10:8080'),
+      'http://192.168.1.10:8080/api/v1',
+    );
+    expect(
+      ApiService.normalizeServer('https://alumvid.example/api/v1/'),
+      'https://alumvid.example/api/v1',
+    );
+    expect(
+      () => ApiService.normalizeServer('ftp://example.test'),
+      throwsFormatException,
+    );
+    expect(
+      () => ApiService.normalizeServer('http://user:password@example.test'),
+      throwsFormatException,
+    );
+    expect(
+      () => ApiService.normalizeServer('http://example.test/other'),
+      throwsFormatException,
+    );
+  });
+  test(
+    'El servidor seleccionado persiste y conserva otras preferencias',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'driver_id': 'demo',
+        'other_setting': 'keep',
+      });
+      await ApiService.initialize();
+      await ApiService.setServer('http://192.168.1.10:8080');
+      await ApiService.initialize();
+      expect(ApiService.baseUrl, 'http://192.168.1.10:8080/api/v1');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('driver_id'), isNull);
+      expect(prefs.getString('other_setting'), 'keep');
+      SharedPreferences.setMockInitialValues({});
+      await ApiService.initialize();
+    },
+  );
 }
