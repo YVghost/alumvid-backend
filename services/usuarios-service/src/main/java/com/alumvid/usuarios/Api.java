@@ -111,6 +111,13 @@ public class Api {
         service.reset(u, id, r.temporaryPassword());
     }
 
+    @DeleteMapping("/admin/users/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteUser(@AuthenticationPrincipal Users.User u, @PathVariable UUID id) {
+        if (u == null) throw new ApiError(401, "No autenticado");
+        service.delete(u, id);
+    }
+
     @GetMapping("/admin/audit")
     public List<Map<String, Object>> audit(@AuthenticationPrincipal Users.User u) {
         if (u == null) throw new ApiError(401, "No autenticado");

@@ -163,13 +163,23 @@ public class UserService {
             requireMaster(actor);
         }
 
+        String ident = request.identification().trim();
+
+        if (users.byIdentification(ident).isPresent()) {
+            throw new ApiError(409, "Ya existe un colaborador registrado con la cédula " + ident);
+        }
+
         String email = request.email() != null && !request.email().isBlank()
                 ? request.email().trim().toLowerCase()
-                : request.identification().trim() + "@alumvid.com";
+                : ident + "@alumvid.com";
+
+        if (users.byIdentificationOrEmail(email).isPresent()) {
+            throw new ApiError(409, "Ya existe un colaborador registrado con el correo " + email);
+        }
 
         var u = new Users.User(
             UUID.randomUUID(),
-            request.identification().trim(),
+            ident,
             email,
             request.telefono() != null ? request.telefono().trim() : null,
             request.fullName().trim(),
@@ -256,5 +266,23 @@ public class UserService {
         return users.list().stream()
             .filter(u -> u.roles().contains(Users.Role.CHOFER) && u.active())
             .toList();
+    }
+
+    @Transactional
+    public void delete(Users.User actor, UUID id) {
+        lock();
+        actor = actor(actor);
+        var target = users.byId(id);
+        if (target.master()) {
+            throw new ApiError(403, "No se puede eliminar la cuenta del administrador principal");
+        }
+        if (actor.id().equals(id)) {
+            throw new ApiError(400, "No puedes eliminar tu propia cuenta en sesión");
+        }
+        requireMaster(actor);
+
+        users.db().update("UPDATE usuarios.app_user SET active = FALSE WHERE id = ?", id);
+        users.revoke(id);
+        users.audit(actor.id(), id, "USER_DEACTIVATED", "Cuenta desactivada; historial conservado");
     }
 }

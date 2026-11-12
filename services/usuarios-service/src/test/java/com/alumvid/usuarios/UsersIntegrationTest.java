@@ -111,4 +111,25 @@ class UsersIntegrationTest {
             .content("{\"identification\":\"" + master.identification() + "\",\"fullName\":\"Usuario\",\"roles\":[\"VENDEDOR\"],\"temporaryPassword\":\"" + TEMP + "\" }"))
             .andExpect(status().isConflict());
     }
+
+    @Test void deleteEndpointDeactivatesPreservesHistoryAndRevokesSession() throws Exception {
+        var target = employee(Set.of(Users.Role.VENDEDOR));
+        String token = permanentToken(target);
+        long events = users.db().queryForObject("SELECT count(*) FROM usuarios.audit_event WHERE target_id = ?", Long.class, target.id());
+        mvc.perform(delete("/api/admin/users/" + target.id()).header("Authorization", "Bearer " + masterToken))
+            .andExpect(status().isNoContent());
+        assertFalse(users.byId(target.id()).active());
+        assertEquals(target.identification(), users.byId(target.id()).identification());
+        assertTrue(users.db().queryForObject("SELECT count(*) FROM usuarios.audit_event WHERE target_id = ?", Long.class, target.id()) > events);
+        mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token)).andExpect(status().isUnauthorized());
+    }
+
+    @Test void delegateCannotDeactivateThroughDeleteEndpoint() throws Exception {
+        var delegate = employee(Set.of(Users.Role.ADMINISTRADOR));
+        String token = permanentToken(delegate);
+        var target = employee(Set.of(Users.Role.VENDEDOR));
+        mvc.perform(delete("/api/admin/users/" + target.id()).header("Authorization", "Bearer " + token))
+            .andExpect(status().isForbidden());
+        assertTrue(users.byId(target.id()).active());
+    }
 }

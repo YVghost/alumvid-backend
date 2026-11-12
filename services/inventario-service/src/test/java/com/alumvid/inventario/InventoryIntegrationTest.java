@@ -124,6 +124,10 @@ class InventoryIntegrationTest {
             executor.shutdownNow();executor.awaitTermination(5,TimeUnit.SECONDS);
             db.update("DELETE FROM inventario.movement WHERE product_id=?",p.id());
             db.update("DELETE FROM inventario.catalog_event WHERE product_id=?",p.id());
+            if (Boolean.TRUE.equals(db.queryForObject("SELECT to_regclass('ubicaciones.placement') IS NOT NULL", Boolean.class))) {
+                db.update("DELETE FROM ubicaciones.placement WHERE product_id=?",p.id());
+                db.update("DELETE FROM ubicaciones.event WHERE product_id=?",p.id());
+            }
             db.update("DELETE FROM inventario.product WHERE id=?",p.id());
         }
     }

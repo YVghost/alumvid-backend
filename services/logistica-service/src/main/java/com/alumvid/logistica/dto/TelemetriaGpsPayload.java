@@ -18,8 +18,10 @@ public class TelemetriaGpsPayload {
 
     private UUID despachoId;
     private UUID choferId;
+    private String choferNombre;
     private Double latitud;
     private Double longitud;
     private Double velocidadKmh;
+    private Double rumbo;
     private Long timestamp;
 }

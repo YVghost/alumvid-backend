@@ -55,6 +55,11 @@ public class Security {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(errors -> errors.authenticationEntryPoint((req, res, error) -> {
+                res.setStatus(401);
+                res.setContentType("application/json");
+                res.getWriter().write("{\"message\":\"No autenticado\"}");
+            }))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     "/",
@@ -160,6 +165,16 @@ public class Security {
                     }
                 } catch (Exception ignored) {
                     // Si el token es invalido no se establece autenticacion
+                }
+            }
+            var authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.getPrincipal() instanceof Users.User current && current.mustChangePassword()) {
+                String path = request.getRequestURI();
+                if (!Set.of("/api/auth/me", "/api/v1/auth/me", "/api/auth/password", "/api/v1/auth/password", "/api/auth/logout", "/api/v1/auth/logout", "/api/auth/login", "/api/v1/auth/login").contains(path)) {
+                    response.setStatus(403);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"message\":\"Debes cambiar tu contraseña temporal antes de operar\"}");
+                    return;
                 }
             }
             filterChain.doFilter(request, response);

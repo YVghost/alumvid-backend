@@ -2,8 +2,8 @@
 
 [Guia de inicio y apagado seguro](README_INICIO_Y_APAGADO.md): abrir el emulador, ejecutar la app y cerrar el entorno conservando los datos.
 
-> **Proyecto de Titulación - Ingeniería de Software (UDLA)**  
-> **Tema:** Plataforma de control y monitoreo en tiempo real para la optimización de inventario muerto y rutas logísticas en una microempresa de vidrios y aluminios (**AlumVid**).  
+> **Proyecto de Titulación - Ingeniería de Software (UDLA)**
+> **Tema:** Plataforma de control y monitoreo en tiempo real para la optimización de inventario muerto y rutas logísticas en una microempresa de vidrios y aluminios (**AlumVid**).
 > **Autores:** Anthonny Jossue Mosquera Rivadeneira & Mateo Michael Ortega Vacas.
 
 ---
@@ -15,7 +15,7 @@ El ecosistema de software está estructurado bajo una **arquitectura de microser
 ```text
                                   ┌─────────────────────────────┐
                                   │      Clientes / Frontend     │
-                                  │  - admin-dashboard (Web)    │
+                                  │  - alumvid_admin_desktop    │
                                   │  - alumvid_mobile (Flutter) │
                                   └──────────────┬──────────────┘
                                                  │ HTTP / REST / WebSocket
@@ -58,7 +58,7 @@ El ecosistema de software está estructurado bajo una **arquitectura de microser
 │   ├── usuarios-service/      # RBAC, autenticacion JWT/Bearer, auditoria y portal (puerto 8081)
 │   ├── inventario-service/    # Catalogo de productos, existencias y movimientos (puerto 8082)
 │   └── logistica-service/     # Rutas multi-destino, PostGIS, telemetria y e-PoD (puerto 8083)
-├── admin-dashboard/           # Panel web del administrador (Google Maps, Kanban, Telemetria)
+├── alumvid_admin_desktop/     # Panel administrativo nativo Desktop (Windows) y Móvil (Android)
 ├── alumvid_mobile/            # Aplicacion movil Flutter para choferes (Camara PoD, Firma, GPS)
 ├── DOCUMENTACION/             # Tesis Mosquera-Ortega (.docx, .pptx) y Catalogo AlumVid (.xls)
 ├── scripts/                   # Scripts de prueba y verificacion automatizada
@@ -105,7 +105,7 @@ El ecosistema de software está estructurado bajo una **arquitectura de microser
 - **Portal de Inventario:** [http://localhost:8082](http://localhost:8082)
 - **Credenciales Iniciales (Master Admin):**
   - **Identificación:** `1700000000` (o `admin@alumvid.com`)
-  - **Contraseña:** `AlumVidAdmin2026!`
+  - **Contraseña:** `MASTER_PASSWORD` de tu `.env` local
 
 ---
 
@@ -183,3 +183,7 @@ Consulta [el flujo y pendientes actuales](FLUJO_ACTUAL.md) y [la API de Pedidos]
 Los pedidos nuevos se registran confirmados y pagados externamente. El catalogo de clientes, los lotes de preparacion/retiro/entrega y el plazo renovable de 72 horas se gestionan en http://localhost:8080/pedidos/. Cada retiro o entrega parcial y cada retraso reinician el plazo. Al cancelar o vencer, vuelve lo no entregado con sus medidas actuales; lo que esta en reparto espera recepcion fisica. Pagos y facturacion estan fuera del alcance.
 
 http://localhost:8080/ubicaciones/ permite compartir espacios como A3/B3 entre productos y trasladar piezas/cantidades sin cambiar stock. Detalle actualizado en [FLUJO_ACTUAL.md](FLUJO_ACTUAL.md). El entorno completo tiene siete servicios de aplicacion y PostgreSQL/PostGIS.
+
+## Integración en revisión
+
+Consulta [INTEGRACION_MATEO.md](INTEGRACION_MATEO.md) para los ajustes, configuración privada y límites de la rama de integración.

@@ -8,9 +8,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
@@ -25,6 +27,7 @@ public class LogisticaController {
 
     private final LogisticaService logisticaService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final Map<String, TelemetriaGpsPayload> ultimasUbicaciones = new ConcurrentHashMap<>();
 
     @GetMapping("/health")
     public ResponseEntity<Map<String, String>> healthCheck() {
@@ -135,9 +138,12 @@ public class LogisticaController {
         return ResponseEntity.ok(logisticaService.eliminarDestinoRuta(rutaId, despachoId));
     }
 
-    @PostMapping("/rutas/{id}/optimizar")
-    public ResponseEntity<RutaResponse> optimizarRuta(@PathVariable UUID id) {
-        return ResponseEntity.ok(logisticaService.optimizarRuta(id));
+    @PostMapping("/rutas/{id}/optimizar-chofer")
+    public ResponseEntity<RutaResponse> optimizarRutaChofer(
+            @PathVariable UUID id,
+            @RequestParam(required = false) Double latitud,
+            @RequestParam(required = false) Double longitud) {
+        return ResponseEntity.ok(logisticaService.optimizarRutaPorChofer(id, latitud, longitud));
     }
 
     @DeleteMapping("/rutas/{id}")
@@ -185,11 +191,22 @@ public class LogisticaController {
         return ResponseEntity.ok(logisticaService.cancelarRutaConsolidada(id, motivo));
     }
 
+    @PostMapping("/rutas/{id}/completar")
+    public ResponseEntity<RutaResponse> completarRutaConsolidada(@PathVariable UUID id) {
+        return ResponseEntity.ok(logisticaService.completarRutaConsolidada(id));
+    }
+
     @PostMapping("/telemetria")
     public ResponseEntity<Map<String, Object>> recibirTelemetriaHttp(@RequestBody TelemetriaGpsPayload payload) {
         if (payload != null) {
             if (payload.getTimestamp() == null) {
                 payload.setTimestamp(System.currentTimeMillis());
+            }
+            if (payload.getChoferId() != null) {
+                ultimasUbicaciones.put(payload.getChoferId().toString(), payload);
+            }
+            if (payload.getChoferNombre() != null && !payload.getChoferNombre().isBlank()) {
+                ultimasUbicaciones.put(payload.getChoferNombre(), payload);
             }
             if (payload.getDespachoId() != null) {
                 messagingTemplate.convertAndSend("/topic/despachos/" + payload.getDespachoId() + "/ubicacion", payload);
@@ -197,5 +214,22 @@ public class LogisticaController {
             messagingTemplate.convertAndSend("/topic/choferes-activos", payload);
         }
         return ResponseEntity.ok(Map.of("status", "RECEIVED", "timestamp", System.currentTimeMillis()));
+    }
+
+    @GetMapping("/telemetria/activa")
+    public ResponseEntity<Collection<TelemetriaGpsPayload>> obtenerTelemetriaActiva() {
+        return ResponseEntity.ok(ultimasUbicaciones.values());
+    }
+
+    @PostMapping("/notificaciones/sesion-revocada")
+    public ResponseEntity<Map<String, Object>> notificarSesionRevocada(@RequestBody(required = false) Map<String, String> body) {
+        String userId = body != null ? body.get("userId") : null;
+        if (userId != null && !userId.isBlank()) {
+            messagingTemplate.convertAndSend("/topic/choferes/" + userId + "/sesion-revocada",
+                    Map.of("tipo", "SESION_REVOCADA", "userId", userId, "mensaje", "Sesion revocada por el administrador"));
+        }
+        messagingTemplate.convertAndSend("/topic/sesiones-revocadas",
+                Map.of("tipo", "SESION_REVOCADA", "userId", userId != null ? userId : ""));
+        return ResponseEntity.ok(Map.of("success", true));
     }
 }
