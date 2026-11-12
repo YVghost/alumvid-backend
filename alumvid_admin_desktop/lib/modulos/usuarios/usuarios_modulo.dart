@@ -7,6 +7,7 @@ import '../../models/user.dart';
 import '../../services/api_negocio.dart';
 import '../../services/api_service.dart';
 import '../../shared/adaptable.dart';
+import '../../shared/identificacion.dart';
 import '../../shared/permisos.dart';
 import '../../shared/tema.dart';
 import '../../shared/ui.dart';
@@ -270,7 +271,12 @@ class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveC
                         ],
                       ],
                     ),
-                    Text(u.identification, style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                    Text(
+                      analizarIdentificacion(u.identification).valida
+                          ? '${u.identification} · ${analizarIdentificacion(u.identification).provincia}'
+                          : u.identification,
+                      style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                    ),
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 6,
@@ -278,6 +284,10 @@ class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveC
                       children: [
                         if (!u.active) const EstadoChip('INACTIVO', texto: 'Desactivado'),
                         if (u.mustChangePassword) const EstadoChip('EN_CURSO', texto: 'Clave temporal'),
+                        if (!analizarIdentificacion(u.identification).valida)
+                          const EstadoChip('', texto: 'Cédula inválida', color: AppColors.danger),
+                        if (normalizarTelefono(u.telefono) == null)
+                          const EstadoChip('', texto: 'Teléfono inválido', color: AppColors.danger),
                         for (final r in u.roles) EstadoChip(r, texto: humanizar(r), color: AppColors.primaryLight),
                       ],
                     ),
@@ -438,14 +448,14 @@ class _UsuarioFormState extends State<_UsuarioForm> {
     try {
       if (_editando) {
         await ApiService.actualizarUsuario(widget.usuario!.id,
-            fullName: _nombre.text.trim(), telefono: _tel.text.trim(), roles: _roles.toList(), active: _activo);
+            fullName: _nombre.text.trim(), telefono: normalizarTelefono(_tel.text) ?? _tel.text.trim(), roles: _roles.toList(), active: _activo);
         if (!_activo && widget.usuario!.active) await ApiService.notificarSesionRevocada(widget.usuario!.id);
       } else {
         await ApiService.crearUsuario(
           identification: _ident.text.trim(),
           fullName: _nombre.text.trim(),
           email: _email.text.trim(),
-          telefono: _tel.text.trim(),
+          telefono: normalizarTelefono(_tel.text) ?? _tel.text.trim(),
           roles: _roles.toList(),
           temporaryPassword: _clave.text.trim(),
         );
@@ -484,12 +494,20 @@ class _UsuarioFormState extends State<_UsuarioForm> {
             TextFormField(
               controller: _ident,
               enabled: !_editando,
-              decoration: const InputDecoration(labelText: 'Identificación *', hintText: 'Cédula o identificación'),
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'Cédula *',
+                helperText: analizarIdentificacion(_ident.text).valida ? analizarIdentificacion(_ident.text).mensaje : '10 dígitos',
+                helperStyle: TextStyle(color: analizarIdentificacion(_ident.text).valida ? AppColors.success : AppColors.textMuted),
+              ),
               validator: (v) {
                 if (_editando) return null;
-                final c = (v ?? '').trim();
-                if (!RegExp(r'^[A-Za-z0-9-]{3,30}$').hasMatch(c)) return 'Entre 3 y 30 letras, números o guiones';
-                if (widget.existentes.any((u) => u.identification == c)) return 'Ya está registrada';
+                final error = validarIdentificacion(v, soloCedula: true);
+                if (error != null) return error;
+                if (widget.existentes.any((u) => u.identification == v!.trim())) return 'Ya está registrada';
                 return null;
               },
             ),
@@ -515,7 +533,14 @@ class _UsuarioFormState extends State<_UsuarioForm> {
               },
             ),
             gap,
-            TextFormField(controller: _tel, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Teléfono')),
+            TextFormField(
+              controller: _tel,
+              keyboardType: TextInputType.phone,
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+ ]')), LengthLimitingTextInputFormatter(16)],
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              decoration: const InputDecoration(labelText: 'Teléfono', helperText: 'Celular 09XXXXXXXX o fijo 02XXXXXXX'),
+              validator: validarTelefono,
+            ),
             const SeccionTitulo('Roles'),
             Wrap(
               spacing: 8,

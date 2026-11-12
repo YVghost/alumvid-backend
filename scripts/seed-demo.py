@@ -37,14 +37,31 @@ def action(order,name,lines=None,token=None,step=None):
     body={'requestId':request_id(key),'reason':'DEMO: '+key,'receiverName':'Receptor ficticio'}
     if lines is not None:body['lines']=lines
     return once(key,lambda:call('/api/pedidos/orders/'+order+'/'+name,'POST',body,token or admin))
+def _digitos(semilla,n):
+    import hashlib
+    h=hashlib.sha256((state['namespace']+':'+semilla).encode()).hexdigest()
+    return ''.join(str(int(c,16)%10) for c in h)[:n]
+def cedula_demo(semilla):
+    base='17'+str(int(_digitos(semilla+'t',1))%6)+_digitos(semilla,6)
+    suma=0
+    for i,c in enumerate(base):
+        v=int(c)*(2 if i%2==0 else 1);suma+=v-9 if v>9 else v
+    return base+str((10-suma%10)%10)
+def ruc_sociedad_demo(semilla):
+    for k in range(50):
+        base='179'+_digitos(semilla+str(k),6)
+        r=sum(int(c)*w for c,w in zip(base,[4,3,2,7,6,5,4,3,2]))%11
+        d=0 if r==0 else 11-r
+        if d<10:return base+str(d)+'001'
+def email_demo(key):return (state['prefix']+'-'+key).lower()+'@example.test'
 def account(key,roles,temporary=False,inactive=False):
     if key not in state['accounts']:
-        state['accounts'][key]={'identification':state['prefix']+'-'+key,'name':'DEMO '+key,'roles':roles,'temporaryPassword':secrets.token_urlsafe(18),'password':secrets.token_urlsafe(18),'temporary':temporary,'inactive':inactive};save()
+        state['accounts'][key]={'identification':cedula_demo('usuario:'+key),'name':'DEMO '+key,'roles':roles,'temporaryPassword':secrets.token_urlsafe(18),'password':secrets.token_urlsafe(18),'temporary':temporary,'inactive':inactive};save()
     a=state['accounts'][key]
     if 'id' not in a:
         found=call('/api/admin/users',token=admin)
         existing=next((u for u in found if u['identification']==a['identification']),None)
-        if existing is None:existing=call('/api/admin/users','POST',{'identification':a['identification'],'fullName':a['name'],'email':a['identification'].lower()+'@example.test','telefono':'0990000000','roles':roles,'temporaryPassword':a['temporaryPassword']},admin)
+        if existing is None:existing=call('/api/admin/users','POST',{'identification':a['identification'],'fullName':a['name'],'email':email_demo(key),'telefono':'0990000000','roles':roles,'temporaryPassword':a['temporaryPassword']},admin)
         a['id']=existing['id'];save()
     if not temporary and not a.get('changed'):
         status,raw=api.request('/api/v1/auth/login','POST',{'identification':a['identification'],'password':a['temporaryPassword']})
@@ -53,7 +70,7 @@ def account(key,roles,temporary=False,inactive=False):
         else:call('/api/v1/auth/login','POST',{'identification':a['identification'],'password':a['password']})
         a['changed']=True;save()
     if inactive and not a.get('deactivated'):
-        call('/api/admin/users/'+a['id'],'PUT',{'fullName':a['name'],'email':a['identification'].lower()+'@example.test','telefono':'0990000000','roles':roles,'active':False},admin);a['deactivated']=True;save()
+        call('/api/admin/users/'+a['id'],'PUT',{'fullName':a['name'],'email':email_demo(key),'telefono':'0990000000','roles':roles,'active':False},admin);a['deactivated']=True;save()
     return a
 def login(a):
     token=call('/api/v1/auth/login','POST',{'identification':a['identification'],'password':a['password']})['accessToken'];tokens.append(token);return token
@@ -90,9 +107,8 @@ try:
     d1=account('CHOFER1',['CHOFER']);d2=account('CHOFER2',['CHOFER'])
     account('MULTI',['VENDEDOR','BODEGUERO','CHOFER']);account('TEMP',['CHOFER'],temporary=True);account('INACTIVO',['VENDEDOR'],inactive=True)
     t1=login(d1);t2=login(d2)
-    for d in [d1,d2]:once('sync:'+d['id'],lambda d=d:call('/api/v1/logistica/choferes/sincronizar','POST',{'id':d['id'],'nombre':d['name'],'email':d['identification'].lower()+'@example.test','telefono':'0990000000'},admin))
     spaces={key:once('space:'+key,lambda key=key:call('/api/ubicaciones/spaces','POST',{'code':state['prefix']+'-'+key,'description':'Espacio mixto ficticio '+key,'active':True},admin)) for key in ['A3','B3','C1']}
-    clients=[once('client:'+str(i),lambda i=i:call('/api/pedidos/clients','POST',{'name':'DEMO '+name,'identification':state['prefix']+'-CLIENTE'+str(i),'phone':'0990000000','email':'','address':'Dirección ficticia Quito','active':True},admin)) for i,name in enumerate(['Ana Pruebas','Constructora Ejemplo','Carlos Demostración'])]
+    clients=[once('client:'+str(i),lambda i=i:call('/api/pedidos/clients','POST',{'name':'DEMO '+name,'identification':ruc_sociedad_demo('cliente:'+str(i)) if i==1 else cedula_demo('cliente:'+str(i)),'phone':'0990000000','email':'','address':'Dirección ficticia Quito','active':True},admin)) for i,name in enumerate(['Ana Pruebas','Constructora Ejemplo','Carlos Demostración'])]
     screw=product('TOR','Tornillos',stock=200,minimum=20);silicone=product('SIL','Silicona - stock bajo',stock=2,minimum=5);missing=product('CER','Cerradura - sin stock',minimum=2)
     glass=product('VID-MAR','Vidrio marrón 183 x 244 cm');aluminum=product('ALU-PER','Perfil aluminio 6.40 m')
     for p,kind,dimensions in [(glass,'VIDRIO',{'fullWidthCm':'183','fullHeightCm':'244'}),(aluminum,'ALUMINIO',{'fullLengthM':'6.4'})]:
@@ -125,6 +141,17 @@ try:
     o=order('ENTREGA_HISTORICA',[line(screw,1)],True);action(o['order']['id'],'prepare');s=ship('ENTREGA_HISTORICA',o,d1)
     once('start:HISTORICA',lambda:call('/api/v1/logistica/despachos/'+s['dispatch_id']+'/aceptar-inicio','POST',{},t1))
     once('complete:HISTORICA',lambda:call('/api/v1/logistica/despachos/'+s['dispatch_id']+'/cerrar-entrega','POST',{'fotoPodUrl':'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jp9sAAAAASUVORK5CYII=','firmaUrl':'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jp9sAAAAASUVORK5CYII=','latitud':-0.1807,'longitud':-78.4678,'comentarios':'DEMO evidencia sintética; no representa una entrega real'},t1));keep('ENTREGADO_LOGISTICA',o,s)
+    def migrar_ids():
+        for key,a in state['accounts'].items():
+            if a['identification'].isdigit():continue
+            nueva=cedula_demo('usuario:'+key)
+            sql("UPDATE usuarios.app_user SET identification='"+nueva+"' WHERE identification='"+a['identification']+"'")
+            a['identification']=nueva;save()
+        for i in range(3):
+            nueva=ruc_sociedad_demo('cliente:'+str(i)) if i==1 else cedula_demo('cliente:'+str(i))
+            sql("UPDATE pedidos.client SET identification='"+nueva+"' WHERE identification='"+state['prefix']+"-CLIENTE"+str(i)+"'")
+        return True
+    once('ids:validas',migrar_ids)
     # Lotes creados antes de que el pedido guardara su ubicación: se completa con puntos ficticios.
     once('coords:backfill',lambda:(sql("UPDATE pedidos.sale_order SET delivery_latitude=-0.1807+((number%7)-3)*0.012,delivery_longitude=-78.4678+((number%5)-2)*0.010 WHERE delivery_mode='ENTREGA' AND delivery_latitude IS NULL AND external_invoice_reference LIKE '"+state['prefix']+"-%'"),True)[1])
     o=order('POR_ASIGNAR_NORTE',[line(screw,5),line(aluminum,1,lengthM='2.4')],True);action(o['order']['id'],'prepare');keep('POR_ASIGNAR_NORTE',o)

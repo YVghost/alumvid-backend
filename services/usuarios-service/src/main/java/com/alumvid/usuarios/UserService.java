@@ -158,6 +158,15 @@ public class UserService {
         return fresh;
     }
 
+    /** Teléfono de Ecuador normalizado (09XXXXXXXX o 0[2-7]XXXXXXX); vacío si no se indica. */
+    private static String telefono(String valor) {
+        try {
+            return IdentificacionEcuador.telefono(valor);
+        } catch (IllegalArgumentException e) {
+            throw new ApiError(400, e.getMessage());
+        }
+    }
+
     private void requireMaster(Users.User actor) {
         if (!actor.master()) {
             throw new ApiError(403, "Solo el administrador principal puede realizar esta operación");
@@ -173,6 +182,14 @@ public class UserService {
         }
 
         String ident = request.identification().trim();
+        var identificacion = IdentificacionEcuador.analizar(ident);
+        if (!identificacion.valida()) {
+            throw new ApiError(400, identificacion.mensaje());
+        }
+        if (identificacion.tipo() != IdentificacionEcuador.Tipo.CEDULA) {
+            throw new ApiError(400, "La identificación de un colaborador debe ser su cédula (10 dígitos)");
+        }
+        String telefonoNuevo = telefono(request.telefono());
 
         if (users.byIdentification(ident).isPresent()) {
             throw new ApiError(409, "Ya existe un colaborador registrado con la cédula " + ident);
@@ -190,7 +207,7 @@ public class UserService {
             UUID.randomUUID(),
             ident,
             email,
-            request.telefono() != null ? request.telefono().trim() : null,
+            telefonoNuevo.isEmpty() ? null : telefonoNuevo,
             request.fullName().trim(),
             encodePassword(request.temporaryPassword()),
             request.roles(),
@@ -233,7 +250,7 @@ public class UserService {
                 : target.email();
 
         String telefono = request.telefono() != null
-                ? request.telefono().trim()
+                ? telefono(request.telefono())
                 : target.telefono();
 
         users.db().update(

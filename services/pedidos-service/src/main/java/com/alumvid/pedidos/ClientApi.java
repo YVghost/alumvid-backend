@@ -26,8 +26,17 @@ class ClientApi {
     private Object save(UUID id,Input r,AuthClient.Identity actor,boolean create) {
         if(!actor.has("ADMINISTRADOR")&&!actor.has("VENDEDOR"))throw new PedidosError(403,"Sin permisos para administrar clientes");
         String identification=PedidosService.text(r.identification());if(identification.isEmpty())identification=null;
-        if(create)db.update("INSERT INTO pedidos.client(id,name,identification,phone,email,address,active) VALUES (?,?,?,?,?,?,?)",id,r.name().trim(),identification,PedidosService.text(r.phone()),PedidosService.text(r.email()),PedidosService.text(r.address()),r.active());
-        else if(db.update("UPDATE pedidos.client SET name=?,identification=?,phone=?,email=?,address=?,active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",r.name().trim(),identification,PedidosService.text(r.phone()),PedidosService.text(r.email()),PedidosService.text(r.address()),r.active(),id)==0)throw new PedidosError(404,"Cliente no encontrado");
+        // Cédula, RUC (persona natural, sociedad o entidad pública) o consumidor final, validados.
+        if(identification!=null){
+            var analisis=IdentificacionEcuador.analizar(identification);
+            if(!analisis.valida())throw new PedidosError(400,analisis.mensaje());
+            if(!db.queryForList("SELECT id FROM pedidos.client WHERE lower(identification)=lower(?) AND id<>?",identification,id).isEmpty())
+                throw new PedidosError(409,"Ya existe un cliente con la identificación "+identification);
+        }
+        String phone;
+        try{phone=IdentificacionEcuador.telefono(r.phone());}catch(IllegalArgumentException e){throw new PedidosError(400,e.getMessage());}
+        if(create)db.update("INSERT INTO pedidos.client(id,name,identification,phone,email,address,active) VALUES (?,?,?,?,?,?,?)",id,r.name().trim(),identification,phone,PedidosService.text(r.email()),PedidosService.text(r.address()),r.active());
+        else if(db.update("UPDATE pedidos.client SET name=?,identification=?,phone=?,email=?,address=?,active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",r.name().trim(),identification,phone,PedidosService.text(r.email()),PedidosService.text(r.address()),r.active(),id)==0)throw new PedidosError(404,"Cliente no encontrado");
         return db.queryForMap("SELECT * FROM pedidos.client WHERE id=?",id);
     }
 }

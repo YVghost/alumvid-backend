@@ -33,8 +33,18 @@ class UsersIntegrationTest {
         masterToken = service.login(master.identification(), FINAL).accessToken();
     }
 
+    /** Cédula sintética válida (provincia 17, dígito verificador correcto). */
+    static String cedulaAleatoria() {
+        var r = new java.util.Random();
+        String base = "17" + r.nextInt(6) + String.format("%06d", r.nextInt(1_000_000));
+        for (int d = 0; d < 10; d++) {
+            if (IdentificacionEcuador.analizar(base + d).valida()) return base + d;
+        }
+        throw new IllegalStateException();
+    }
+
     Users.User employee(Set<Users.Role> roles) {
-        String idStr = "TEST-" + UUID.randomUUID().toString().substring(0, 8);
+        String idStr = cedulaAleatoria();
         return users.byId(service.create(master, new Api.Create(idStr, idStr + "@alumvid.com", "0991234567", "Empleado de prueba", roles, TEMP)).id());
     }
 

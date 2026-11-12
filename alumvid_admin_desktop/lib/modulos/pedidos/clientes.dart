@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../services/api_negocio.dart';
 import '../../shared/adaptable.dart';
+import '../../shared/identificacion.dart';
 import '../../shared/permisos.dart';
 import '../../shared/tema.dart';
 import '../../shared/ui.dart';
@@ -89,19 +91,29 @@ class _ClientesListaState extends State<ClientesLista> with AutomaticKeepAliveCl
                               itemBuilder: (_, i) {
                                 final c = _items[i];
                                 final activo = c['active'] != false;
+                                final ident = aTexto(c['identification']);
+                                final info = ident.isEmpty ? null : analizarIdentificacion(ident);
+                                final datosInvalidos = (info != null && !info.valida) ||
+                                    normalizarTelefono(aTexto(c['phone'])) == null;
                                 return Card(
                                   child: ListTile(
                                     leading: AvatarIniciales(aTexto(c['name'], '?'), color: activo ? null : AppColors.neutral),
                                     title: Text(aTexto(c['name'])),
                                     subtitle: Text(
-                                      [aTexto(c['identification']), aTexto(c['phone']), aTexto(c['address'])]
-                                          .where((x) => x.isNotEmpty)
-                                          .join(' · '),
+                                      [
+                                        if (ident.isNotEmpty) info!.valida ? '$ident · ${info.mensaje}' : ident,
+                                        aTexto(c['phone']),
+                                        aTexto(c['address']),
+                                      ].where((x) => x.isNotEmpty).join(' · '),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(color: AppColors.textMuted),
                                     ),
-                                    trailing: activo ? const Icon(Icons.edit_outlined) : const EstadoChip('INACTIVO', texto: 'Inactivo'),
+                                    trailing: datosInvalidos
+                                        ? const EstadoChip('', texto: 'Datos inválidos', color: AppColors.danger)
+                                        : activo
+                                        ? const Icon(Icons.edit_outlined)
+                                        : const EstadoChip('INACTIVO', texto: 'Inactivo'),
                                     onTap: () => _form(c),
                                   ),
                                 );
@@ -150,7 +162,7 @@ class _ClienteFormState extends State<ClienteForm> {
       final r = await Api.guardarCliente(widget.cliente == null ? null : '${widget.cliente!['id']}', {
         'name': _nombre.text.trim(),
         'identification': _ident.text.trim(),
-        'phone': _tel.text.trim(),
+        'phone': normalizarTelefono(_tel.text) ?? _tel.text.trim(),
         'email': _email.text.trim().isEmpty ? null : _email.text.trim(),
         'address': _dir.text.trim(),
         'active': _activo,
@@ -192,9 +204,32 @@ class _ClienteFormState extends State<ClienteForm> {
               validator: (v) => (v ?? '').trim().isEmpty ? 'Obligatorio' : null,
             ),
             gap,
-            TextFormField(controller: _ident, decoration: const InputDecoration(labelText: 'Cédula o RUC')),
+            TextFormField(
+              controller: _ident,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(13)],
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'Cédula o RUC',
+                helperText: _ident.text.isEmpty
+                    ? 'Opcional. Consumidor final: 9999999999999'
+                    : analizarIdentificacion(_ident.text).valida
+                    ? analizarIdentificacion(_ident.text).mensaje
+                    : null,
+                helperStyle: const TextStyle(color: AppColors.success),
+              ),
+              validator: (v) => validarIdentificacion(v, obligatorio: false),
+            ),
             gap,
-            TextFormField(controller: _tel, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Teléfono')),
+            TextFormField(
+              controller: _tel,
+              keyboardType: TextInputType.phone,
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+ ]')), LengthLimitingTextInputFormatter(16)],
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              decoration: const InputDecoration(labelText: 'Teléfono', helperText: 'Celular 09XXXXXXXX o fijo 02XXXXXXX'),
+              validator: validarTelefono,
+            ),
             gap,
             TextFormField(
               controller: _email,

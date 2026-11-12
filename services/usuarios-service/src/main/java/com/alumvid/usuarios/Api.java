@@ -38,7 +38,7 @@ public class Api {
     ) {}
 
     public record Create(
-        @NotBlank @Pattern(regexp = "[A-Za-z0-9-]{3,30}") String identification,
+        @NotBlank @Size(max = 13) String identification,
         String email,
         String telefono,
         @NotBlank @Size(max = 120) String fullName,
