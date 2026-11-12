@@ -187,3 +187,7 @@ http://localhost:8080/ubicaciones/ permite compartir espacios como A3/B3 entre p
 ## Integración en revisión
 
 Consulta [INTEGRACION_MATEO.md](INTEGRACION_MATEO.md) para los ajustes, configuración privada y límites de la rama de integración.
+
+## Pedidos y logística integrados
+
+[Flujo y API de despachos comerciales](INTEGRACION_PEDIDOS_LOGISTICA.md) · [Validación y administrador Windows](VALIDACION_INTEGRACION.md).

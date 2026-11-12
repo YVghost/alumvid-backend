@@ -80,6 +80,7 @@ services:
     container_name: alumvid-logistica
     restart: on-failure
     environment:
+      AUTH_URL: http://usuarios-service:8081
       DB_HOST: postgres-postgis
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-alumvid_db}

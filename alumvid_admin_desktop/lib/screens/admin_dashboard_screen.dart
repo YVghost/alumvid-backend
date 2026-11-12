@@ -639,8 +639,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         };
       case 4:
         return {
-          'title': 'Gestión de Usuarios, Cédulas y Seguridad RBAC',
-          'subtitle': 'Control de acceso basado en roles y registro civil ecuatoriano',
+          'title': 'Gestión de Usuarios y Seguridad RBAC',
+          'subtitle': 'Control de acceso por roles e identificación del trabajador',
         };
       case 5:
         return {

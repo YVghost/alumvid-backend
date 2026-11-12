@@ -161,3 +161,9 @@ Los contenedores se recrean usando el volumen conservado. No necesitas reinstala
 - Si `docker` no se conecta, abre Docker Desktop y espera a que su motor termine de iniciar.
 - Si Flutter no ve el emulador, espera a que arranque y revisa `adb devices` y `flutter devices`.
 - Las rutas locales y las limitaciones funcionales de la app están en [alumvid_mobile/README.md](alumvid_mobile/README.md).
+
+## Administrador nativo de Windows
+
+Abrir `alumvid_admin_desktop\build\windows\x64\runner\Release\alumvid_admin_desktop.exe` después de iniciar Docker. Para ejecutarlo en desarrollo, usar `.\scripts\iniciar-admin.ps1`. Los requisitos C++ y el Modo de desarrollador ya están configurados en este equipo.
+
+Antes de apagar, cerrar sesión en el administrador y cerrar su ventana. Si se ejecutó con Flutter, pulsar `q` en su terminal. Después cerrar el móvil/emulador y detener Docker como se indica arriba. Cerrar el administrador no detiene los servicios ni PostgreSQL.

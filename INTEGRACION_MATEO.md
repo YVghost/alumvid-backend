@@ -28,13 +28,9 @@ docker compose -f compose.yaml up -d --build
 
 Windows requiere Visual Studio con Desarrollo para el escritorio con C++. Se puede probar el administrador en Android con `-Device emulator-5554`. Los lanzadores comprueban dependencias y compilan desde fuentes; no requieren el ejecutable Debug de otra computadora.
 
-## Límites que no resuelve un merge
+## Integración comercial completada
 
-Los pedidos comerciales y los pedidos de logística siguen siendo entidades diferentes. No existe todavía sincronización automática transaccional entre entregas logísticas y entregas parciales/reservas comerciales; no debe darse por completada una venta comercial por cerrar una ruta. Las operaciones comerciales completas siguen disponibles en `/pedidos/`.
-
-La fotografía del móvil todavía tiene captura simulada. GPS, permisos, evidencias reales y recuperación sin conexión requieren una prueba de campo. Una compilación o prueba unitaria no certifica estos flujos.
-
-Antes de promover a `main` deben completarse y validarse esos flujos según el alcance acordado. Esta rama permite revisar la integración sin reemplazar la rama principal.
+La sincronización pedidos–logística se implementó después del merge. Consultar [INTEGRACION_PEDIDOS_LOGISTICA.md](INTEGRACION_PEDIDOS_LOGISTICA.md) para el contrato transaccional, despachos parciales, devoluciones y pruebas. Se conserva la limitación de captura fotográfica simulada del móvil.
 
 ## Verificación realizada
 
@@ -44,4 +40,4 @@ Antes de promover a `main` deben completarse y validarse esos flujos según el a
 - Plataforma levantada: `python scripts/smoke-platform.py` comprueba 19 condiciones HTTP, acceso autenticado, portales y fecha inválida, sin crear pedidos/productos. Revoca su sesión al terminar.
 - Respaldo previo de PostgreSQL en `.cache/integracion/database-before-integration.dump` (local e ignorado).
 
-No se certifica el ejecutable Windows: este equipo no tiene instalado el componente C++ de Visual Studio requerido. Se compiló el administrador para Android. La prueba HTTP no sustituye una prueba de campo GPS/entrega ni valida restricciones/cuotas de Google Cloud.
+Se instaló Visual Studio Build Tools 2022 con C++, CMake y Windows SDK, y se habilitó el Modo de desarrollador con autorización del usuario. Flutter doctor reconoce Windows sin incidencias. Se compiló el ejecutable y se agregó una prueba nativa de login, navegación por pedidos/retazos/ubicaciones y logout. La prueba HTTP no sustituye una prueba de campo GPS/entrega ni valida restricciones/cuotas de Google Cloud.

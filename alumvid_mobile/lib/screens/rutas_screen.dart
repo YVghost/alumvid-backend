@@ -50,6 +50,7 @@ class _RutasScreenState extends State<RutasScreen> {
     // Verificación periódica HTTP como salvaguarda complementaria cada 8 segundos
     _sesionCheckTimer = Timer.periodic(const Duration(seconds: 8), (_) {
       _verificarSesionHttp();
+      if (mounted && !_expulsando) _cargarRutasAsignadas();
     });
   }
 

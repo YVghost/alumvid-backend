@@ -129,13 +129,16 @@ class OrderFulfillment {
             if(need.signum()>0)throw new PedidosError(409,"La cantidad supera lo preparado o lo enviado a reparto");
         }
     }
-    void returnToStock(UUID order,PedidosApi.Action action,AuthClient.Identity actor,boolean receiveTransit) {
+    void returnToStock(UUID order,PedidosApi.Action action,AuthClient.Identity actor,boolean receiveTransit) { returnToStock(order,action,actor,receiveTransit,null); }
+    void returnShipment(UUID order,PedidosApi.Action action,AuthClient.Identity actor,Map<UUID,BigDecimal> quantities) { returnToStock(order,action,actor,true,quantities); }
+    private void returnToStock(UUID order,PedidosApi.Action action,AuthClient.Identity actor,boolean receiveTransit,Map<UUID,BigDecimal> quantities) {
         Set<UUID> changed=new TreeSet<>();Map<UUID,BigDecimal> before=new HashMap<>();Map<UUID,BigDecimal> generic=new HashMap<>();
         Map<UUID,BigDecimal> selected=receiveTransit?selection(order,action,"receive"):null;
         for(var item:db.queryForList("SELECT * FROM pedidos.fulfillment_item WHERE order_id=? ORDER BY created_at,id",order)) {
             UUID line=uuid(item.get("line_id"));
             BigDecimal amount=receiveTransit?decimal(item.get("dispatched_quantity")):decimal(item.get("quantity")).subtract(decimal(item.get("delivered_quantity"))).subtract(decimal(item.get("returned_quantity"))).subtract(decimal(item.get("dispatched_quantity")));
-            if(receiveTransit) {amount=amount.min(selected.getOrDefault(line,BigDecimal.ZERO));selected.computeIfPresent(line,(k,v)->v.subtract(decimal(item.get("dispatched_quantity")).min(v)));}
+            if(quantities!=null)amount=amount.min(quantities.getOrDefault(uuid(item.get("id")),BigDecimal.ZERO));
+            if(receiveTransit) {amount=amount.min(selected.getOrDefault(line,BigDecimal.ZERO));BigDecimal taken=amount;selected.computeIfPresent(line,(k,v)->v.subtract(taken));}
             if(amount.signum()<=0)continue;
             if(Boolean.TRUE.equals(item.get("legacy_unmeasured")))throw new PedidosError(409,"Pedido antiguo sin medidas de salida: requiere revision fisica antes de devolver");
             UUID product=uuid(item.get("product_id"));var p=planner.product(product);before.putIfAbsent(product,decimal(p.get("stock")));boolean first=changed.add(product);

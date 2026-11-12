@@ -49,3 +49,6 @@ build/
 config/flutter.local.json
 
 **/.kotlin/
+
+__pycache__/
+*.pyc
