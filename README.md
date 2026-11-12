@@ -1,5 +1,7 @@
 # Plataforma Integral AlumVid
 
+[Guia de inicio y apagado seguro](README_INICIO_Y_APAGADO.md): abrir el emulador, ejecutar la app y cerrar el entorno conservando los datos.
+
 > **Proyecto de Titulación - Ingeniería de Software (UDLA)**  
 > **Tema:** Plataforma de control y monitoreo en tiempo real para la optimización de inventario muerto y rutas logísticas en una microempresa de vidrios y aluminios (**AlumVid**).  
 > **Autores:** Anthonny Jossue Mosquera Rivadeneira & Mateo Michael Ortega Vacas.
