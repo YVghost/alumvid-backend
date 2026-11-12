@@ -117,9 +117,68 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
     }
   }
 
+  void _mostrarToastDiscreto(String mensaje, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+              color: Colors.white,
+              size: 16,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                mensaje,
+                style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: isError ? const Color(0xFFDC2626) : const Color(0xFF1E293B),
+        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: isError ? const Color(0xFFEF4444) : const Color(0xFF334155)),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _reintentarParada(Map<String, dynamic> despacho) async {
+    final id = despacho['id']?.toString() ?? '';
+    try {
+      await ApiService.reintentarParada(id);
+      _mostrarToastDiscreto('Parada habilitada nuevamente para entrega');
+      _recargarDetalleRuta();
+    } catch (e) {
+      _mostrarToastDiscreto('Error al reintentar parada: $e', isError: true);
+    }
+  }
+
   Future<void> _iniciarDestinoSeleccionado(Map<String, dynamic> despacho) async {
     final despachoId = despacho['id']?.toString() ?? '';
     final estadoDespacho = despacho['estado'] ?? 'PENDIENTE';
+
+    // Regla de Negocio: Verificar si YA hay una parada EN_CURSO activa
+    final List<dynamic> paradas = (_rutaActual['paradas'] as List<dynamic>?) ?? [];
+    final tieneEnCurso = paradas.any((p) => (p['estado'] ?? '') == 'EN_CURSO' && p['id'].toString() != despachoId);
+    if (tieneEnCurso && estadoDespacho != 'EN_CURSO') {
+      _mostrarToastDiscreto(
+        'Ya tienes una entrega en curso. Debes finalizar o reportar la parada actual antes de iniciar otra.',
+        isError: true,
+      );
+      return;
+    }
 
     // Si la parada está pendiente, notificar inicio formal al backend
     if (estadoDespacho == 'PENDIENTE') {
@@ -127,12 +186,11 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
         await ApiService.aceptarEIniciarRuta(despachoId);
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Atencion: ${e.toString().replaceAll('Exception: ', '')}'),
-            backgroundColor: const Color(0xFFF59E0B),
-          ),
+        _mostrarToastDiscreto(
+          e.toString().replaceAll('Exception: ', ''),
+          isError: true,
         );
+        return;
       }
     }
 
@@ -297,25 +355,25 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                       child: Text(_error!, style: const TextStyle(color: Color(0xFFFB7185), fontSize: 12)),
                     ),
 
-                  // Botón Chofer: Optimizar Paradas desde GPS
+                  // Botón Chofer: Optimizar Paradas desde GPS (compacto a la derecha)
                   if (paradas.length > 1) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF60A5FA),
+                          side: const BorderSide(color: Color(0xFF2563EB)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                         icon: _optimizando
-                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.auto_mode, size: 16),
-                        label: const Text('Re-optimizar por Menor Tiempo (Google Routes)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF60A5FA)))
+                            : const Icon(Icons.auto_mode_rounded, size: 14),
+                        label: const Text('optimizar ruta', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                         onPressed: _optimizando ? null : _optimizarRutaDesdeGps,
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                   ],
 
                   // 2. LISTA DE PARADAS / DESTINOS
@@ -447,6 +505,47 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                                       ),
                                     ],
                                   ),
+                                )
+                              else if (estado == 'CANCELADA')
+                                Column(
+                                  children: [
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.report_problem_outlined, color: Color(0xFFEF4444), size: 16),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Parada Fallida: ${d['comentarios'] ?? "No concretada"}',
+                                              style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 11),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton.icon(
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: const Color(0xFF38BDF8),
+                                          side: const BorderSide(color: Color(0xFF0284C7)),
+                                          padding: const EdgeInsets.symmetric(vertical: 9),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        ),
+                                        icon: const Icon(Icons.replay_rounded, size: 16),
+                                        label: const Text('Reintentar Entrega', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                        onPressed: () => _reintentarParada(d),
+                                      ),
+                                    ),
+                                  ],
                                 )
                               else
                                 SizedBox(

@@ -291,13 +291,150 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
     );
 
     if (resultado == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Entrega documentada registrada con exito en el sistema.'),
-          backgroundColor: Color(0xFF059669),
-        ),
-      );
+      _mostrarToastDiscreto('Entrega documentada registrada con éxito en el sistema.');
       Navigator.pop(context, true);
+    }
+  }
+
+  void _mostrarToastDiscreto(String mensaje, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+              color: Colors.white,
+              size: 16,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                mensaje,
+                style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: isError ? const Color(0xFFDC2626) : const Color(0xFF1E293B),
+        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: isError ? const Color(0xFFEF4444) : const Color(0xFF334155)),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _reportarParadaFallida() async {
+    final motivos = [
+      'Cliente ausente / no se encontraba en el lugar',
+      'Dirección o teléfono de contacto erróneo',
+      'Local o negocio cerrado',
+      'Cliente rechazó la entrega del material',
+      'Vía o acceso bloqueado para el camión',
+      'Otro motivo...',
+    ];
+
+    String motivoSeleccionado = motivos.first;
+    final detalleCtrl = TextEditingController();
+
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final esOtro = motivoSeleccionado == 'Otro motivo...';
+          return AlertDialog(
+            backgroundColor: const Color(0xFF111827),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Color(0xFF1E293B)),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.report_problem_rounded, color: Color(0xFFEF4444), size: 22),
+                SizedBox(width: 8),
+                Text(
+                  'Reportar Parada Fallida',
+                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Seleccione la causa por la cual no se pudo concretar la entrega:',
+                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  ...motivos.map((m) => RadioListTile<String>(
+                        value: m,
+                        groupValue: motivoSeleccionado,
+                        activeColor: const Color(0xFFEF4444),
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(m, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                        onChanged: (val) {
+                          if (val != null) setDialogState(() => motivoSeleccionado = val);
+                        },
+                      )),
+                  if (esOtro) ...[
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: detalleCtrl,
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      decoration: const InputDecoration(
+                        hintText: 'Especifique el motivo...',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar', style: TextStyle(color: Color(0xFF94A3B8))),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEF4444),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Confirmar Fallida', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (confirmado == true) {
+      final motivoFinal = motivoSeleccionado == 'Otro motivo...' && detalleCtrl.text.trim().isNotEmpty
+          ? detalleCtrl.text.trim()
+          : motivoSeleccionado;
+
+      try {
+        await ApiService.cancelarRuta(widget.despacho['id'].toString(), motivoFinal);
+        if (!mounted) return;
+        Navigator.pop(context, true); // Retornar a la lista de paradas
+      } catch (e) {
+        if (!mounted) return;
+        _mostrarToastDiscreto('Error al reportar parada fallida: $e', isError: true);
+      }
     }
   }
 
@@ -630,21 +767,22 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                 ),
                 const SizedBox(height: 8),
 
-                // Boton secundario: Regresar al Itinerario de Paradas
+                // Botón secundario: Reportar Parada Fallida
                 SizedBox(
                   width: double.infinity,
                   height: 42,
-                  child: OutlinedButton(
+                  child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF94A3B8),
-                      side: const BorderSide(color: Color(0xFF1E293B)),
+                      foregroundColor: const Color(0xFFEF4444),
+                      side: const BorderSide(color: Color(0xFFEF4444)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text(
-                      'Ver Lista de Paradas de la Ruta',
-                      style: TextStyle(fontSize: 13),
+                    icon: const Icon(Icons.cancel_outlined, size: 16, color: Color(0xFFEF4444)),
+                    label: const Text(
+                      'Reportar Parada Fallida',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                     ),
+                    onPressed: _reportarParadaFallida,
                   ),
                 ),
               ],

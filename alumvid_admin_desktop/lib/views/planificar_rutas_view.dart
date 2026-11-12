@@ -178,18 +178,6 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
     );
   }
 
-  Future<void> _iniciarRuta(Ruta ruta) async {
-    try {
-      final act = await ApiService.iniciarRuta(ruta.id);
-      if (!mounted) return;
-      AppToast.success(context, 'Ruta "${act.codigoRuta}" puesta EN CURSO');
-      widget.onRefresh();
-    } catch (e) {
-      if (!mounted) return;
-      AppToast.error(context, 'Error al iniciar ruta: $e');
-    }
-  }
-
   Future<void> _eliminarRuta(Ruta ruta) async {
     final conf = await showDialog<bool>(
       context: context,
@@ -841,8 +829,6 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
   // WIDGET: 2. CENTRO OPERATIVO & ESTADO DE FLOTA (REEMPLAZA PUNTO DE ENTREGA)
   // ==========================================
   Widget _buildCardCentroOperativoFlota() {
-    // Buscar si hay alguna ruta activa en curso
-    final rutaEnCurso = widget.rutas.where((r) => r.isEnCurso).toList();
     final choferesEnRuta = widget.choferes.where((c) => c.isEnRuta).length;
     final choferesDisponibles = widget.choferes.where((c) => c.isDisponible).length;
 
@@ -922,35 +908,6 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                   color: const Color(0xFF94A3B8),
                 ),
               ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Botón de Acción Directo: Ir a Monitoreo Satelital GPS
-          SizedBox(
-            width: double.infinity,
-            height: 38,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F2B48),
-                foregroundColor: const Color(0xFF38BDF8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: const BorderSide(color: Color(0xFF0284C7)),
-                ),
-                elevation: 0,
-              ),
-              icon: const Icon(Icons.satellite_alt_rounded, size: 16),
-              label: Text(
-                rutaEnCurso.isNotEmpty
-                    ? 'Monitorear ${rutaEnCurso.first.codigoRuta} en Vivo'
-                    : 'Ir a Monitoreo Satelital GPS',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              ),
-              onPressed: () {
-                final rTarget = rutaEnCurso.isNotEmpty ? rutaEnCurso.first : null;
-                widget.onIrAMonitoreo?.call(rTarget);
-              },
             ),
           ),
         ],
@@ -1180,6 +1137,18 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                                 ),
                               ),
 
+                              // Botón intuitivo para monitorear en vivo (si la ruta está EN CURSO)
+                              if (r.isEnCurso) ...[
+                                IconButton(
+                                  icon: const Icon(Icons.sensors_rounded, color: Color(0xFF38BDF8), size: 19),
+                                  tooltip: 'Monitorear ${r.codigoRuta} en vivo',
+                                  padding: const EdgeInsets.all(4),
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => widget.onIrAMonitoreo?.call(r),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+
                               // Estado Chip
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1250,19 +1219,6 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                                         label: const Text('+ Añadir Parada', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                         onPressed: () => _abrirDialogoAgregarParada(r),
                                       ),
-
-                                      // Iniciar Ruta (si está pendiente)
-                                      if (r.isPendiente && r.paradas.isNotEmpty)
-                                        OutlinedButton.icon(
-                                          style: OutlinedButton.styleFrom(
-                                            side: const BorderSide(color: Color(0xFF10B981)),
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                          ),
-                                          icon: const Icon(Icons.play_arrow_rounded, size: 15, color: Color(0xFF10B981)),
-                                          label: const Text('Iniciar Ruta', style: TextStyle(color: Color(0xFF10B981), fontSize: 11)),
-                                          onPressed: () => _iniciarRuta(r),
-                                        ),
 
                                       // Eliminar Ruta
                                       IconButton(
@@ -1423,6 +1379,18 @@ class _PlanificarRutasViewState extends State<PlanificarRutasView> {
                                               ],
                                             ),
                                           ),
+
+                                          // Botón intuitivo para monitorear en vivo (si la parada está EN CURSO)
+                                          if (p.isEnCurso) ...[
+                                            IconButton(
+                                              icon: const Icon(Icons.sensors_rounded, size: 17, color: Color(0xFF38BDF8)),
+                                              tooltip: 'Monitorear parada en vivo',
+                                              padding: const EdgeInsets.all(6),
+                                              constraints: const BoxConstraints(),
+                                              onPressed: () => widget.onIrAMonitoreo?.call(r),
+                                            ),
+                                            const SizedBox(width: 4),
+                                          ],
 
                                           // Badge Estado
                                           Container(

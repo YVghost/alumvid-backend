@@ -28,6 +28,8 @@ public interface LogisticaService {
 
     DespachoResponse cerrarEntrega(UUID despachoId, CerrarEntregaRequest request);
 
+    DespachoResponse reintentarParada(UUID despachoId);
+
     List<DespachoResponse> listarDespachos();
 
     List<DespachoResponse> listarDespachosHoyChofer(UUID choferId);

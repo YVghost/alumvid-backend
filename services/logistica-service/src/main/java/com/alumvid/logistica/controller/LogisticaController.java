@@ -77,6 +77,11 @@ public class LogisticaController {
         return ResponseEntity.ok(logisticaService.cancelarRuta(id, motivo));
     }
 
+    @PostMapping("/despachos/{id}/reintentar")
+    public ResponseEntity<DespachoResponse> reintentarParada(@PathVariable UUID id) {
+        return ResponseEntity.ok(logisticaService.reintentarParada(id));
+    }
+
     @PostMapping("/despachos/{id}/cerrar-entrega")
     public ResponseEntity<DespachoResponse> cerrarEntrega(
             @PathVariable UUID id,

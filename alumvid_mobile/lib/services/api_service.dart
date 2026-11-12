@@ -260,7 +260,41 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
+      try {
+        final err = jsonDecode(response.body);
+        if (err is Map && err.containsKey('message')) {
+          throw Exception(err['message']);
+        }
+      } catch (e) {
+        if (e is! FormatException && !e.toString().contains('FormatException')) rethrow;
+      }
       throw Exception('Error al registrar consentimiento de inicio de ruta');
+    }
+  }
+
+  static Future<Map<String, dynamic>> reintentarParada(String despachoId) async {
+    final token = await getToken();
+    final url = Uri.parse('$baseUrl/logistica/despachos/$despachoId/reintentar');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      try {
+        final err = jsonDecode(response.body);
+        if (err is Map && err.containsKey('message')) {
+          throw Exception(err['message']);
+        }
+      } catch (e) {
+        if (e is! FormatException && !e.toString().contains('FormatException')) rethrow;
+      }
+      throw Exception('Error al reintentar la entrega');
     }
   }
 

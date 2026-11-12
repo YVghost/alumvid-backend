@@ -94,11 +94,29 @@ public class LogisticaServiceImpl implements LogisticaService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ChoferResponse> listarChoferes() {
+        sincronizarChoferesDesdeUsuarios();
         return choferRepository.findAll().stream()
                 .map(this::mapearAChoferResponse)
                 .collect(Collectors.toList());
+    }
+
+    private void sincronizarChoferesDesdeUsuarios() {
+        try {
+            jdbcTemplate.update("""
+                INSERT INTO logistica.choferes (id, nombre, email, telefono, estado_disponibilidad, created_at, updated_at)
+                SELECT u.id, u.full_name, u.email, COALESCE(u.telefono, ''), 'DISPONIBLE', NOW(), NOW()
+                FROM usuarios.app_user u
+                WHERE u.roles LIKE '%CHOFER%'
+                ON CONFLICT (id) DO UPDATE
+                SET nombre = EXCLUDED.nombre,
+                    email = EXCLUDED.email,
+                    telefono = COALESCE(EXCLUDED.telefono, logistica.choferes.telefono)
+            """);
+        } catch (Exception e) {
+            log.warn("No se pudo sincronizar choferes desde usuarios: {}", e.getMessage());
+        }
     }
 
     @Override
@@ -547,7 +565,18 @@ public class LogisticaServiceImpl implements LogisticaService {
         }
 
         despacho.setEstado(EstadoDespacho.CANCELADA);
-        despacho.setComentarios(motivo != null ? "Cancelada por chofer: " + motivo : "Cancelada por chofer voluntariamente.");
+        String comentarioPrevio = despacho.getComentarios() != null ? despacho.getComentarios() : "";
+        StringBuilder sbTags = new StringBuilder();
+        java.util.regex.Matcher mTags = java.util.regex.Pattern.compile("\\[META:[^\\]]+\\]").matcher(comentarioPrevio);
+        while (mTags.find()) {
+            sbTags.append(mTags.group()).append(" ");
+        }
+        String tagsPreservados = sbTags.toString().trim();
+        String limpio = comentarioPrevio.replaceAll("\\[META:[^\\]]+\\]", "").trim();
+        String motivoTexto = motivo != null ? "Cancelada por chofer: " + motivo : "Cancelada por chofer voluntariamente.";
+        String nuevoComentario = (limpio.isEmpty() ? motivoTexto : (limpio + " (" + motivoTexto + ")")) +
+                (tagsPreservados.isEmpty() ? "" : " " + tagsPreservados);
+        despacho.setComentarios(nuevoComentario);
 
         Pedido pedido = despacho.getPedido();
         pedido.setEstado(EstadoPedido.CANCELADO);
@@ -646,6 +675,41 @@ public class LogisticaServiceImpl implements LogisticaService {
                 Map.of("despachoId", despachoId.toString(), "estado", "ENTREGADO", "mensaje", "Entrega completada"));
         notificarActualizacionTablero();
 
+        return mapearADespachoResponse(guardado);
+    }
+
+    @Override
+    @Transactional
+    public DespachoResponse reintentarParada(UUID despachoId) {
+        Despacho despacho = despachoRepository.findById(despachoId)
+                .orElseThrow(() -> new IllegalArgumentException("Despacho no encontrado con ID: " + despachoId));
+
+        if (despacho.getEstado() == EstadoDespacho.ENTREGADO) {
+            throw new IllegalStateException("No se puede reintentar una entrega que ya fue completada exitosamente.");
+        }
+
+        despacho.setEstado(EstadoDespacho.PENDIENTE);
+        if (despacho.getPedido() != null) {
+            despacho.getPedido().setEstado(EstadoPedido.PENDIENTE);
+            pedidoRepository.save(despacho.getPedido());
+        }
+
+        marcarPiezaPreparada(despacho.getComentarios());
+        Despacho guardado = despachoRepository.save(despacho);
+
+        if (despacho.getRuta() != null) {
+            Ruta ruta = despacho.getRuta();
+            if (ruta.getEstado() == EstadoRuta.COMPLETADA || ruta.getEstado() == EstadoRuta.CANCELADA) {
+                ruta.setEstado(EstadoRuta.EN_CURSO);
+                rutaRepository.save(ruta);
+            }
+            if (ruta.getChofer() != null) {
+                RutaResponse res = mapearARutaResponse(ruta);
+                messagingTemplate.convertAndSend("/topic/choferes/" + ruta.getChofer().getId() + "/rutas-asignadas", res);
+            }
+        }
+
+        notificarActualizacionTablero();
         return mapearADespachoResponse(guardado);
     }
 
@@ -1089,7 +1153,7 @@ public class LogisticaServiceImpl implements LogisticaService {
         try {
             java.util.regex.Pattern p = java.util.regex.Pattern.compile("PIECE=([a-fA-F0-9\\-]+)");
             java.util.regex.Matcher m = p.matcher(comentarios);
-            if (m.find()) {
+            while (m.find()) {
                 UUID pieceId = UUID.fromString(m.group(1));
                 jdbcTemplate.update("UPDATE retazos.piece SET state = 'PREPARADO' WHERE id = ? AND state = 'DISPONIBLE'", pieceId);
                 log.info("Pieza retazo {} reservada/preparada para parada de ruta", pieceId);
@@ -1104,7 +1168,7 @@ public class LogisticaServiceImpl implements LogisticaService {
         try {
             java.util.regex.Pattern p = java.util.regex.Pattern.compile("PIECE=([a-fA-F0-9\\-]+)");
             java.util.regex.Matcher m = p.matcher(comentarios);
-            if (m.find()) {
+            while (m.find()) {
                 UUID pieceId = UUID.fromString(m.group(1));
                 jdbcTemplate.update("UPDATE retazos.piece SET state = 'DISPONIBLE' WHERE id = ? AND state = 'PREPARADO'", pieceId);
                 log.info("Pieza retazo {} liberada a DISPONIBLE tras eliminación/cancelación de parada", pieceId);
@@ -1121,80 +1185,81 @@ public class LogisticaServiceImpl implements LogisticaService {
             String comentarios = despacho.getComentarios();
             java.util.regex.Pattern metaPattern = java.util.regex.Pattern.compile("\\[META:([^\\]]+)\\]");
             java.util.regex.Matcher metaMatcher = metaPattern.matcher(comentarios);
-            if (!metaMatcher.find()) return;
-
-            String metaContent = metaMatcher.group(1);
-            Map<String, String> metaMap = new HashMap<>();
-            for (String pair : metaContent.split(";")) {
-                String[] kv = pair.split("=");
-                if (kv.length == 2) {
-                    metaMap.put(kv[0].trim().toUpperCase(Locale.ROOT), kv[1].trim());
-                }
-            }
-
-            String productIdStr = metaMap.get("PID");
-            String qtyStr = metaMap.get("QTY");
-            String pieceIdStr = metaMap.get("PIECE");
 
             UUID actorId = chofer != null && chofer.getId() != null ? chofer.getId() : UUID.randomUUID();
-            String actorName = chofer != null ? (chofer.getNombre() + " " + (chofer.getApellido() != null ? chofer.getApellido() : "")).trim() : "Chofer Móvil";
+            String actorName = chofer != null && chofer.getNombre() != null ? chofer.getNombre().trim() : "Chofer Móvil";
 
-            // 1. Si era una pieza de retazo/vidrio/aluminio, marcarla ENTREGADO
-            if (pieceIdStr != null && !pieceIdStr.isBlank()) {
-                try {
-                    UUID pieceId = UUID.fromString(pieceIdStr);
-                    int updated = jdbcTemplate.update(
-                        "UPDATE retazos.piece SET state = 'ENTREGADO' WHERE id = ? AND state IN ('DISPONIBLE', 'PREPARADO', 'TRANSFORMADO')",
-                        pieceId
-                    );
-                    log.info("Despacho {} completado: pieza {} marcada como ENTREGADO (filas: {})", despacho.getId(), pieceId, updated);
-                } catch (Exception e) {
-                    log.error("Error al actualizar pieza retazo {} a ENTREGADO: {}", pieceIdStr, e.getMessage());
-                }
-            }
-
-            // 2. Si hay producto y cantidad, registrar SALIDA en inventario
-            if (productIdStr != null && !productIdStr.isBlank() && qtyStr != null && !qtyStr.isBlank()) {
-                try {
-                    UUID productId = UUID.fromString(productIdStr);
-                    java.math.BigDecimal qty = new java.math.BigDecimal(qtyStr);
-
-                    if (qty.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                            "SELECT stock FROM inventario.product WHERE id = ? FOR UPDATE",
-                            productId
-                        );
-                        if (!rows.isEmpty()) {
-                            java.math.BigDecimal stockBefore = (java.math.BigDecimal) rows.get(0).get("stock");
-                            if (stockBefore == null) stockBefore = java.math.BigDecimal.ZERO;
-                            java.math.BigDecimal stockAfter = stockBefore.subtract(qty);
-                            if (stockAfter.compareTo(java.math.BigDecimal.ZERO) < 0) {
-                                stockAfter = java.math.BigDecimal.ZERO;
-                            }
-
-                            UUID movementId = UUID.randomUUID();
-                            UUID requestId = UUID.nameUUIDFromBytes(("despacho:" + despacho.getId() + ":" + productId).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                            String reason = "Salida por entrega e-PoD parada #" + (despacho.getOrdenParada() != null ? despacho.getOrdenParada() : "1") +
-                                " despacho " + despacho.getId();
-
-                            jdbcTemplate.update(
-                                "INSERT INTO inventario.movement(id, request_id, product_id, type, quantity, delta, stock_before, stock_after, reason, reference, actor_id, actor_name) " +
-                                "VALUES (?, ?, ?, 'SALIDA', ?, ?, ?, ?, ?, ?, ?, ?)",
-                                movementId, requestId, productId, qty, qty.negate(), stockBefore, stockAfter,
-                                reason, "e-PoD:" + despacho.getId(), actorId, actorName
-                            );
-
-                            jdbcTemplate.update(
-                                "UPDATE inventario.product SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                                stockAfter, productId
-                            );
-
-                            log.info("Despacho {}: Registrado movimiento de salida de inventario para producto {} (Qty: {}, Stock: {} -> {})",
-                                despacho.getId(), productId, qty, stockBefore, stockAfter);
-                        }
+            while (metaMatcher.find()) {
+                String metaContent = metaMatcher.group(1);
+                Map<String, String> metaMap = new HashMap<>();
+                for (String pair : metaContent.split(";")) {
+                    String[] kv = pair.split("=");
+                    if (kv.length == 2) {
+                        metaMap.put(kv[0].trim().toUpperCase(Locale.ROOT), kv[1].trim());
                     }
-                } catch (Exception e) {
-                    log.error("Error al registrar movimiento inventario para producto {}: {}", productIdStr, e.getMessage());
+                }
+
+                String productIdStr = metaMap.get("PID");
+                String qtyStr = metaMap.get("QTY");
+                String pieceIdStr = metaMap.get("PIECE");
+
+                // 1. Si era una pieza de retazo/vidrio/aluminio, marcarla ENTREGADO
+                if (pieceIdStr != null && !pieceIdStr.isBlank()) {
+                    try {
+                        UUID pieceId = UUID.fromString(pieceIdStr);
+                        int updated = jdbcTemplate.update(
+                            "UPDATE retazos.piece SET state = 'ENTREGADO' WHERE id = ? AND state IN ('DISPONIBLE', 'PREPARADO', 'TRANSFORMADO')",
+                            pieceId
+                        );
+                        log.info("Despacho {} completado: pieza {} marcada como ENTREGADO (filas: {})", despacho.getId(), pieceId, updated);
+                    } catch (Exception e) {
+                        log.error("Error al actualizar pieza retazo {} a ENTREGADO: {}", pieceIdStr, e.getMessage());
+                    }
+                }
+
+                // 2. Si hay producto y cantidad, registrar SALIDA en inventario
+                if (productIdStr != null && !productIdStr.isBlank() && qtyStr != null && !qtyStr.isBlank()) {
+                    try {
+                        UUID productId = UUID.fromString(productIdStr);
+                        java.math.BigDecimal qty = new java.math.BigDecimal(qtyStr);
+
+                        if (qty.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                                "SELECT stock FROM inventario.product WHERE id = ? FOR UPDATE",
+                                productId
+                            );
+                            if (!rows.isEmpty()) {
+                                java.math.BigDecimal stockBefore = (java.math.BigDecimal) rows.get(0).get("stock");
+                                if (stockBefore == null) stockBefore = java.math.BigDecimal.ZERO;
+                                java.math.BigDecimal stockAfter = stockBefore.subtract(qty);
+                                if (stockAfter.compareTo(java.math.BigDecimal.ZERO) < 0) {
+                                    stockAfter = java.math.BigDecimal.ZERO;
+                                }
+
+                                UUID movementId = UUID.randomUUID();
+                                UUID requestId = UUID.nameUUIDFromBytes(("despacho:" + despacho.getId() + ":" + productId + ":" + (pieceIdStr != null ? pieceIdStr : UUID.randomUUID())).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                                String reason = "Salida por entrega e-PoD parada #" + (despacho.getOrdenParada() != null ? despacho.getOrdenParada() : "1") +
+                                    " despacho " + despacho.getId();
+
+                                jdbcTemplate.update(
+                                    "INSERT INTO inventario.movement(id, request_id, product_id, type, quantity, delta, stock_before, stock_after, reason, reference, actor_id, actor_name) " +
+                                    "VALUES (?, ?, ?, 'SALIDA', ?, ?, ?, ?, ?, ?, ?, ?)",
+                                    movementId, requestId, productId, qty, qty.negate(), stockBefore, stockAfter,
+                                    reason, "e-PoD:" + despacho.getId(), actorId, actorName
+                                );
+
+                                jdbcTemplate.update(
+                                    "UPDATE inventario.product SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                                    stockAfter, productId
+                                );
+
+                                log.info("Despacho {}: Registrado movimiento de salida de inventario para producto {} (Qty: {}, Stock: {} -> {})",
+                                    despacho.getId(), productId, qty, stockBefore, stockAfter);
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.error("Error al registrar movimiento inventario para producto {}: {}", productIdStr, e.getMessage());
+                    }
                 }
             }
         } catch (Exception e) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/despacho.dart';
 import '../models/ruta.dart';
 import 'modificar_parada_dialog.dart';
@@ -242,6 +243,23 @@ class VerUbicacionParadaDialog extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF38BDF8),
+                      side: const BorderSide(color: Color(0xFF1E293B)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.open_in_new_rounded, size: 15),
+                    label: const Text('Abrir en Google Maps', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    onPressed: () async {
+                      final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=${parada.latitud},${parada.longitud}');
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                  ),
+                  const Spacer(),
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF94A3B8),
