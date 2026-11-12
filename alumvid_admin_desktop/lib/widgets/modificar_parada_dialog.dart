@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../models/despacho.dart';
 import '../models/item_entrega_parada.dart';
 import '../models/producto.dart';
 import '../models/retazo_pieza.dart';
 import '../models/ruta.dart';
 import '../services/api_service.dart';
-import '../services/location_search_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_toast.dart';
+import 'map_picker_dialog.dart';
 
 enum TipoEntregaMaterial {
   inventario,
@@ -49,12 +48,10 @@ class _ModificarParadaDialogState extends State<ModificarParadaDialog> {
   final _corteLargoCtrl = TextEditingController();
   bool _aplicarCorteRetazo = false;
 
-  final MapController _mapController = MapController();
   late double _lat;
   late double _lon;
   String _direccionResuelta = '';
   bool _ubicacionModificada = false;
-  bool _isResolvingAddress = false;
 
   // Catálogos
   TipoEntregaMaterial _tipoSubForm = TipoEntregaMaterial.inventario;
@@ -141,45 +138,30 @@ class _ModificarParadaDialogState extends State<ModificarParadaDialog> {
           _cargandoPiezas = false;
         });
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _cargandoPiezas = false);
-      }
-    }
-  }
-
-  Future<void> _actualizarUbicacionDesdeMapa(LatLng point) async {
-    setState(() {
-      _lat = point.latitude;
-      _lon = point.longitude;
-      _ubicacionModificada = true;
-      _isResolvingAddress = true;
-    });
-
-    try {
-      final addr = await LocationSearchService.reverseGeocode(point);
-      if (mounted) {
-        setState(() {
-          _isResolvingAddress = false;
-          if (addr.isNotEmpty) {
-            _direccionResuelta = addr;
-            _direccionCtrl.text = addr;
-          }
-        });
-      }
     } catch (_) {
-      if (mounted) setState(() => _isResolvingAddress = false);
+      if (mounted) setState(() => _cargandoPiezas = false);
     }
   }
 
-  Future<void> _abrirEnGoogleMaps() async {
-    final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$_lat,$_lon');
-    try {
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      debugPrint('Error al abrir Google Maps: $e');
+  Future<void> _abrirSelectorMapa() async {
+    final result = await showDialog<MapPickerResult>(
+      context: context,
+      builder: (_) => MapPickerDialog(
+        initialLocation: LatLng(_lat, _lon),
+        title: 'Modificar Ubicación en Google Maps',
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _lat = result.location.latitude;
+        _lon = result.location.longitude;
+        _direccionResuelta = result.address;
+        _ubicacionModificada = true;
+        if (_direccionCtrl.text.trim().isEmpty) {
+          _direccionCtrl.text = result.address;
+        }
+      });
     }
   }
 
@@ -334,7 +316,7 @@ class _ModificarParadaDialogState extends State<ModificarParadaDialog> {
         side: const BorderSide(color: Color(0xFF1E293B)),
       ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1040, maxHeight: 700),
+        constraints: const BoxConstraints(maxWidth: 980, maxHeight: 660),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Form(
@@ -380,16 +362,15 @@ class _ModificarParadaDialogState extends State<ModificarParadaDialog> {
                 ),
                 const SizedBox(height: 14),
 
-                // Contenido en 2 Columnas: Izquierda (Formulario y Materiales), Derecha (Mapa Interactivo)
+                // Contenido en 2 Columnas
                 Expanded(
                   child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // ==========================================
                       // COLUMNA IZQUIERDA: FORMULARIO Y MATERIALES
                       // ==========================================
                       Expanded(
-                        flex: 6,
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.only(right: 14),
                           child: Column(
@@ -413,18 +394,9 @@ class _ModificarParadaDialogState extends State<ModificarParadaDialog> {
                                   labelText: 'Dirección o Referencia *',
                                   prefixIcon: const Icon(Icons.location_on_rounded, size: 18),
                                   suffixIcon: IconButton(
-                                    icon: const Icon(Icons.search_rounded, color: Color(0xFF38BDF8), size: 18),
-                                    tooltip: 'Localizar dirección en el mapa',
-                                    onPressed: () async {
-                                      final query = _direccionCtrl.text.trim();
-                                      if (query.isNotEmpty) {
-                                        final results = await LocationSearchService.searchPlaces(query, center: LatLng(_lat, _lon));
-                                        if (results.isNotEmpty && mounted) {
-                                          _actualizarUbicacionDesdeMapa(results.first.location);
-                                          _mapController.move(results.first.location, 15.0);
-                                        }
-                                      }
-                                    },
+                                    icon: const Icon(Icons.map_rounded, color: Color(0xFF38BDF8), size: 20),
+                                    tooltip: 'Modificar en Google Maps con buscador inteligente',
+                                    onPressed: _abrirSelectorMapa,
                                   ),
                                 ),
                                 validator: (val) => (val == null || val.trim().isEmpty) ? 'Ingrese la dirección' : null,
@@ -460,7 +432,7 @@ class _ModificarParadaDialogState extends State<ModificarParadaDialog> {
                               ),
                               const SizedBox(height: 8),
 
-                              // Lista de items asignados (Sin mensaje de advertencia irrelevante)
+                              // Lista de items asignados (sin texto de advertencia)
                               if (_itemsEntrega.isNotEmpty)
                                 ListView.separated(
                                   shrinkWrap: true,
@@ -784,15 +756,11 @@ class _ModificarParadaDialogState extends State<ModificarParadaDialog> {
                         ),
                       ),
 
-                      // Separador vertical
-                      Container(width: 1, color: const Color(0xFF1E293B)),
-                      const SizedBox(width: 14),
-
                       // ==========================================
-                      // COLUMNA DERECHA: MAPA INTERACTIVO DIRECTO
+                      // COLUMNA DERECHA: MAPA CUADRADO GOOGLE MAPS
                       // ==========================================
-                      Expanded(
-                        flex: 5,
+                      SizedBox(
+                        width: 310,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -801,101 +769,151 @@ class _ModificarParadaDialogState extends State<ModificarParadaDialog> {
                               children: [
                                 const Row(
                                   children: [
-                                    Icon(Icons.map_rounded, size: 16, color: Color(0xFF38BDF8)),
+                                    Icon(Icons.location_on, size: 16, color: Color(0xFF38BDF8)),
                                     SizedBox(width: 6),
-                                    Text('Ubicación en el Mapa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                    Text(
+                                      'Punto de Entrega',
+                                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                    ),
                                   ],
                                 ),
-                                InkWell(
-                                  onTap: _abrirEnGoogleMaps,
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF1E293B),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: const Color(0xFF334155)),
+                                Text(
+                                  '${_lat.toStringAsFixed(4)}, ${_lon.toStringAsFixed(4)}',
+                                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 10, fontFamily: 'monospace'),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Contenedor Cuadrado con AspectRatio 1:1 y Mapa de Google Maps
+                            AspectRatio(
+                              aspectRatio: 1.0,
+                              child: InkWell(
+                                onTap: _abrirSelectorMapa,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0F172A),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _ubicacionModificada ? const Color(0xFF10B981) : const Color(0xFF1E293B),
+                                      width: 1.5,
                                     ),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.5),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(11),
+                                    child: Stack(
                                       children: [
-                                        Icon(Icons.open_in_new_rounded, size: 12, color: Color(0xFF38BDF8)),
-                                        SizedBox(width: 4),
-                                        Text('Google Maps', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold)),
+                                        IgnorePointer(
+                                          ignoring: true,
+                                          child: FlutterMap(
+                                            key: ValueKey('dialog-map-mod-$_lat-$_lon'),
+                                            options: MapOptions(
+                                              initialCenter: LatLng(_lat, _lon),
+                                              initialZoom: 15.0,
+                                              interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                                            ),
+                                            children: [
+                                              TileLayer(
+                                                urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                                                userAgentPackageName: 'com.alumvid.admin',
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                        // Pin Rojo Centrado con Sombra (Estilo Google Maps)
+                                        Center(
+                                          child: FractionalTranslation(
+                                            translation: const Offset(0.0, -0.42),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.all(6),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFEF4444),
+                                                    shape: BoxShape.circle,
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: const Color(0xFFEF4444).withValues(alpha: 0.7),
+                                                        blurRadius: 8,
+                                                        spreadRadius: 2,
+                                                      ),
+                                                      const BoxShadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 2)),
+                                                    ],
+                                                  ),
+                                                  child: const Icon(Icons.location_pin, color: Colors.white, size: 22),
+                                                ),
+                                                Container(
+                                                  width: 4,
+                                                  height: 4,
+                                                  margin: const EdgeInsets.only(top: 1),
+                                                  decoration: const BoxDecoration(
+                                                    color: Colors.white,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+
+                                        // Botón Flotante: Elegir con Buscador Inteligente
+                                        Positioned(
+                                          bottom: 10,
+                                          left: 10,
+                                          right: 10,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xF20F172A),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: const Color(0xFF0284C7)),
+                                              boxShadow: const [
+                                                BoxShadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2)),
+                                              ],
+                                            ),
+                                            child: const Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.search_rounded, size: 14, color: Color(0xFF38BDF8)),
+                                                SizedBox(width: 6),
+                                                Text(
+                                                  'Buscador Google Maps',
+                                                  style: TextStyle(
+                                                    color: Color(0xFF38BDF8),
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF090E1A),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFF1E293B)),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFF38BDF8)),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      _isResolvingAddress
-                                          ? 'Obteniendo dirección...'
-                                          : (_ubicacionModificada
-                                              ? 'Nueva ubicación: $_direccionResuelta'
-                                              : 'Ubicación actual: $_direccionResuelta (Haz clic para cambiar)'),
-                                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
                               ),
                             ),
                             const SizedBox(height: 8),
 
-                            // Mapa Interactivo con selección directa por clic
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: const Color(0xFF1E293B)),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: FlutterMap(
-                                    mapController: _mapController,
-                                    options: MapOptions(
-                                      initialCenter: LatLng(_lat, _lon),
-                                      initialZoom: 15.0,
-                                      onTap: (tapPosition, point) => _actualizarUbicacionDesdeMapa(point),
-                                    ),
-                                    children: [
-                                      TileLayer(
-                                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                        userAgentPackageName: 'com.alumvid.admin',
-                                      ),
-                                      MarkerLayer(
-                                        markers: [
-                                          Marker(
-                                            point: LatLng(_lat, _lon),
-                                            width: 38,
-                                            height: 38,
-                                            child: const Icon(
-                                              Icons.location_on,
-                                              color: Color(0xFFEF4444),
-                                              size: 38,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                            // Dirección Resuelta bajo el Mapa
+                            if (_direccionResuelta.isNotEmpty)
+                              Text(
+                                'Punto: $_direccionResuelta',
+                                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontStyle: FontStyle.italic),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
                           ],
                         ),
                       ),
