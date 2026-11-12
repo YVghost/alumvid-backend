@@ -81,6 +81,7 @@ services:
     restart: on-failure
     environment:
       AUTH_URL: http://usuarios-service:8081
+      PEDIDOS_URL: http://pedidos-service:8085
       DB_HOST: postgres-postgis
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-alumvid_db}
