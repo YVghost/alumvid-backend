@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 /** Respuestas de error con {"status","message"}, igual que el resto de servicios. */
-@RestControllerAdvice
+@RestControllerAdvice(basePackages="com.alumvid.logistica")
 @Slf4j
 public class ManejadorErrores {
 

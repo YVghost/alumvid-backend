@@ -11,3 +11,7 @@ DOCUMENTACION
 documentos
 config/*.local.json
 **/*devtools_options.yaml
+
+# Archivos privados en subdirectorios
+**/.env*
+**/*.local.md

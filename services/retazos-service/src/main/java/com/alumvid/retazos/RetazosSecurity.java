@@ -16,7 +16,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 @Configuration
 class RetazosSecurity {
-    @Bean SecurityFilterChain retazosFilterChain(HttpSecurity http,AuthClient auth) throws Exception {
+    @Bean @org.springframework.core.annotation.Order(30) SecurityFilterChain retazosFilterChain(HttpSecurity http,AuthClient auth, @org.springframework.beans.factory.annotation.Value("${app.unified:false}") boolean unified) throws Exception {
+        if (unified) http.securityMatcher("/api/retazos/**");
         var filter=new OncePerRequestFilter() {
             @Override protected boolean shouldNotFilter(HttpServletRequest r) {
                 return !r.getRequestURI().startsWith("/api/");

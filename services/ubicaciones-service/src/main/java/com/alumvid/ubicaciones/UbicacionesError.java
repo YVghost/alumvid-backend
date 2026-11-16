@@ -9,7 +9,7 @@ class UbicacionesError extends RuntimeException {
     final int status;
     UbicacionesError(int status,String message) { super(message);this.status=status; }
 }
-@RestControllerAdvice
+@RestControllerAdvice(basePackages="com.alumvid.ubicaciones")
 class UbicacionesErrors {
     @ExceptionHandler(UbicacionesError.class) ResponseEntity<?> error(UbicacionesError e) {
         return ResponseEntity.status(e.status).body(Map.of("message",e.getMessage()));

@@ -17,6 +17,7 @@
         <module>services/ubicaciones-service</module>
 		<module>services/logistica-service</module>
 		<module>services/gateway-service</module>
+		<module>services/backend-unificado</module>
 	</modules>
 
 	<properties>

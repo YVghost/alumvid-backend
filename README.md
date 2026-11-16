@@ -1,3 +1,5 @@
+> Despliegue de un solo backend en Railway (rama `despliegue_test`): [configuración y pruebas](deploy/unificado/README.md).
+
 # Plataforma Integral AlumVid
 
 [Guia de inicio y apagado seguro](README_INICIO_Y_APAGADO.md): abrir el emulador, ejecutar la app y cerrar el entorno conservando los datos.

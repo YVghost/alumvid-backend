@@ -17,7 +17,8 @@ import org.springframework.http.HttpMethod;
 
 @Configuration
 class PedidosSecurity {
-    @Bean SecurityFilterChain pedidosChain(HttpSecurity http,AuthClient auth) throws Exception {
+    @Bean @org.springframework.core.annotation.Order(40) SecurityFilterChain pedidosChain(HttpSecurity http,AuthClient auth, @org.springframework.beans.factory.annotation.Value("${app.unified:false}") boolean unified) throws Exception {
+        if (unified) http.securityMatcher("/api/pedidos/**");
         var filter=new OncePerRequestFilter() {
             protected boolean shouldNotFilter(HttpServletRequest r) {return !r.getRequestURI().startsWith("/api/");}
             protected void doFilterInternal(HttpServletRequest q,HttpServletResponse r,FilterChain chain) throws IOException,ServletException {

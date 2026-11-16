@@ -9,7 +9,7 @@ class RetazosError extends RuntimeException {
     final int status;
     RetazosError(int status,String message) { super(message);this.status=status; }
 }
-@RestControllerAdvice
+@RestControllerAdvice(basePackages="com.alumvid.retazos")
 class RetazosErrors {
     @ExceptionHandler(RetazosError.class) ResponseEntity<?> error(RetazosError e) {
         return ResponseEntity.status(e.status).body(Map.of("message",e.getMessage()));

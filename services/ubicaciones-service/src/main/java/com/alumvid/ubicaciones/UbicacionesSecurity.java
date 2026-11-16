@@ -16,7 +16,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 @Configuration
 class UbicacionesSecurity {
-    @Bean SecurityFilterChain ubicacionesFilterChain(HttpSecurity http,AuthClient auth) throws Exception {
+    @Bean @org.springframework.core.annotation.Order(50) SecurityFilterChain ubicacionesFilterChain(HttpSecurity http,AuthClient auth, @org.springframework.beans.factory.annotation.Value("${app.unified:false}") boolean unified) throws Exception {
+        if (unified) http.securityMatcher("/api/ubicaciones/**");
         var filter=new OncePerRequestFilter() {
             @Override protected boolean shouldNotFilter(HttpServletRequest r) {
                 return !r.getRequestURI().startsWith("/api/");

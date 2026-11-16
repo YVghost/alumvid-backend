@@ -1,0 +1,45 @@
+# Isolated local alternative: does not replace compose.yaml or its database volume.
+services:
+  postgres-unificado:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${DB_NAME:-alumvid_db}
+      POSTGRES_USER: ${DB_USER:-alumvid_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD in .env}
+    volumes:
+      - alumvid_unificado_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  backend-unificado:
+    image: alumvid/backend-unificado:local
+    build:
+      context: .
+      dockerfile: deploy/unificado/Dockerfile
+    mem_limit: 512m
+    cpus: 1.0
+    environment:
+      PORT: 8080
+      SERVER_ADDRESS: 0.0.0.0
+      DB_HOST: postgres-unificado
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-alumvid_db}
+      DB_USER: ${DB_USER:-alumvid_admin}
+      DB_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD}
+      DB_SSLMODE: prefer
+      DB_POOL_SIZE: 4
+      MASTER_IDENTIFICATION: ${MASTER_IDENTIFICATION:?Define MASTER_IDENTIFICATION}
+      MASTER_NAME: ${MASTER_NAME:-Administrador principal}
+      MASTER_PASSWORD: ${MASTER_PASSWORD:?Define MASTER_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET}
+      JWT_EXPIRATION_HOURS: ${JWT_EXPIRATION_HOURS:-24}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+    ports:
+      - "${UNIFICADO_PORT:-8090}:8080"
+    depends_on:
+      postgres-unificado:
+        condition: service_healthy
+volumes:
+  alumvid_unificado_data:

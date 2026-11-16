@@ -29,6 +29,9 @@ public class PedidosClient {
     private final RestClient client;
     private final ObjectMapper json;
 
+    /** Constructor reserved for an in-process adapter overriding every public operation. */
+    protected PedidosClient() { this.client = null; this.json = null; }
+
     public PedidosClient(@Value("${PEDIDOS_URL:http://localhost:8085}") String url, ObjectMapper json) {
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build());
         factory.setReadTimeout(Duration.ofSeconds(15));

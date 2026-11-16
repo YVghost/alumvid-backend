@@ -27,7 +27,8 @@ public class LogisticaSecurity {
     private static final String API = "/api/v1/logistica";
 
     @Bean
-    SecurityFilterChain logisticaChain(HttpSecurity http, AuthClient auth) throws Exception {
+    @org.springframework.core.annotation.Order(10) SecurityFilterChain logisticaChain(HttpSecurity http, AuthClient auth, @org.springframework.beans.factory.annotation.Value("${app.unified:false}") boolean unified) throws Exception {
+        if (unified) http.securityMatcher("/api/v1/logistica/**","/ws-logistica/**","/ws-telemetria/**");
         var filter = new OncePerRequestFilter() {
             @Override
             protected boolean shouldNotFilter(HttpServletRequest r) {

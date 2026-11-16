@@ -16,7 +16,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 @Configuration
 class InventorySecurity {
-    @Bean SecurityFilterChain inventoryFilterChain(HttpSecurity http,AuthClient auth) throws Exception {
+    @Bean @org.springframework.core.annotation.Order(20) SecurityFilterChain inventoryFilterChain(HttpSecurity http,AuthClient auth, @org.springframework.beans.factory.annotation.Value("${app.unified:false}") boolean unified) throws Exception {
+        if (unified) http.securityMatcher("/api/products/**","/api/inventario/**");
         var filter=new OncePerRequestFilter() {
             @Override protected boolean shouldNotFilter(HttpServletRequest r) {
                 return !r.getRequestURI().startsWith("/api/");

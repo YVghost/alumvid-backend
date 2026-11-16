@@ -9,7 +9,7 @@ class PedidosError extends RuntimeException {
     final int status;
     PedidosError(int status,String message) { super(message);this.status=status; }
 }
-@RestControllerAdvice
+@RestControllerAdvice(basePackages="com.alumvid.pedidos")
 class PedidosErrors {
     @ExceptionHandler(PedidosError.class) ResponseEntity<?> error(PedidosError e) {
         return ResponseEntity.status(e.status).body(Map.of("message",e.getMessage()));

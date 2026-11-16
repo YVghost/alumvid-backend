@@ -50,7 +50,9 @@ public class Security {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, AuthFilter authFilter) throws Exception {
+    @org.springframework.core.annotation.Order(60)
+    public SecurityFilterChain filterChain(HttpSecurity http, AuthFilter authFilter, @org.springframework.beans.factory.annotation.Value("${app.unified:false}") boolean unified) throws Exception {
+        if (unified) http.securityMatcher("/api/auth/**","/api/v1/auth/**","/api/admin/**","/api/v1/admin/**","/api/choferes/**","/api/v1/choferes/**");
         http
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))

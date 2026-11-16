@@ -27,6 +27,9 @@ public class AuthClient {
 
     private final RestClient client;
 
+    /** Constructor for in-process adapters; the standalone constructor still uses HTTP. */
+    protected AuthClient() { this.client = null; }
+
     public AuthClient(@Value("${AUTH_URL:http://localhost:8081}") String url) {
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
         factory.setReadTimeout(Duration.ofSeconds(4));

@@ -19,7 +19,7 @@ public class ApiError extends RuntimeException {
     }
 }
 
-@RestControllerAdvice
+@RestControllerAdvice(basePackages="com.alumvid.usuarios")
 class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiError.class)

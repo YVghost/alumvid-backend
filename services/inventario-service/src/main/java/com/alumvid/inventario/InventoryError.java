@@ -10,7 +10,7 @@ class InventoryError extends RuntimeException {
     final int status;
     InventoryError(int status,String message) { super(message); this.status=status; }
 }
-@RestControllerAdvice
+@RestControllerAdvice(basePackages="com.alumvid.inventario")
 class InventoryErrors {
     @ExceptionHandler(InventoryError.class) ResponseEntity<?> error(InventoryError e) {
         return ResponseEntity.status(e.status).body(Map.of("message",e.getMessage()));
