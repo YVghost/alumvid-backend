@@ -59,7 +59,7 @@ flutter run -d android
 
 Usar `..\scripts\iniciar-admin.ps1` desde esta carpeta, o `.\scripts\iniciar-admin.ps1` desde la raíz. Inyecta la configuración Maps desde `config/flutter.local.json` (ignorado por Git). Gateway: 8080. El usuario y la contraseña se ingresan manualmente; una contraseña temporal exige cambio antes de administrar.
 
-Las pantallas de pedidos, retazos y ubicaciones incluyen el botón **Abrir gestión completa** para ejecutar los flujos en sus portales web. Ver [informe de integración](../INTEGRACION_MATEO.md).
+Los módulos actuales de pedidos, piezas y bodega funcionan dentro de las apps. Ver [despliegue local y Railway](../DESPLIEGUE_RAILWAY.md).
 
 ## Windows instalado y prueba nativa
 
@@ -77,3 +77,7 @@ flutter build windows --release --dart-define-from-file=../config/flutter.local.
 Ejecutable: `build/windows/x64/runner/Release/alumvid_admin_desktop.exe`. Para distribuirlo conservar toda la carpeta Release, incluyendo DLL y `data`; el `.exe` por sí solo no contiene todos los recursos. La configuración de Maps se inyecta desde el archivo privado local.
 
 La prueba nativa lee las credenciales del `.env` mediante variables de proceso, ingresa a la plataforma, consulta los tres módulos y cierra la sesión. No crea ni modifica productos o pedidos.
+
+## Servidor local o Railway
+
+Desde el login → Conexión con el Servidor se pueden elegir Local y Railway. Pegar el dominio HTTPS público del gateway y guardar; el perfil local se conserva. Los paquetes actualizados se generan con `scripts/build-pruebas.ps1` desde la raíz.

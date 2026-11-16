@@ -94,3 +94,7 @@ Las pruebas de instalación/login no registran entregas ni crean productos o ven
 - APK debug generado, instalado y abierto en `AlumVid_API35`; pantalla de login inspeccionada.
 
 Gradle 8.14, AGP 8.11.1 y Kotlin 2.2.20 siguen compilando, pero Flutter muestra avisos sobre sus minimos futuros. La migracion mayor a Gradle 9/AGP debe hacerse por separado y no se forzo durante esta preparacion. Las pruebas anteriores no certifican camara/GPS reales ni una entrega fisica.
+
+## Servidor local o Railway
+
+El selector Servidor permite guardar por separado la conexión local y el dominio HTTPS de Railway. El seguimiento remoto usa WSS por el mismo dominio público. Si Railway no responde, elegir Local explícitamente; la búsqueda de Wi-Fi permanece disponible para el entorno local. Ver [DESPLIEGUE_RAILWAY.md](../DESPLIEGUE_RAILWAY.md).

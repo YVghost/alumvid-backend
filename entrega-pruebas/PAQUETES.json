@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-15",
+  "buildNumber": 2,
+  "connectionModes": [
+    "Local",
+    "Railway"
+  ],
+  "artifacts": {
+    "android": {
+      "file": "AlumVid.apk",
+      "bytes": 59865094,
+      "sha256": "f0c67c87fa78a5f99546a7e36f0ad978290bd259b7a2a8980d4217bd3a33f40d"
+    },
+    "windows": {
+      "file": "AlumVidAdmin-Windows.zip",
+      "bytes": 12966652,
+      "sha256": "f044c115226562013051e0d6787fef5f466f2506ac597eed01b0484434988f9b"
+    }
+  }
+}

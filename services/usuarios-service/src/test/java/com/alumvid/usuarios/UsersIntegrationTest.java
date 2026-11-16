@@ -119,11 +119,12 @@ class UsersIntegrationTest {
     }
 
     @Test void validatesInputAndRejectsDuplicateIdentification() throws Exception {
+        var duplicate = employee(Set.of(Users.Role.VENDEDOR));
         mvc.perform(post("/api/admin/users").header("Authorization", "Bearer " + masterToken).contentType("application/json")
             .content("{\"identification\":\"123\",\"fullName\":\"Usuario\",\"roles\":[],\"temporaryPassword\":\"corta\"}"))
             .andExpect(status().isBadRequest());
         mvc.perform(post("/api/admin/users").header("Authorization", "Bearer " + masterToken).contentType("application/json")
-            .content("{\"identification\":\"" + master.identification() + "\",\"fullName\":\"Usuario\",\"roles\":[\"VENDEDOR\"],\"temporaryPassword\":\"" + TEMP + "\" }"))
+            .content("{\"identification\":\"" + duplicate.identification() + "\",\"fullName\":\"Usuario\",\"roles\":[\"VENDEDOR\"],\"temporaryPassword\":\"" + TEMP + "\" }"))
             .andExpect(status().isConflict());
     }
 

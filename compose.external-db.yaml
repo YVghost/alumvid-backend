@@ -1,0 +1,161 @@
+name: alumvid-platform
+
+services:
+  usuarios-service:
+    build:
+      context: ./services/usuarios-service
+    container_name: alumvid-usuarios
+    restart: on-failure
+    environment:
+      <<: &database
+        DB_HOST: ${DB_HOST:?Configura DB_HOST de la base externa}
+        DB_PORT: ${DB_PORT:-5432}
+        DB_NAME: ${DB_NAME:?Configura DB_NAME}
+        DB_USER: ${DB_USER:?Configura DB_USER}
+        DB_PASSWORD: ${DB_PASSWORD:?Configura DB_PASSWORD}
+        DB_SSLMODE: ${DB_SSLMODE:-require}
+        DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+        DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-1}
+        DB_INIT_TIMEOUT: ${DB_INIT_TIMEOUT:-60000}
+        DB_URL: "${DB_URL:-jdbc:postgresql://${DB_HOST}:${DB_PORT:-5432}/${DB_NAME}?sslmode=${DB_SSLMODE:-require}}"
+      MASTER_IDENTIFICATION: ${MASTER_IDENTIFICATION:?Configura el principal}
+      MASTER_NAME: ${MASTER_NAME:-Administrador principal}
+      MASTER_PASSWORD: ${MASTER_PASSWORD:?Configura la clave del principal}
+      JWT_SECRET: ${JWT_SECRET:?Configura JWT_SECRET}
+      JWT_EXPIRATION_HOURS: ${JWT_EXPIRATION_HOURS:-24}
+    ports:
+      - "127.0.0.1:8081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 30
+
+  inventario-service:
+    build:
+      context: ./services/inventario-service
+    container_name: alumvid-inventario
+    restart: on-failure
+    environment:
+      <<: *database
+      AUTH_URL: http://usuarios-service:8081
+    ports:
+      - "127.0.0.1:8082:8082"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 30
+    depends_on:
+      usuarios-service:
+        condition: service_healthy
+
+  logistica-service:
+    build:
+      context: ./services/logistica-service
+    container_name: alumvid-logistica
+    restart: on-failure
+    environment:
+      <<: *database
+      AUTH_URL: http://usuarios-service:8081
+      PEDIDOS_URL: http://pedidos-service:8085
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:?Configura JWT_SECRET}
+    ports:
+      - "127.0.0.1:8083:8083"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/api/v1/logistica/health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 30
+
+  retazos-service:
+    build:
+      context: ./services/retazos-service
+    container_name: alumvid-retazos
+    restart: on-failure
+    environment:
+      <<: *database
+      AUTH_URL: http://usuarios-service:8081
+    ports:
+      - "127.0.0.1:8084:8084"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 30
+    depends_on:
+      inventario-service:
+        condition: service_healthy
+
+  pedidos-service:
+    build:
+      context: ./services/pedidos-service
+    container_name: alumvid-pedidos
+    restart: on-failure
+    environment:
+      <<: *database
+      AUTH_URL: http://usuarios-service:8081
+    ports:
+      - "127.0.0.1:8085:8085"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8085/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 30
+    depends_on:
+      retazos-service:
+        condition: service_healthy
+
+  ubicaciones-service:
+    build:
+      context: ./services/ubicaciones-service
+    container_name: alumvid-ubicaciones
+    restart: on-failure
+    environment:
+      <<: *database
+      AUTH_URL: http://usuarios-service:8081
+    ports:
+      - "127.0.0.1:8086:8086"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8086/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 30
+    depends_on:
+      pedidos-service:
+        condition: service_healthy
+
+  gateway-service:
+    build:
+      context: .
+      dockerfile: deploy/railway/gateway/Dockerfile
+    container_name: alumvid-gateway
+    restart: on-failure
+    environment:
+      PORT: 8080
+      AUTH_SERVICE_URL: http://usuarios-service:8081
+      INVENTARIO_SERVICE_URL: http://inventario-service:8082
+      LOGISTICA_SERVICE_URL: http://logistica-service:8083
+      RETAZOS_SERVICE_URL: http://retazos-service:8084
+      PEDIDOS_SERVICE_URL: http://pedidos-service:8085
+      UBICACIONES_SERVICE_URL: http://ubicaciones-service:8086
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      usuarios-service:
+        condition: service_healthy
+      pedidos-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/platform-info"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 30

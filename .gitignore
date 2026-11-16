@@ -58,3 +58,7 @@ entrega-pruebas/android/
 entrega-pruebas/windows/
 entrega-pruebas/*.zip
 entrega-pruebas/*.local.*
+
+# Credenciales de bases externas y Railway
+.env.external
+.env.*.local

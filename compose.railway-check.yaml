@@ -1,0 +1,7 @@
+services:
+  gateway-service:
+    build:
+      context: .
+      dockerfile: deploy/railway/gateway/Dockerfile
+    environment:
+      PORT: 8080

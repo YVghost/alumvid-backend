@@ -1,3 +1,4 @@
+import 'package:alumvid_admin_desktop/shared/server_config.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'cambiar_password_screen.dart';
@@ -60,6 +61,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _configurarServidor() async {
     final controller = TextEditingController(text: ApiService.baseUrl);
+    final localServer = await ApiService.getLocalServer();
+    final railwayServer = await ApiService.getRailwayServer();
+    if (!mounted) return;
     final value = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -68,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'El teléfono y la computadora deben estar en la misma red. Usa la IP de la computadora y el puerto 8080.',
+              'Local: misma Wi-Fi e IP de la computadora. Railway: pega el dominio HTTPS del gateway y guarda. Puedes volver a Local en cualquier momento.',
             ),
             TextField(
               controller: controller,
@@ -80,6 +84,20 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
         actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, localServer),
+            child: const Text('Local'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (railwayServer.isEmpty) {
+                controller.text = 'https://';
+                return;
+              }
+              Navigator.pop(ctx, railwayServer);
+            },
+            child: const Text('Railway'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancelar'),
@@ -130,7 +148,11 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       } catch (e) {
         // Si cambiamos de red, el servidor guardado ya no responde: buscarlo y reintentar.
-        if (!ApiService.esErrorDeConexion(e) || !mounted) rethrow;
+        if (!ApiService.esErrorDeConexion(e) ||
+            !mounted ||
+            !ServerConfig.isLocal(Uri.parse(ApiService.baseUrl))) {
+          rethrow;
+        }
         if (!await _buscarServidor()) return;
         res = await ApiService.login(
           _emailController.text.trim(),

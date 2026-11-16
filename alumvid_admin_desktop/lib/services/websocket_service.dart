@@ -1,3 +1,4 @@
+import '../shared/server_config.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -41,10 +42,7 @@ class WebSocketService {
 
     try {
       final host = await ApiService.getBaseHost();
-      String baseWs = host.replaceFirst('http://', 'ws://').replaceFirst('https://', 'wss://');
-      // Redirigir hacia el microservicio de logistica que aloja el broker WebSocket (puerto 8083)
-      baseWs = baseWs.replaceAll(RegExp(r':(8080|8085)'), ':8083');
-      final wsUri = Uri.parse('$baseWs/ws-logistica');
+      final wsUri = ServerConfig.websocket(host);
 
       _channel = WebSocketChannel.connect(wsUri);
       _isConnected = true;
@@ -75,17 +73,20 @@ class WebSocketService {
   }
 
   void _sendStompConnect() {
-    const connectFrame = 'CONNECT\naccept-version:1.1,1.0\nheart-beat:10000,10000\n\n\x00';
+    const connectFrame =
+        'CONNECT\naccept-version:1.1,1.0\nheart-beat:10000,10000\n\n\x00';
     _channel?.sink.add(connectFrame);
   }
 
   void _subscribeTopics() {
     // 1. Telemetria de choferes activos
-    const subChoferes = 'SUBSCRIBE\nid:sub-0\ndestination:/topic/choferes-activos\n\n\x00';
+    const subChoferes =
+        'SUBSCRIBE\nid:sub-0\ndestination:/topic/choferes-activos\n\n\x00';
     _channel?.sink.add(subChoferes);
 
     // 2. Notificaciones de actualizacion de pedidos o rutas
-    const subTablero = 'SUBSCRIBE\nid:sub-1\ndestination:/topic/tablero-actualizado\n\n\x00';
+    const subTablero =
+        'SUBSCRIBE\nid:sub-1\ndestination:/topic/tablero-actualizado\n\n\x00';
     _channel?.sink.add(subTablero);
   }
 
@@ -141,7 +142,9 @@ class WebSocketService {
   void _iniciarPollingFallback() {
     _pollingFallbackTimer?.cancel();
     // Consulta periodica dual: telemetria GPS activa de choferes + actualizacion de rutas
-    _pollingFallbackTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+    _pollingFallbackTimer = Timer.periodic(const Duration(seconds: 4), (
+      _,
+    ) async {
       try {
         final activas = await ApiService.obtenerTelemetriaActiva();
         for (final tel in activas) {
