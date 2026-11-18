@@ -1,9 +1,9 @@
 # Pedidos confirmados y entregas por partes
 
-> **Sin portal web.** La interfaz de este servicio está en las apps (Windows y Android). Responsabilidad y datos: ver `ARQUITECTURA_SERVICIOS.md` en la raíz.
+> **Sin portal web.** La interfaz de este servicio está en las apps (Windows y Android). Flujo vigente: ver [Preparación y rutas](../../FLUJO_PEDIDOS_Y_RUTAS.md).
 
 
-Portal administrativo: **http://localhost:8080/pedidos/**. API `/api/pedidos`, puerto interno 8085.
+API `/api/pedidos`, puerto interno 8085.
 
 ## Alcance acordado
 
@@ -61,7 +61,8 @@ Pedidos preparados antes de esta reforma sin piezas de salida medidas se identif
 | POST `/orders` | Registrar pedido confirmado, asociado a cliente |
 | GET `/orders`, GET `/orders/{id}` | Listado, vencimiento, líneas, reservas, preparados e historial |
 | POST `/orders/{id}/retry` | Revisar faltantes y reservar, sin renovar plazo |
-| POST `/orders/{id}/prepare` | Preparar las cantidades seleccionadas |
+| POST `/orders/{id}/start-preparation` | Bodega inicia la preparación, sin consumir stock |
+| POST `/orders/{id}/prepare` | Marcar listas las cantidades seleccionadas y consumir el material |
 | POST `/orders/{id}/dispatch` | Enviar a reparto cantidades preparadas |
 | POST `/orders/{id}/deliver` | Retiro/entrega de cantidades seleccionadas |
 | POST `/orders/{id}/delay`, `/resume` | Retraso documentado y reanudación |

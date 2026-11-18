@@ -1,3 +1,4 @@
+import '../shared/tema.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
@@ -40,9 +41,11 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final WebSocketService _wsService = WebSocketService();
-  final GlobalKey<LiveMapWidgetState> _mapWidgetKey = GlobalKey<LiveMapWidgetState>();
+  final GlobalKey<LiveMapWidgetState> _mapWidgetKey =
+      GlobalKey<LiveMapWidgetState>();
 
-  int _selectedTabIndex = 0; // 0 = GPS, 1 = Kanban, 2 = Planificar Rutas, 3 = Inventario, 4 = Usuarios, 5 = Simulador
+  int _selectedTabIndex =
+      6; // 0 = GPS, 1 = Kanban, 2 = Planificar Rutas, 3 = Inventario, 4 = Usuarios, 5 = Simulador
   int _mobileMapSubIndex = 0; // Para vista 0 en móvil: 0 = Mapa, 1 = Rutas
 
   List<Ruta> _rutas = [];
@@ -69,9 +72,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (dt == null) return false;
     // Ajustar a hora de Ecuador (UTC-5) para comparar fechas correctamente
     final ecDt = dt.toUtc().subtract(const Duration(hours: 5));
-    final start = DateTime(range.start.year, range.start.month, range.start.day, 0, 0, 0);
-    final end = DateTime(range.end.year, range.end.month, range.end.day, 23, 59, 59);
-    final localDt = DateTime(ecDt.year, ecDt.month, ecDt.day, ecDt.hour, ecDt.minute, ecDt.second);
+    final start = DateTime(
+      range.start.year,
+      range.start.month,
+      range.start.day,
+      0,
+      0,
+      0,
+    );
+    final end = DateTime(
+      range.end.year,
+      range.end.month,
+      range.end.day,
+      23,
+      59,
+      59,
+    );
+    final localDt = DateTime(
+      ecDt.year,
+      ecDt.month,
+      ecDt.day,
+      ecDt.hour,
+      ecDt.minute,
+      ecDt.second,
+    );
     return localDt.isAfter(start.subtract(const Duration(seconds: 1))) &&
         localDt.isBefore(end.add(const Duration(seconds: 1)));
   }
@@ -96,11 +120,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       context: context,
       builder: (_) => AuditoriaHistoricoDialog(
         todasLasRutas: _rutas,
-        rangoInicial: _rangoFiltro ?? DateTimeRange(start: DateTime.now(), end: DateTime.now()),
+        rangoInicial:
+            _rangoFiltro ??
+            DateTimeRange(start: DateTime.now(), end: DateTime.now()),
         onRangoCambiado: (nuevoRango) {
           setState(() {
             _rangoFiltro = nuevoRango;
-            if (_rutaSeleccionada != null && !_estaEnRango(_rutaSeleccionada!.fechaCreacion, nuevoRango)) {
+            if (_rutaSeleccionada != null &&
+                !_estaEnRango(_rutaSeleccionada!.fechaCreacion, nuevoRango)) {
               _rutaSeleccionada = null;
               _puntosPolilinea = [];
             }
@@ -135,11 +162,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       if (!mounted) return;
       if (!_esCoordenadaQuito(telemetria.latitud, telemetria.longitud)) return;
       setState(() {
-        final key = (telemetria.choferId != null && telemetria.choferId!.isNotEmpty)
+        final key =
+            (telemetria.choferId != null && telemetria.choferId!.isNotEmpty)
             ? telemetria.choferId!
             : (telemetria.choferNombre ?? 'chofer');
         _telemetriaChoferes[key] = telemetria;
-        if (telemetria.choferNombre != null && telemetria.choferNombre!.isNotEmpty) {
+        if (telemetria.choferNombre != null &&
+            telemetria.choferNombre!.isNotEmpty) {
           _telemetriaChoferes[telemetria.choferNombre!] = telemetria;
         }
       });
@@ -272,9 +301,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (ruta.paradas.isNotEmpty) {
       // Buscar telemetría activa del chofer asignado en la zona de Quito
       TelemetriaGps? telChofer;
-      if (ruta.choferId != null && _telemetriaChoferes.containsKey(ruta.choferId)) {
+      if (ruta.choferId != null &&
+          _telemetriaChoferes.containsKey(ruta.choferId)) {
         telChofer = _telemetriaChoferes[ruta.choferId];
-      } else if (ruta.choferNombre != null && _telemetriaChoferes.containsKey(ruta.choferNombre)) {
+      } else if (ruta.choferNombre != null &&
+          _telemetriaChoferes.containsKey(ruta.choferNombre)) {
         telChofer = _telemetriaChoferes[ruta.choferNombre];
       } else {
         for (final t in _telemetriaChoferes.values) {
@@ -287,8 +318,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
       // La polilínea NACE ÚNICA Y EXCLUSIVAMENTE EN EL CHOFER.
       // Jamás debe nacer en la bodega ni conectar la bodega a la ruta.
-      if (telChofer != null && _esCoordenadaQuito(telChofer.latitud, telChofer.longitud)) {
-        await _recalcularTrazoDesdeChofer(LatLng(telChofer.latitud, telChofer.longitud));
+      if (telChofer != null &&
+          _esCoordenadaQuito(telChofer.latitud, telChofer.longitud)) {
+        await _recalcularTrazoDesdeChofer(
+          LatLng(telChofer.latitud, telChofer.longitud),
+        );
       } else {
         // Si aún no hay señal GPS del chofer, no se dibuja línea desde bodega
         if (mounted) setState(() => _puntosPolilinea = []);
@@ -300,8 +334,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (_rutaSeleccionada == null) return;
     final ruta = _rutaSeleccionada!;
 
-    final bool coincideChofer = (ruta.choferId != null && ruta.choferId == telemetria.choferId) ||
-        (ruta.choferNombre != null && ruta.choferNombre == telemetria.choferNombre) ||
+    final bool coincideChofer =
+        (ruta.choferId != null && ruta.choferId == telemetria.choferId) ||
+        (ruta.choferNombre != null &&
+            ruta.choferNombre == telemetria.choferNombre) ||
         (ruta.isEnCurso && _telemetriaChoferes.length <= 2);
 
     if (!coincideChofer) return;
@@ -317,7 +353,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _recalculandoPolilinea = true;
     try {
       final paradasPendientes = _rutaSeleccionada!.paradas
-          .where((p) => p.pedido != null && !p.isEntregado && p.estado != 'CANCELADA')
+          .where(
+            (p) =>
+                p.pedido != null && !p.isEntregado && p.estado != 'CANCELADA',
+          )
           .toList();
       if (paradasPendientes.isEmpty) return;
 
@@ -328,7 +367,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       for (final p in paradasPendientes) {
         final destLat = p.pedido!.latitudDestino;
         final destLon = p.pedido!.longitudDestino;
-        final tramo = await ApiService.trazarRutaVial(origLat, origLon, destLat, destLon);
+        final tramo = await ApiService.trazarRutaVial(
+          origLat,
+          origLon,
+          destLat,
+          destLon,
+        );
         for (final c in tramo) {
           nuevosPuntos.add(LatLng(c[0], c[1]));
         }
@@ -351,13 +395,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return delDia.where((r) => r.estado == _filtroEstado).toList();
   }
 
-
-
   Permisos get _permisos => Permisos(widget.user);
 
   /// Las paradas nacen de pedidos: se gestionan en el detalle de la ruta.
   Future<void> _abrirAgregarParadaDialog(Ruta ruta) async {
-    await abrirPanel(context, (_) => RutaDetalle(rutaId: ruta.id, permisos: _permisos), ancho: 680);
+    await abrirPanel(
+      context,
+      (_) => RutaDetalle(rutaId: ruta.id, permisos: _permisos),
+      ancho: 680,
+    );
     await _cargarRutas();
     if (_rutaSeleccionada != null && _rutaSeleccionada!.id == ruta.id) {
       final actual = _rutas.where((r) => r.id == ruta.id).firstOrNull;
@@ -369,18 +415,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     try {
       double lat = -0.089290;
       double lon = -78.439607;
-      if (ruta.choferId != null && _telemetriaChoferes.containsKey(ruta.choferId)) {
+      if (ruta.choferId != null &&
+          _telemetriaChoferes.containsKey(ruta.choferId)) {
         final tel = _telemetriaChoferes[ruta.choferId]!;
         lat = tel.latitud;
         lon = tel.longitud;
       }
 
-      final res = await ApiService.optimizarRutaChofer(ruta.id, latitud: lat, longitud: lon);
+      final res = await ApiService.optimizarRutaChofer(
+        ruta.id,
+        latitud: lat,
+        longitud: lon,
+      );
       await _cargarRutas();
       _seleccionarRuta(res);
 
       if (mounted) {
-        AppToast.success(context, 'Ruta re-optimizada exitosamente con Google Routes API');
+        AppToast.success(
+          context,
+          'Ruta re-optimizada exitosamente con Google Routes API',
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -395,7 +449,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder: (_) => EpodDialog(despacho: despacho),
     );
   }
-
 
   Future<void> _reasignarChoferDialog(Ruta ruta) async {
     String? choferIdSel = ruta.choferId;
@@ -422,7 +475,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar', style: TextStyle(color: AppTheme.textMuted)),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(color: AppTheme.textMuted),
+              ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, choferIdSel),
@@ -435,7 +491,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     if (nuevoChofer != null && nuevoChofer != ruta.choferId) {
       try {
-        final actualizada = await ApiService.asignarChoferRuta(ruta.id, nuevoChofer);
+        final actualizada = await ApiService.asignarChoferRuta(
+          ruta.id,
+          nuevoChofer,
+        );
         if (!mounted) return;
         AppToast.success(context, 'Chofer reasignado exitosamente.');
         await _cargarRutas();
@@ -453,11 +512,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
         title: const Text('Iniciar Hoja de Ruta'),
-        content: Text('¿Desea marcar la ruta ${ruta.codigoRuta} como activa y en curso de despacho?'),
+        content: Text(
+          '¿Desea marcar la ruta ${ruta.codigoRuta} como activa y en curso de despacho?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.statusEnCurso),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.statusEnCurso,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Iniciar Ruta Ahora'),
           ),
@@ -493,14 +559,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: motivoCtrl,
-              decoration: const InputDecoration(labelText: 'Motivo de cancelación'),
+              decoration: const InputDecoration(
+                labelText: 'Motivo de cancelación',
+              ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Volver')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Volver'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.statusAlerta),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.statusAlerta,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Confirmar Cancelación'),
           ),
@@ -525,7 +598,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _eliminarParada(Despacho parada) async {
     if (_rutaSeleccionada == null) return;
     try {
-      final act = await ApiService.eliminarDestinoRuta(_rutaSeleccionada!.id, parada.id);
+      final act = await ApiService.eliminarDestinoRuta(
+        _rutaSeleccionada!.id,
+        parada.id,
+      );
       if (!mounted) return;
       AppToast.success(context, 'Parada eliminada.');
       await _cargarRutas();
@@ -539,7 +615,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void _cerrarSesion() async {
     await ApiService.logout();
     if (!mounted) return;
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
   }
 
   Map<String, String> get _titulosPestana {
@@ -547,17 +626,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       case 0:
         return {
           'title': 'Monitoreo Cartográfico en Tiempo Real',
-          'subtitle': 'Supervisión satelital de rutas de distribución y telemetría GPS activa',
+          'subtitle':
+              'Supervisión satelital de rutas de distribución y telemetría GPS activa',
         };
       case 1:
         return {
           'title': 'Tablero Despachos',
-          'subtitle': 'Control y seguimiento operativo de rutas por estado de avance',
+          'subtitle':
+              'Control y seguimiento operativo de rutas por estado de avance',
         };
       case 2:
         return {
           'title': 'Rutas y entregas',
-          'subtitle': 'Pedidos por asignar, rutas por estado y choferes disponibles',
+          'subtitle':
+              'Pedidos por asignar, rutas por estado y choferes disponibles',
         };
       case 3:
         return {
@@ -587,15 +669,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       case 8:
         return {
           'title': 'Simulador Móvil de Chofer y Telemetría',
-          'subtitle': 'Emulación de smartphone chofer para pruebas de streaming y e-PoD',
+          'subtitle':
+              'Emulación de smartphone chofer para pruebas de streaming y e-PoD',
         };
       default:
-        return {'title': 'AlumVid Logistics', 'subtitle': 'Sistema de Control Logístico'};
+        return {
+          'title': 'AlumVid Logistics',
+          'subtitle': 'Sistema de Control Logístico',
+        };
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: _buildDesktopFullLayout(),
@@ -613,9 +701,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           child: Column(
             children: [
               _buildTopBar(),
-              Expanded(
-                child: _buildContenidoPestanaActiva(),
-              ),
+              Expanded(child: _buildContenidoPestanaActiva()),
             ],
           ),
         ),
@@ -623,138 +709,191 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-
   // BARRA LATERAL (SIDEBAR) SLIM & ELEGANTE - NO INVASIVA
   Widget _buildSlimSidebar() {
-    final menuItems = [
-      {'index': 0, 'label': 'monitoreo', 'icon': Icons.radar_rounded},
-      {'index': 1, 'label': 'despachos', 'icon': Icons.view_kanban_rounded},
-      {'index': 2, 'label': 'rutas', 'icon': Icons.alt_route_rounded},
-      {'index': 3, 'label': 'pedidos', 'icon': Icons.receipt_long_rounded},
-      {'index': 4, 'label': 'piezas', 'icon': Icons.content_cut_rounded},
-      {'index': 5, 'label': 'bodega', 'icon': Icons.grid_view_rounded},
-      {'index': 6, 'label': 'inventario', 'icon': Icons.inventory_2_rounded},
-      {'index': 7, 'label': 'usuarios', 'icon': Icons.people_alt_rounded},
-      {'index': 8, 'label': 'simulador', 'icon': Icons.phone_android_rounded},
+    final entries = <(int, String, IconData, Color)>[
+      (6, 'Inventario', Icons.inventory_2_outlined, AppColors.sky),
+      (3, 'Pedidos', Icons.receipt_long_outlined, AppColors.lavender),
+      (4, 'Piezas y retazos', Icons.content_cut_outlined, AppColors.peach),
+      (5, 'Bodega', Icons.grid_view_outlined, AppColors.mint),
+      (2, 'Rutas y entregas', Icons.alt_route_outlined, AppColors.sky),
+      (0, 'Monitoreo', Icons.radar_outlined, AppColors.mint),
+      (1, 'Despachos', Icons.view_kanban_outlined, AppColors.peach),
+      (7, 'Usuarios', Icons.people_alt_outlined, AppColors.rose),
+      (8, 'Simulador', Icons.phone_android_outlined, AppColors.lavender),
     ];
-
+    final compact = MediaQuery.sizeOf(context).width < 1080;
     return Container(
-      width: 82,
-      decoration: const BoxDecoration(
-        color: Color(0xFF090E1A),
-        border: Border(right: BorderSide(color: Color(0xFF1E293B), width: 1.2)),
+      width: compact ? 84 : 236,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(right: BorderSide(color: AppColors.border)),
       ),
-      child: Column(
-        children: [
-          // Logo AlumVid Pin Superior
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF101728),
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF1D72FE).withValues(alpha: 0.5), width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF1D72FE).withValues(alpha: 0.25),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: const Center(
-                child: Icon(Icons.location_on_rounded, color: Color(0xFF38BDF8), size: 26),
-              ),
-            ),
-          ),
-
-          // Lista de Opciones de Navegación Vertical
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              itemCount: menuItems.length,
-              itemBuilder: (context, idx) {
-                final item = menuItems[idx];
-                final int tabIdx = item['index'] as int;
-                final String label = item['label'] as String;
-                final IconData icon = item['icon'] as IconData;
-                final bool active = _selectedTabIndex == tabIdx;
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Material(
-                    color: active ? const Color(0xFF1D72FE) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => setState(() => _selectedTabIndex = tabIdx),
-                      hoverColor: Colors.white.withValues(alpha: 0.05),
-                      child: Container(
-                        height: 58,
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              icon,
-                              size: 22,
-                              color: active ? Colors.white : const Color(0xFF8DA4C4),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              label,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: active ? FontWeight.bold : FontWeight.w500,
-                                color: active ? Colors.white : const Color(0xFF8DA4C4),
-                                letterSpacing: 0.2,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(compact ? 16 : 22, 26, 16, 28),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.lavender,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Icon(
+                      Icons.layers_outlined,
+                      color: Color(0xFF65549C),
+                      size: 26,
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-
-          // Configuración / Ajustes Inferior
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: _mostrarDialogoConfiguracion,
-                hoverColor: Colors.white.withValues(alpha: 0.05),
-                child: Container(
-                  height: 52,
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.settings_outlined, size: 20, color: Color(0xFF8DA4C4)),
-                      SizedBox(height: 3),
-                      Text(
-                        'configuración',
-                        style: TextStyle(fontSize: 9.5, color: Color(0xFF8DA4C4)),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                  if (!compact) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'AlumVid',
+                            style: TextStyle(
+                              color: AppColors.text,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -.7,
+                            ),
+                          ),
+                          Text(
+                            'GESTIÓN INTEGRAL',
+                            style: TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 9,
+                              letterSpacing: 1.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (!compact)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'ESPACIO DE TRABAJO',
+                    style: TextStyle(
+                      color: AppColors.textDim,
+                      fontSize: 10,
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
+                  for (final e in entries)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Tooltip(
+                        message: compact ? e.$2 : '',
+                        child: Material(
+                          color: _selectedTabIndex == e.$1
+                              ? AppColors.primary.withValues(alpha: .10)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(13),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(13),
+                            onTap: () =>
+                                setState(() => _selectedTabIndex = e.$1),
+                            child: Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 34,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color: Apariencia.instancia.esOscuro
+                                          ? e.$4.withValues(alpha: .13)
+                                          : e.$4,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      e.$3,
+                                      size: 19,
+                                      color: Apariencia.instancia.esOscuro
+                                          ? e.$4
+                                          : const Color(0xFF536078),
+                                    ),
+                                  ),
+                                  if (!compact) ...[
+                                    const SizedBox(width: 11),
+                                    Expanded(
+                                      child: Text(
+                                        e.$2,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: _selectedTabIndex == e.$1
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color: _selectedTabIndex == e.$1
+                                              ? AppColors.primary
+                                              : AppColors.textMuted,
+                                        ),
+                                      ),
+                                    ),
+                                    if (_selectedTabIndex == e.$1)
+                                      Icon(
+                                        Icons.chevron_right,
+                                        size: 16,
+                                        color: AppColors.primary,
+                                      ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  if (!compact) const SelectorTema(),
+                  if (!compact) const SizedBox(height: 16),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    leading: Icon(
+                      Icons.settings_outlined,
+                      color: AppColors.textMuted,
+                    ),
+                    title: compact
+                        ? null
+                        : const Text(
+                            'Configuración',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                    onTap: _mostrarDialogoConfiguracion,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -763,20 +902,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF101728),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: Color(0xFF1E293B))),
-        title: const Row(
+        backgroundColor: AppTheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: AppTheme.surfaceCard),
+        ),
+        title: Row(
           children: [
-            Icon(Icons.settings_rounded, color: Color(0xFF38BDF8), size: 20),
+            Icon(
+              Icons.settings_rounded,
+              color: AppTheme.primaryLight,
+              size: 20,
+            ),
             SizedBox(width: 8),
-            Text('Ecosistema AlumVid', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(
+              'Ecosistema AlumVid',
+              style: TextStyle(
+                color: AppTheme.textMain,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Microservicios Conectados:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.bold)),
+            Text(
+              'Microservicios Conectados:',
+              style: TextStyle(
+                color: AppTheme.textMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 8),
             const _SysTag(label: 'Gateway: 8080'),
             const SizedBox(height: 3),
@@ -793,14 +953,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             const _SysTag(label: 'Ubicaciones: 8086'),
             const SizedBox(height: 3),
             const _SysTag(label: 'PostGIS 3.4 Activo'),
-            const Divider(color: Color(0xFF1E293B), height: 20),
+            Divider(color: AppTheme.surfaceCard, height: 20),
             Row(
               children: [
-                const Text('Estado Streaming: ', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
                 Text(
-                  _wsService.isConnected ? 'WebSocket Activo' : 'Polling Activo',
+                  'Estado Streaming: ',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                ),
+                Text(
+                  _wsService.isConnected
+                      ? 'WebSocket Activo'
+                      : 'Polling Activo',
                   style: TextStyle(
-                    color: _wsService.isConnected ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                    color: _wsService.isConnected
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFF59E0B),
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                   ),
@@ -812,10 +979,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cerrar', style: TextStyle(color: Color(0xFF38BDF8))),
+            child: Text(
+              'Cerrar',
+              style: TextStyle(color: AppTheme.primaryLight),
+            ),
           ),
           ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+            ),
             icon: const Icon(Icons.logout, size: 14),
             label: const Text('Cerrar Sesión'),
             onPressed: () {
@@ -831,142 +1003,121 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // CABECERA SUPERIOR - ESTILO CLEAN (MOCKUP)
   Widget _buildTopBar() {
     final titles = _titulosPestana;
-
     return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: const BoxDecoration(
-        color: Color(0xFF090E1A),
-        border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
+      height: 88,
+      padding: const EdgeInsets.symmetric(horizontal: 26),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Título de la Pantalla Activa
-          Text(
-            titles['title']!,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
-          ),
-
-          // Avatar y Menú de Perfil
-          PopupMenuButton<String>(
-            tooltip: 'Menú de Usuario',
-            offset: const Offset(0, 48),
-            color: const Color(0xFF101728),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFF1E293B)),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  titles['title']!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -.45,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  titles['subtitle']!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                ),
+              ],
             ),
-            onSelected: (val) {
-              if (val == 'refresh') _inicializarDatos();
-              if (val == 'auditoria') _abrirAuditoriaHistorico();
-              if (val == 'config') _mostrarDialogoConfiguracion();
-              if (val == 'logout') _cerrarSesion();
-              if (val == 'clave') cambiarMiClave(context, alTerminar: _cerrarSesion);
+          ),
+          const SizedBox(width: 20),
+          const SelectorTema(compacto: true),
+          IconButton(
+            tooltip: 'Actualizar datos',
+            onPressed: _inicializarDatos,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+          const SizedBox(width: 12),
+          Container(height: 36, width: 1, color: AppColors.border),
+          const SizedBox(width: 16),
+          PopupMenuButton<String>(
+            tooltip: 'Menú de usuario',
+            onSelected: (value) {
+              if (value == 'logout') _cerrarSesion();
+              if (value == 'clave') {
+                cambiarMiClave(context, alTerminar: _cerrarSesion);
+              }
+              if (value == 'auditoria') _abrirAuditoriaHistorico();
             },
-            itemBuilder: (ctx) => [
-              PopupMenuItem(
-                enabled: false,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(widget.user.email, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13)),
-                    const SizedBox(height: 2),
-                    Text(
-                      _wsService.isConnected ? 'Streaming WebSocket Activo' : 'Sincronización Polling',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: _wsService.isConnected ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(height: 1),
+            itemBuilder: (_) => [
+              PopupMenuItem(enabled: false, child: Text(widget.user.email)),
               const PopupMenuItem(
-                value: 'refresh',
-                child: Row(
-                  children: [
-                    Icon(Icons.refresh_rounded, size: 16, color: Color(0xFF38BDF8)),
-                    SizedBox(width: 10),
-                    Text('Actualizar Datos', style: TextStyle(color: Colors.white, fontSize: 13)),
-                  ],
-                ),
+                value: 'clave',
+                child: Text('Cambiar contraseña'),
               ),
               const PopupMenuItem(
                 value: 'auditoria',
-                child: Row(
-                  children: [
-                    Icon(Icons.history_rounded, size: 16, color: Color(0xFF38BDF8)),
-                    SizedBox(width: 10),
-                    Text('Auditoría Histórica', style: TextStyle(color: Colors.white, fontSize: 13)),
-                  ],
-                ),
+                child: Text('Auditoría histórica'),
               ),
-              const PopupMenuItem(
-                value: 'config',
-                child: Row(
-                  children: [
-                    Icon(Icons.hub_rounded, size: 16, color: Color(0xFF38BDF8)),
-                    SizedBox(width: 10),
-                    Text('Servicios & Sistema', style: TextStyle(color: Colors.white, fontSize: 13)),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'clave',
-                child: Row(
-                  children: [
-                    Icon(Icons.key_rounded, size: 16, color: Color(0xFF38BDF8)),
-                    SizedBox(width: 10),
-                    Text('Cambiar mi contraseña', style: TextStyle(color: Colors.white, fontSize: 13)),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(height: 1),
               const PopupMenuItem(
                 value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout_rounded, size: 16, color: Color(0xFFEF4444)),
-                    SizedBox(width: 10),
-                    Text('Cerrar Sesión', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.bold)),
-                  ],
-                ),
+                child: Text('Cerrar Sesión'),
               ),
             ],
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF101728),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF1E293B)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircleAvatar(
-                    radius: 12,
-                    backgroundColor: Color(0xFF1D72FE),
-                    child: Icon(Icons.person, size: 14, color: Colors.white),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 19,
+                  backgroundColor: AppColors.primary.withValues(alpha: .12),
+                  child: Text(
+                    widget.user.fullName.isEmpty
+                        ? 'A'
+                        : widget.user.fullName[0].toUpperCase(),
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    widget.user.email,
-                    style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(width: 10),
+                if (MediaQuery.sizeOf(context).width > 960)
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.user.fullName,
+                        style: TextStyle(
+                          color: AppColors.text,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        'Administrador',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF94A3B8)),
-                ],
-              ),
+                Icon(Icons.expand_more, color: AppColors.textDim, size: 18),
+              ],
             ),
           ),
         ],
       ),
     );
   }
-
-
 
   // VISTA ACTIVA
   Widget _buildContenidoPestanaActiva() {
@@ -1041,7 +1192,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
 
-        const VerticalDivider(width: 1, color: AppTheme.border),
+        VerticalDivider(width: 1, color: AppTheme.border),
 
         // Panel Lateral de Rutas y Paradas (35%)
         Expanded(
@@ -1067,9 +1218,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: _mobileMapSubIndex == 0 ? AppTheme.primary : AppTheme.surface,
+                    color: _mobileMapSubIndex == 0
+                        ? AppTheme.primary
+                        : AppTheme.surface,
                   ),
-                  child: const Text('Mapa Google Maps', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'Mapa Google Maps',
+                    style: TextStyle(
+                      color: AppTheme.textMain,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1080,9 +1240,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: _mobileMapSubIndex == 1 ? AppTheme.primary : AppTheme.surface,
+                    color: _mobileMapSubIndex == 1
+                        ? AppTheme.primary
+                        : AppTheme.surface,
                   ),
-                  child: const Text('Rutas y Paradas', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'Rutas y Paradas',
+                    style: TextStyle(
+                      color: AppTheme.textMain,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1103,10 +1272,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   },
                   onRutaFocus: (r) => _seleccionarRuta(r),
                 )
-              : Container(
-                  color: AppTheme.surface,
-                  child: _buildPanelControl(),
-                ),
+              : Container(color: AppTheme.surface, child: _buildPanelControl()),
         ),
       ],
     );
@@ -1114,7 +1280,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildPanelControl() {
     if (_cargando) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.primaryLight));
+      return Center(
+        child: CircularProgressIndicator(color: AppTheme.primaryLight),
+      );
     }
 
     return Column(
@@ -1122,7 +1290,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         // Barra Superior del Panel: Botón Nueva Ruta y Filtros
         Container(
           padding: const EdgeInsets.all(12),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: Color(0xFF161F30),
             border: Border(bottom: BorderSide(color: AppTheme.border)),
           ),
@@ -1131,9 +1299,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Rutas y Despachos',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppTheme.textMain,
+                    ),
                   ),
                   Tooltip(
                     message: _rutaSeleccionada != null
@@ -1141,12 +1313,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         : 'Seleccione primero una ruta de la lista para agregarle paradas',
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _rutaSeleccionada != null ? AppTheme.primary : AppTheme.surfaceCard,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        backgroundColor: _rutaSeleccionada != null
+                            ? AppTheme.primary
+                            : AppTheme.surfaceCard,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         visualDensity: VisualDensity.compact,
                       ),
                       icon: const Icon(Icons.add_location_alt, size: 16),
-                      label: const Text('Gestionar paradas', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      label: const Text(
+                        'Gestionar paradas',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       onPressed: _rutaSeleccionada != null
                           ? () => _abrirAgregarParadaDialog(_rutaSeleccionada!)
                           : null,
@@ -1160,11 +1343,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _buildFilterChip('En Curso', 'EN_CURSO', AppTheme.statusEnCurso),
+                    _buildFilterChip(
+                      'En Curso',
+                      'EN_CURSO',
+                      AppTheme.statusEnCurso,
+                    ),
                     const SizedBox(width: 6),
-                    _buildFilterChip('Pendientes', 'PENDIENTE', AppTheme.statusPendiente),
+                    _buildFilterChip(
+                      'Pendientes',
+                      'PENDIENTE',
+                      AppTheme.statusPendiente,
+                    ),
                     const SizedBox(width: 6),
-                    _buildFilterChip('Completadas', 'COMPLETADA', AppTheme.statusCompletada),
+                    _buildFilterChip(
+                      'Completadas',
+                      'COMPLETADA',
+                      AppTheme.statusCompletada,
+                    ),
                     const SizedBox(width: 6),
                     _buildFilterChip('Todas', 'TODAS', AppTheme.accent),
                   ],
@@ -1225,7 +1420,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               child: Text(
                 '$count',
-                style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: AppTheme.textMain,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -1241,11 +1440,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.inbox, size: 40, color: AppTheme.textDim),
+            Icon(Icons.inbox, size: 40, color: AppTheme.textDim),
             const SizedBox(height: 8),
             Text(
               'No hay rutas en estado "$_filtroEstado"',
-              style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
             ),
           ],
         ),
@@ -1280,8 +1479,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         children: [
           TextButton.icon(
             style: TextButton.styleFrom(padding: EdgeInsets.zero),
-            icon: const Icon(Icons.arrow_back, size: 16, color: AppTheme.primaryLight),
-            label: const Text('Volver a Todas las Rutas', style: TextStyle(color: AppTheme.primaryLight, fontSize: 12)),
+            icon: Icon(
+              Icons.arrow_back,
+              size: 16,
+              color: AppTheme.primaryLight,
+            ),
+            label: Text(
+              'Volver a Todas las Rutas',
+              style: TextStyle(color: AppTheme.primaryLight, fontSize: 12),
+            ),
             onPressed: () {
               setState(() {
                 _rutaSeleccionada = null;
@@ -1311,22 +1517,48 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             children: [
               Text(
                 'Itinerario de Paradas (${ruta.paradas.length}):',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: AppTheme.textMain,
+                ),
               ),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (ruta.paradas.length > 1 && (ruta.isPendiente || ruta.isEnCurso)) ...[
+                  if (ruta.paradas.length > 1 &&
+                      (ruta.isPendiente || ruta.isEnCurso)) ...[
                     TextButton.icon(
-                      icon: const Icon(Icons.auto_mode, size: 14, color: Color(0xFF38BDF8)),
-                      label: const Text('Re-optimizar (Google Routes)', style: TextStyle(fontSize: 11, color: Color(0xFF38BDF8), fontWeight: FontWeight.bold)),
+                      icon: Icon(
+                        Icons.auto_mode,
+                        size: 14,
+                        color: AppTheme.primaryLight,
+                      ),
+                      label: Text(
+                        'Re-optimizar (Google Routes)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.primaryLight,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       onPressed: () => _reoptimizarRutaDesdeDashboard(ruta),
                     ),
                     const SizedBox(width: 4),
                   ],
                   TextButton.icon(
-                    icon: const Icon(Icons.add_location_alt, size: 14, color: AppTheme.primaryLight),
-                    label: const Text('Gestionar paradas', style: TextStyle(fontSize: 11, color: AppTheme.primaryLight)),
+                    icon: Icon(
+                      Icons.add_location_alt,
+                      size: 14,
+                      color: AppTheme.primaryLight,
+                    ),
+                    label: Text(
+                      'Gestionar paradas',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.primaryLight,
+                      ),
+                    ),
                     onPressed: () => _abrirAgregarParadaDialog(ruta),
                   ),
                 ],
@@ -1340,7 +1572,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             onParadaClick: (parada) {
               if (parada.pedido != null) {
                 _mapWidgetKey.currentState?.enfocarCoordenada(
-                  LatLng(parada.pedido!.latitudDestino, parada.pedido!.longitudDestino),
+                  LatLng(
+                    parada.pedido!.latitudDestino,
+                    parada.pedido!.longitudDestino,
+                  ),
                   16.0,
                 );
               }
@@ -1361,6 +1596,8 @@ class _SysTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Row(
       children: [
         Container(
@@ -1374,7 +1611,11 @@ class _SysTag extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: const TextStyle(color: AppTheme.textMuted, fontSize: 9, fontFamily: 'monospace'),
+          style: TextStyle(
+            color: AppTheme.textMuted,
+            fontSize: 9,
+            fontFamily: 'monospace',
+          ),
         ),
       ],
     );

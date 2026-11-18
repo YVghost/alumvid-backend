@@ -41,7 +41,8 @@ public class LogisticaController {
 
     @GetMapping("/choferes")
     public List<ChoferResponse> listarChoferes() {
-        return logisticaService.listarChoferes();
+        var all=logisticaService.listarChoferes();
+        return Sesion.planificaBodega()?all:all.stream().filter(c->c.getId().equals(Sesion.actor().id())).toList();
     }
 
     @GetMapping("/choferes/{idChofer}/rutas")
@@ -60,18 +61,19 @@ public class LogisticaController {
 
     @GetMapping("/rutas")
     public List<RutaResponse> listarRutas() {
-        return logisticaService.listarRutas();
+        return Sesion.planificaBodega()?logisticaService.listarRutas():logisticaService.listarRutasPorChofer(Sesion.actor().id());
     }
 
     @GetMapping("/rutas/{id}")
     public RutaResponse obtenerRutaPorId(@PathVariable UUID id) {
-        Sesion.exigirPropietario(logisticaService.choferDeRuta(id));
+        Sesion.exigirConsulta(logisticaService.choferDeRuta(id));
         return logisticaService.obtenerRutaPorId(id);
     }
 
     /** Crea una ruta con un chofer disponible y, opcionalmente, sus primeros pedidos. */
     @PostMapping("/rutas")
     public ResponseEntity<RutaResponse> crearRuta(@Valid @RequestBody CrearRutaSimpleRequest request) {
+        Sesion.exigirPlanificacion(request.getChoferId());
         return ResponseEntity.status(HttpStatus.CREATED).body(logisticaService.crearRuta(request));
     }
 

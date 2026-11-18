@@ -36,6 +36,8 @@ class _KanbanViewState extends State<KanbanView> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     // Clasificar las Hojas de Ruta en las 4 columnas operativas
     final List<Ruta> pendientes = [];
     final List<Ruta> enCurso = [];
@@ -45,7 +47,8 @@ class _KanbanViewState extends State<KanbanView> {
     for (final r in widget.rutas) {
       if (r.estado == 'CANCELADA' || r.estado == 'CANCELADO') {
         canceladas.add(r);
-      } else if (r.isCompletada || (r.paradas.isNotEmpty && r.paradas.every((p) => p.isEntregado))) {
+      } else if (r.isCompletada ||
+          (r.paradas.isNotEmpty && r.paradas.every((p) => p.isEntregado))) {
         completadas.add(r);
       } else if (r.isEnCurso || r.paradas.any((p) => p.isEnCurso)) {
         enCurso.add(r);
@@ -63,12 +66,16 @@ class _KanbanViewState extends State<KanbanView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Tablero Despachos',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textMain,
+                    ),
                   ),
                   Text(
                     'Control y seguimiento operativo de rutas por estado de avance',
@@ -80,13 +87,23 @@ class _KanbanViewState extends State<KanbanView> {
                 children: [
                   if (_rutasExpandidas.isNotEmpty)
                     TextButton.icon(
-                      icon: const Icon(Icons.unfold_less, size: 16, color: AppTheme.textMuted),
-                      label: const Text('Colapsar todas', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                      icon: Icon(
+                        Icons.unfold_less,
+                        size: 16,
+                        color: AppTheme.textMuted,
+                      ),
+                      label: Text(
+                        'Colapsar todas',
+                        style: TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
                       onPressed: () => setState(() => _rutasExpandidas.clear()),
                     ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: const Icon(Icons.refresh, color: AppTheme.primaryLight),
+                    icon: Icon(Icons.refresh, color: AppTheme.primaryLight),
                     tooltip: 'Actualizar Tablero',
                     onPressed: widget.onRefresh,
                   ),
@@ -105,13 +122,41 @@ class _KanbanViewState extends State<KanbanView> {
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: _buildColumn('Pendientes', pendientes, AppTheme.statusPendiente, Icons.schedule)),
+                      Expanded(
+                        child: _buildColumn(
+                          'Pendientes',
+                          pendientes,
+                          AppTheme.statusPendiente,
+                          Icons.schedule,
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      Expanded(child: _buildColumn('En Curso', enCurso, AppTheme.statusEnCurso, Icons.local_shipping)),
+                      Expanded(
+                        child: _buildColumn(
+                          'En Curso',
+                          enCurso,
+                          AppTheme.statusEnCurso,
+                          Icons.local_shipping,
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      Expanded(child: _buildColumn('Completadas', completadas, AppTheme.statusCompletada, Icons.verified)),
+                      Expanded(
+                        child: _buildColumn(
+                          'Completadas',
+                          completadas,
+                          AppTheme.statusCompletada,
+                          Icons.verified,
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      Expanded(child: _buildColumn('Canceladas', canceladas, AppTheme.statusCancelada, Icons.cancel)),
+                      Expanded(
+                        child: _buildColumn(
+                          'Canceladas',
+                          canceladas,
+                          AppTheme.statusCancelada,
+                          Icons.cancel,
+                        ),
+                      ),
                     ],
                   );
                 } else {
@@ -120,13 +165,45 @@ class _KanbanViewState extends State<KanbanView> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(width: 290, child: _buildColumn('Pendientes', pendientes, AppTheme.statusPendiente, Icons.schedule)),
+                        SizedBox(
+                          width: 290,
+                          child: _buildColumn(
+                            'Pendientes',
+                            pendientes,
+                            AppTheme.statusPendiente,
+                            Icons.schedule,
+                          ),
+                        ),
                         const SizedBox(width: 12),
-                        SizedBox(width: 290, child: _buildColumn('En Curso', enCurso, AppTheme.statusEnCurso, Icons.local_shipping)),
+                        SizedBox(
+                          width: 290,
+                          child: _buildColumn(
+                            'En Curso',
+                            enCurso,
+                            AppTheme.statusEnCurso,
+                            Icons.local_shipping,
+                          ),
+                        ),
                         const SizedBox(width: 12),
-                        SizedBox(width: 290, child: _buildColumn('Completadas', completadas, AppTheme.statusCompletada, Icons.verified)),
+                        SizedBox(
+                          width: 290,
+                          child: _buildColumn(
+                            'Completadas',
+                            completadas,
+                            AppTheme.statusCompletada,
+                            Icons.verified,
+                          ),
+                        ),
                         const SizedBox(width: 12),
-                        SizedBox(width: 290, child: _buildColumn('Canceladas', canceladas, AppTheme.statusCancelada, Icons.cancel)),
+                        SizedBox(
+                          width: 290,
+                          child: _buildColumn(
+                            'Canceladas',
+                            canceladas,
+                            AppTheme.statusCancelada,
+                            Icons.cancel,
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -139,7 +216,12 @@ class _KanbanViewState extends State<KanbanView> {
     );
   }
 
-  Widget _buildColumn(String title, List<Ruta> listaRutas, Color color, IconData icon) {
+  Widget _buildColumn(
+    String title,
+    List<Ruta> listaRutas,
+    Color color,
+    IconData icon,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surface,
@@ -153,8 +235,12 @@ class _KanbanViewState extends State<KanbanView> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              border: Border(bottom: BorderSide(color: color.withValues(alpha: 0.3))),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
+              border: Border(
+                bottom: BorderSide(color: color.withValues(alpha: 0.3)),
+              ),
             ),
             child: Row(
               children: [
@@ -163,18 +249,29 @@ class _KanbanViewState extends State<KanbanView> {
                 Expanded(
                   child: Text(
                     title,
-                    style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13),
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: color,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     '${listaRutas.length}',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                    style: TextStyle(
+                      color: AppTheme.textMain,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
                   ),
                 ),
               ],
@@ -187,7 +284,7 @@ class _KanbanViewState extends State<KanbanView> {
                 ? Center(
                     child: Text(
                       'Sin rutas en esta fase',
-                      style: const TextStyle(color: AppTheme.textDim, fontSize: 12),
+                      style: TextStyle(color: AppTheme.textDim, fontSize: 12),
                     ),
                   )
                 : ListView.builder(
@@ -212,7 +309,7 @@ class _KanbanViewState extends State<KanbanView> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      color: const Color(0xFF1E293B),
+      color: AppTheme.surfaceCard,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
@@ -247,17 +344,31 @@ class _KanbanViewState extends State<KanbanView> {
                       children: [
                         Text(
                           r.codigoRuta,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Colors.white),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.5,
+                            color: AppTheme.textMain,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Row(
                           children: [
-                            const Icon(Icons.person, size: 12, color: AppTheme.textDim),
+                            Icon(
+                              Icons.person,
+                              size: 12,
+                              color: AppTheme.textDim,
+                            ),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                r.choferNombre != null && r.choferNombre!.isNotEmpty ? r.choferNombre! : 'Sin chofer asignado',
-                                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                r.choferNombre != null &&
+                                        r.choferNombre!.isNotEmpty
+                                    ? r.choferNombre!
+                                    : 'Sin chofer asignado',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textMuted,
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -269,20 +380,29 @@ class _KanbanViewState extends State<KanbanView> {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
+                      color: AppTheme.surface,
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(color: AppTheme.border),
                     ),
                     child: Text(
                       '$total paradas',
-                      style: const TextStyle(color: AppTheme.textMuted, fontSize: 10, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: AppTheme.textMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 4),
                   Icon(
-                    isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    isExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
                     color: AppTheme.textMuted,
                     size: 20,
                   ),
@@ -293,7 +413,7 @@ class _KanbanViewState extends State<KanbanView> {
 
           // DETALLE DESPLEGADO (Solo visible al presionar la tarjeta)
           if (isExpanded) ...[
-            const Divider(color: AppTheme.border, height: 1),
+            Divider(color: AppTheme.border, height: 1),
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -308,7 +428,11 @@ class _KanbanViewState extends State<KanbanView> {
                           children: [
                             Text(
                               '$entregadas de $total entregadas ($enCamino en camino)',
-                              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white),
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textMain,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -317,7 +441,7 @@ class _KanbanViewState extends State<KanbanView> {
                               borderRadius: BorderRadius.circular(3),
                               child: LinearProgressIndicator(
                                 value: total == 0 ? 0 : (entregadas / total),
-                                backgroundColor: const Color(0xFF0F172A),
+                                backgroundColor: AppTheme.surface,
                                 color: color,
                                 minHeight: 4,
                               ),
@@ -330,11 +454,20 @@ class _KanbanViewState extends State<KanbanView> {
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primary,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 5,
+                            ),
                             visualDensity: VisualDensity.compact,
                           ),
                           icon: const Icon(Icons.radar, size: 13),
-                          label: const Text('Ver en Mapa', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                          label: const Text(
+                            'Ver en Mapa',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           onPressed: () => widget.onVerEnMapa!(r),
                         ),
                       ],
@@ -343,16 +476,23 @@ class _KanbanViewState extends State<KanbanView> {
                   const SizedBox(height: 12),
 
                   // Lista de Paradas de la Ruta
-                  const Text(
+                  Text(
                     'Paradas en esta Ruta:',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryLight),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryLight,
+                    ),
                   ),
                   const SizedBox(height: 6),
 
                   if (r.paradas.isEmpty)
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Text('Esta ruta aún no tiene paradas registradas.', style: TextStyle(fontSize: 11, color: AppTheme.textDim)),
+                      child: Text(
+                        'Esta ruta aún no tiene paradas registradas.',
+                        style: TextStyle(fontSize: 11, color: AppTheme.textDim),
+                      ),
                     )
                   else
                     ...r.paradas.map((p) => _buildParadaItem(p)),
@@ -361,9 +501,22 @@ class _KanbanViewState extends State<KanbanView> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
-                      style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: EdgeInsets.zero),
-                      icon: const Icon(Icons.keyboard_arrow_up, size: 14, color: AppTheme.textDim),
-                      label: const Text('Minimizar', style: TextStyle(fontSize: 10.5, color: AppTheme.textDim)),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                      ),
+                      icon: Icon(
+                        Icons.keyboard_arrow_up,
+                        size: 14,
+                        color: AppTheme.textDim,
+                      ),
+                      label: Text(
+                        'Minimizar',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: AppTheme.textDim,
+                        ),
+                      ),
                       onPressed: () => _toggleRuta(r.id),
                     ),
                   ),
@@ -398,7 +551,9 @@ class _KanbanViewState extends State<KanbanView> {
         color: const Color(0xFF131D2E),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: p.hasAlertaDesviacion ? AppTheme.statusAlerta : const Color(0xFF1E293B),
+          color: p.hasAlertaDesviacion
+              ? AppTheme.statusAlerta
+              : AppTheme.surfaceCard,
         ),
       ),
       child: Column(
@@ -411,21 +566,32 @@ class _KanbanViewState extends State<KanbanView> {
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
                       decoration: BoxDecoration(
                         color: statusCol.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         '#${p.ordenParada}',
-                        style: TextStyle(color: statusCol, fontWeight: FontWeight.bold, fontSize: 10),
+                        style: TextStyle(
+                          color: statusCol,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         p.pedido?.cliente ?? 'Cliente',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Colors.white),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11.5,
+                          color: AppTheme.textMain,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -442,7 +608,11 @@ class _KanbanViewState extends State<KanbanView> {
                 ),
                 child: Text(
                   statusTxt,
-                  style: TextStyle(color: statusCol, fontSize: 9, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: statusCol,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               if (p.isEntregado) ...[
@@ -455,17 +625,31 @@ class _KanbanViewState extends State<KanbanView> {
                     );
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.statusCompletada.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.attachment, size: 10, color: AppTheme.statusCompletada),
+                        Icon(
+                          Icons.attachment,
+                          size: 10,
+                          color: AppTheme.statusCompletada,
+                        ),
                         SizedBox(width: 2),
-                        Text('e-PoD', style: TextStyle(color: AppTheme.statusCompletada, fontSize: 9, fontWeight: FontWeight.bold)),
+                        Text(
+                          'e-PoD',
+                          style: TextStyle(
+                            color: AppTheme.statusCompletada,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -477,12 +661,12 @@ class _KanbanViewState extends State<KanbanView> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.location_on, size: 11, color: AppTheme.textDim),
+              Icon(Icons.location_on, size: 11, color: AppTheme.textDim),
               const SizedBox(width: 3),
               Expanded(
                 child: Text(
                   p.pedido?.direccionTexto ?? 'Dirección no especificada',
-                  style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                  style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -493,12 +677,16 @@ class _KanbanViewState extends State<KanbanView> {
             const SizedBox(height: 2),
             Row(
               children: [
-                const Icon(Icons.inventory_2, size: 10, color: AppTheme.primaryLight),
+                Icon(Icons.inventory_2, size: 10, color: AppTheme.primaryLight),
                 const SizedBox(width: 3),
                 Expanded(
                   child: Text(
                     p.comentarios!,
-                    style: const TextStyle(fontSize: 9.5, color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      color: AppTheme.textMuted,
+                      fontStyle: FontStyle.italic,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -517,11 +705,15 @@ class _KanbanViewState extends State<KanbanView> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.warning, size: 10, color: AppTheme.statusAlerta),
+                  Icon(Icons.warning, size: 10, color: AppTheme.statusAlerta),
                   const SizedBox(width: 4),
                   Text(
                     'Desvío detectado: ${p.desviacionMetros?.toStringAsFixed(0)}m',
-                    style: const TextStyle(color: AppTheme.statusAlerta, fontSize: 9, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: AppTheme.statusAlerta,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),

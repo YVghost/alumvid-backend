@@ -28,7 +28,9 @@ class TelemetriaGps {
       velocidadKmh: (json['velocidadKmh'] as num?)?.toDouble() ?? 0.0,
       rumbo: (json['rumbo'] as num?)?.toDouble() ?? 0.0,
       choferNombre: json['choferNombre']?.toString(),
-      timestamp: (json['timestamp'] as num?)?.toInt() ?? DateTime.now().millisecondsSinceEpoch,
+      timestamp:
+          (json['timestamp'] as num?)?.toInt() ??
+          DateTime.now().millisecondsSinceEpoch,
     );
   }
 }

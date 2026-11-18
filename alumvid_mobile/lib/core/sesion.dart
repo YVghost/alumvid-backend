@@ -27,7 +27,11 @@ enum Modulo {
     'CHOFER',
   }),
   monitoreo('Monitoreo', Icons.radar_outlined, Icons.radar, {'ADMINISTRADOR'}),
-  rutas('Rutas', Icons.alt_route_outlined, Icons.alt_route, {'ADMINISTRADOR'}),
+  rutas('Crear rutas', Icons.alt_route_outlined, Icons.alt_route, {
+    'ADMINISTRADOR',
+    'BODEGUERO',
+    'CHOFER',
+  }),
   pedidos('Pedidos', Icons.receipt_long_outlined, Icons.receipt_long, {
     'ADMINISTRADOR',
     'VENDEDOR',
@@ -37,6 +41,7 @@ enum Modulo {
     'ADMINISTRADOR',
     'VENDEDOR',
     'BODEGUERO',
+    'CHOFER',
   }),
   retazos('Piezas', Icons.content_cut_outlined, Icons.content_cut, {
     'ADMINISTRADOR',
@@ -71,7 +76,10 @@ class Sesion {
 
   @visibleForTesting
   factory Sesion.paraPruebas(AppUser usuario, [Map<String, dynamic>? datos]) =>
-      Sesion._(usuario, datos ?? {'id': usuario.id, 'nombre': usuario.fullName});
+      Sesion._(
+        usuario,
+        datos ?? {'id': usuario.id, 'nombre': usuario.fullName},
+      );
 
   List<String> get roles => usuario.roles;
 
@@ -88,15 +96,50 @@ class Sesion {
 
   bool puede(Modulo m) => m.roles.any(roles.contains);
 
-  List<Modulo> get modulos => Modulo.values.where(puede).toList();
+  List<Modulo> get modulos => const [
+    Modulo.inicio,
+    Modulo.inventario,
+    Modulo.pedidos,
+    Modulo.misRutas,
+    Modulo.retazos,
+    Modulo.bodega,
+    Modulo.rutas,
+    Modulo.monitoreo,
+    Modulo.usuarios,
+  ].where(puede).toList();
+
+  /// A work view can narrow assigned roles, but can never grant an unassigned role.
+  Sesion vista(String? rol) {
+    if (rol == null) return this;
+    if (!roles.contains(rol)) {
+      throw ArgumentError.value(rol, 'rol', 'Rol no asignado');
+    }
+    return Sesion._(
+      AppUser(
+        id: usuario.id,
+        identification: usuario.identification,
+        fullName: usuario.fullName,
+        email: usuario.email,
+        telefono: usuario.telefono,
+        roles: [rol],
+        master: usuario.master,
+        active: usuario.active,
+        mustChangePassword: usuario.mustChangePassword,
+      ),
+      datos,
+    );
+  }
 
   /// Un chofer sin otros roles ve directamente su lista de rutas.
-  bool get soloChofer => modulos.every(
-    (m) => m == Modulo.inicio || m == Modulo.misRutas,
-  );
+  bool get soloChofer => roles.length == 1 && tiene('CHOFER');
 
   String get rolPrincipal {
-    for (final r in const ['ADMINISTRADOR', 'BODEGUERO', 'VENDEDOR', 'CHOFER']) {
+    for (final r in const [
+      'ADMINISTRADOR',
+      'BODEGUERO',
+      'VENDEDOR',
+      'CHOFER',
+    ]) {
       if (tiene(r)) return r;
     }
     return roles.isEmpty ? 'SIN ROL' : roles.first;

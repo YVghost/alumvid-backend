@@ -22,7 +22,9 @@ class EventoAuditoria {
       targetId: json['targetId']?.toString(),
       action: json['action']?.toString() ?? '',
       detail: json['detail']?.toString() ?? '',
-      occurredAt: json['occurredAt'] != null ? DateTime.tryParse(json['occurredAt'].toString()) : null,
+      occurredAt: json['occurredAt'] != null
+          ? DateTime.tryParse(json['occurredAt'].toString())
+          : null,
     );
   }
 }

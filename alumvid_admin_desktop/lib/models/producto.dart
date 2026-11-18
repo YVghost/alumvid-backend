@@ -11,6 +11,7 @@ class Producto {
   final double minStock;
   final double stock;
   final bool active;
+
   /// Se gestiona por piezas con medida (perfiles de aluminio, planchas de vidrio).
   final bool piecesManaged;
   final DateTime? createdAt;
@@ -51,9 +52,14 @@ class Producto {
       minStock: double.tryParse(json['minStock']?.toString() ?? '') ?? 0.0,
       stock: double.tryParse(json['stock']?.toString() ?? '') ?? 0.0,
       active: json['active'] != false,
-      piecesManaged: json['piecesManaged'] == true || json['pieces_managed'] == true,
-      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString()) : null,
-      updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt'].toString()) : null,
+      piecesManaged:
+          json['piecesManaged'] == true || json['pieces_managed'] == true,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())
+          : null,
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.tryParse(json['updatedAt'].toString())
+          : null,
     );
   }
 

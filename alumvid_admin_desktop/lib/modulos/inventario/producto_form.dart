@@ -18,12 +18,25 @@ class _ProductoFormState extends State<ProductoForm> {
   final _form = GlobalKey<FormState>();
   late final _code = TextEditingController(text: widget.producto?.code ?? '');
   late final _name = TextEditingController(text: widget.producto?.name ?? '');
-  late final _min = TextEditingController(text: widget.producto == null ? '5' : fmtNum(widget.producto!.minStock));
-  late final _sup = TextEditingController(text: widget.producto?.supplier ?? '');
-  late final _ext = TextEditingController(text: widget.producto?.externalCode ?? '');
-  late final _desc = TextEditingController(text: widget.producto?.description ?? '');
-  late String _categoria = categoriasProducto.contains(widget.producto?.category) ? widget.producto!.category : 'VIDRIO';
-  late String _unidad = unidadesProducto.containsKey(widget.producto?.unit) ? widget.producto!.unit : 'UNIDAD';
+  late final _min = TextEditingController(
+    text: widget.producto == null ? '5' : fmtNum(widget.producto!.minStock),
+  );
+  late final _sup = TextEditingController(
+    text: widget.producto?.supplier ?? '',
+  );
+  late final _ext = TextEditingController(
+    text: widget.producto?.externalCode ?? '',
+  );
+  late final _desc = TextEditingController(
+    text: widget.producto?.description ?? '',
+  );
+  late String _categoria =
+      categoriasProducto.contains(widget.producto?.category)
+      ? widget.producto!.category
+      : 'VIDRIO';
+  late String _unidad = unidadesProducto.containsKey(widget.producto?.unit)
+      ? widget.producto!.unit
+      : 'UNIDAD';
   late bool _activo = widget.producto?.active ?? true;
   bool _guardando = false;
 
@@ -74,7 +87,9 @@ class _ProductoFormState extends State<ProductoForm> {
   Widget build(BuildContext context) {
     const gap = SizedBox(height: 14);
     return Scaffold(
-      appBar: AppBar(title: Text(_editando ? 'Editar producto' : 'Nuevo producto')),
+      appBar: AppBar(
+        title: Text(_editando ? 'Editar producto' : 'Nuevo producto'),
+      ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -101,38 +116,65 @@ class _ProductoFormState extends State<ProductoForm> {
               controller: _name,
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(labelText: 'Nombre *'),
-              validator: (v) => (v ?? '').trim().length < 3 ? 'Mínimo 3 caracteres' : null,
+              validator: (v) =>
+                  (v ?? '').trim().length < 3 ? 'Mínimo 3 caracteres' : null,
             ),
             gap,
             DropdownButtonFormField<String>(
               initialValue: _categoria,
               decoration: const InputDecoration(labelText: 'Categoría'),
-              items: [for (final c in categoriasProducto) DropdownMenuItem(value: c, child: Text(humanizar(c)))],
+              items: [
+                for (final c in categoriasProducto)
+                  DropdownMenuItem(value: c, child: Text(humanizar(c))),
+              ],
               onChanged: (v) => setState(() => _categoria = v ?? _categoria),
             ),
             gap,
             DropdownButtonFormField<String>(
               initialValue: _unidad,
               decoration: const InputDecoration(labelText: 'Unidad de medida'),
-              items: [for (final e in unidadesProducto.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
-              onChanged: _editando ? null : (v) => setState(() => _unidad = v ?? _unidad),
+              items: [
+                for (final e in unidadesProducto.entries)
+                  DropdownMenuItem(value: e.key, child: Text(e.value)),
+              ],
+              onChanged: _editando
+                  ? null
+                  : (v) => setState(() => _unidad = v ?? _unidad),
             ),
             gap,
             TextFormField(
               controller: _min,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Stock mínimo *', helperText: 'Por debajo se avisa como "stock bajo"'),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Stock mínimo *',
+                helperText: 'Por debajo se avisa como "stock bajo"',
+              ),
               validator: (v) {
                 final n = double.tryParse((v ?? '').replaceAll(',', '.'));
                 return n == null || n < 0 ? 'Número mayor o igual a 0' : null;
               },
             ),
             gap,
-            TextFormField(controller: _sup, decoration: const InputDecoration(labelText: 'Proveedor')),
+            TextFormField(
+              controller: _sup,
+              decoration: const InputDecoration(labelText: 'Proveedor'),
+            ),
             gap,
-            TextFormField(controller: _ext, decoration: const InputDecoration(labelText: 'Código del proveedor')),
+            TextFormField(
+              controller: _ext,
+              decoration: const InputDecoration(
+                labelText: 'Código del proveedor',
+              ),
+            ),
             gap,
-            TextFormField(controller: _desc, maxLines: 3, minLines: 2, decoration: const InputDecoration(labelText: 'Descripción')),
+            TextFormField(
+              controller: _desc,
+              maxLines: 3,
+              minLines: 2,
+              decoration: const InputDecoration(labelText: 'Descripción'),
+            ),
             if (_editando) ...[
               gap,
               Card(

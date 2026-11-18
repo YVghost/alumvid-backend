@@ -19,7 +19,9 @@ class EspacioUbicacion {
       code: json['code']?.toString() ?? 'Ubicación',
       description: json['description']?.toString(),
       active: json['active'] != false,
-      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
     );
   }
 }

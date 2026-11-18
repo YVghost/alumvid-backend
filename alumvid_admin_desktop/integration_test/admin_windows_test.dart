@@ -38,12 +38,12 @@ void main() {
       await tester.enterText(find.byType(TextField).at(1), password!);
       await tester.tap(find.byType(ElevatedButton).first);
       await waitFor(tester, find.byType(AdminDashboardScreen));
-      for (final entry in <(IconData, Type)>[
-        (Icons.receipt_long_rounded, PedidosModulo),
-        (Icons.content_cut_rounded, PiezasModulo),
-        (Icons.grid_view_rounded, BodegaModulo),
+      for (final entry in <(String, Type)>[
+        ('Pedidos', PedidosModulo),
+        ('Piezas y retazos', PiezasModulo),
+        ('Bodega', BodegaModulo),
       ]) {
-        await tester.tap(find.byIcon(entry.$1).first);
+        await tester.tap(find.text(entry.$1).first);
         await waitFor(tester, find.byType(entry.$2));
         await tester.pump(const Duration(seconds: 2));
         expect(tester.takeException(), isNull);

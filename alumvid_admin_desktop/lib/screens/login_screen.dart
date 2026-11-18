@@ -44,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
-        title: const Row(
+        title: Row(
           children: [
             Icon(
               Icons.settings_ethernet,
@@ -59,7 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'En Windows Escritorio usa http://localhost:8080.\nPara emulador Android usa http://10.0.2.2:8080.',
               style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
             ),
@@ -76,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text(
+            child: Text(
               'Cancelar',
               style: TextStyle(color: AppTheme.textMuted),
             ),
@@ -140,185 +140,225 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final wide = MediaQuery.sizeOf(context).width >= 900;
     return Scaffold(
-      backgroundColor: AppTheme.background,
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 440),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.border),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black54,
-                  blurRadius: 24,
-                  offset: Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Logo e Identidad AlumVid
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF2563EB), Color(0xFF38BDF8)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.primary.withValues(alpha: 0.4),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1060),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.layers_outlined,
+                        color: colors.primary,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'AlumVid',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const Spacer(),
+                      const SelectorTema(),
+                    ],
+                  ),
+                  const SizedBox(height: 52),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (wide) ...[
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 76),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 7,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colors.primary.withValues(
+                                      alpha: .10,
+                                    ),
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  child: Text(
+                                    'TU OPERACIÓN, EN UN SOLO LUGAR',
+                                    style: TextStyle(
+                                      color: colors.primary,
+                                      fontSize: 10,
+                                      letterSpacing: 1.1,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 22),
+                                const Text(
+                                  'Claridad para\ncada jornada.',
+                                  style: TextStyle(
+                                    fontSize: 46,
+                                    height: 1.12,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -1.7,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Text(
+                                  'Organiza tus materiales, acompaña cada pedido y mantén a tu equipo conectado.',
+                                  style: TextStyle(
+                                    color: colors.onSurfaceVariant,
+                                    fontSize: 15,
+                                    height: 1.7,
+                                  ),
+                                ),
+                                const SizedBox(height: 32),
+                                for (final feature in <(IconData, String)>[
+                                  (
+                                    Icons.inventory_2_outlined,
+                                    'Inventario y materiales',
+                                  ),
+                                  (
+                                    Icons.receipt_long_outlined,
+                                    'Pedidos y preparación',
+                                  ),
+                                  (
+                                    Icons.local_shipping_outlined,
+                                    'Rutas y entregas',
+                                  ),
+                                ])
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 15),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          feature.$1,
+                                          color: colors.primary,
+                                          size: 21,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          feature.$2,
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(34),
+                          decoration: BoxDecoration(
+                            color: colors.surface,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: colors.outlineVariant),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Text(
+                                'Bienvenido de nuevo',
+                                style: TextStyle(
+                                  fontSize: 25,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -.7,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Ingresa a tu espacio de administración.',
+                                style: TextStyle(
+                                  color: colors.onSurfaceVariant,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 30),
+                              TextField(
+                                controller: _identCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Identificación o correo',
+                                  prefixIcon: Icon(Icons.badge_outlined),
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              TextField(
+                                controller: _passCtrl,
+                                obscureText: _ocultarPass,
+                                onSubmitted: (_) => _iniciarSesion(),
+                                decoration: InputDecoration(
+                                  labelText: 'Contraseña',
+                                  prefixIcon: const Icon(Icons.lock_outline),
+                                  suffixIcon: IconButton(
+                                    tooltip: _ocultarPass
+                                        ? 'Mostrar contraseña'
+                                        : 'Ocultar contraseña',
+                                    onPressed: () => setState(
+                                      () => _ocultarPass = !_ocultarPass,
+                                    ),
+                                    icon: Icon(
+                                      _ocultarPass
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 25),
+                              ElevatedButton(
+                                onPressed: _cargando ? null : _iniciarSesion,
+                                child: _cargando
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Ingresar'),
+                              ),
+                              const SizedBox(height: 20),
+                              TextButton.icon(
+                                onPressed: _abrirConfiguracionHost,
+                                icon: const Icon(Icons.dns_outlined, size: 17),
+                                label: const Text('Configurar servidor'),
+                              ),
+                              Text(
+                                _hostActual,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: colors.onSurfaceVariant,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    'AV',
+                  const SizedBox(height: 38),
+                  Text(
+                    'AlumVid · Gestión simple, trabajo conectado',
                     style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
+                      color: colors.onSurfaceVariant,
+                      fontSize: 11,
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-
-                const Text(
-                  'AlumVid — Centro de Control',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Supervisión y Gestión Logística en Tiempo Real',
-                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                  textAlign: TextAlign.center,
-                ),
-
-                const SizedBox(height: 24),
-
-                // Campo Identificación
-                TextField(
-                  controller: _identCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Identificación o Correo',
-                    hintText: '1700000000 o admin@alumvid.com',
-                    prefixIcon: Icon(
-                      Icons.badge,
-                      size: 20,
-                      color: AppTheme.primaryLight,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Campo Contraseña
-                TextField(
-                  controller: _passCtrl,
-                  obscureText: _ocultarPass,
-                  decoration: InputDecoration(
-                    labelText: 'Contraseña de Administrador',
-                    prefixIcon: const Icon(
-                      Icons.lock,
-                      size: 20,
-                      color: AppTheme.primaryLight,
-                    ),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _ocultarPass ? Icons.visibility_off : Icons.visibility,
-                        color: AppTheme.textDim,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        setState(() => _ocultarPass = !_ocultarPass);
-                      },
-                    ),
-                  ),
-                  onSubmitted: (_) => _iniciarSesion(),
-                ),
-
-                const SizedBox(height: 22),
-
-                // Botón Ingresar
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                    ),
-                    onPressed: _cargando ? null : _iniciarSesion,
-                    child: _cargando
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            'Ingresar al Panel Administrativo',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Conector e indicador de servidor
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.statusCompletada,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        'Servidor: $_hostActual',
-                        style: const TextStyle(
-                          color: AppTheme.textDim,
-                          fontSize: 11,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.settings,
-                        size: 16,
-                        color: AppTheme.primaryLight,
-                      ),
-                      tooltip: 'Cambiar dirección del servidor',
-                      onPressed: _abrirConfiguracionHost,
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

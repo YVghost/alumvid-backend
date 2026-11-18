@@ -3,7 +3,8 @@ class PedidoComercial {
   final int number;
   final String clientId;
   final String clientName;
-  final String state; // BORRADOR, PENDIENTE_MATERIAL, RESERVADO, PARCIAL, LISTO, EN_REPARTO, RETRASADO, CANCELADO, VENCIDO, ENTREGADO
+  final String
+  state; // BORRADOR, PENDIENTE_MATERIAL, RESERVADO, PARCIAL, LISTO, EN_REPARTO, RETRASADO, CANCELADO, VENCIDO, ENTREGADO
   final String deliveryMode; // ENTREGA, RETIRO
   final String? deliveryAddress;
   final String? receiverName;
@@ -28,21 +29,40 @@ class PedidoComercial {
   });
 
   bool get isEntregaDomicilio => deliveryMode == 'ENTREGA';
-  bool get isListoParaDespacho => state == 'LISTO' || state == 'RESERVADO' || state == 'PARCIAL';
+  bool get isListoParaDespacho =>
+      state == 'LISTO' ||
+      state == 'POR_PREPARAR' ||
+      state == 'EN_PREPARACION' ||
+      state == 'RESERVADO' ||
+      state == 'PARCIAL';
 
   factory PedidoComercial.fromJson(Map<String, dynamic> json) {
     return PedidoComercial(
       id: json['id']?.toString() ?? '',
       number: int.tryParse(json['number']?.toString() ?? '') ?? 0,
-      clientId: json['client_id']?.toString() ?? json['clientId']?.toString() ?? '',
-      clientName: json['client_name']?.toString() ?? json['clientName']?.toString() ?? 'Cliente',
+      clientId:
+          json['client_id']?.toString() ?? json['clientId']?.toString() ?? '',
+      clientName:
+          json['client_name']?.toString() ??
+          json['clientName']?.toString() ??
+          'Cliente',
       state: json['state']?.toString() ?? 'RESERVADO',
-      deliveryMode: json['delivery_mode']?.toString() ?? json['deliveryMode']?.toString() ?? 'ENTREGA',
-      deliveryAddress: json['delivery_address']?.toString() ?? json['deliveryAddress']?.toString(),
-      receiverName: json['receiver_name']?.toString() ?? json['receiverName']?.toString(),
+      deliveryMode:
+          json['delivery_mode']?.toString() ??
+          json['deliveryMode']?.toString() ??
+          'ENTREGA',
+      deliveryAddress:
+          json['delivery_address']?.toString() ??
+          json['deliveryAddress']?.toString(),
+      receiverName:
+          json['receiver_name']?.toString() ?? json['receiverName']?.toString(),
       total: double.tryParse(json['total']?.toString() ?? '') ?? 0.0,
-      expiresAt: DateTime.tryParse((json['expires_at'] ?? json['expiresAt'] ?? '').toString()),
-      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
+      expiresAt: DateTime.tryParse(
+        (json['expires_at'] ?? json['expiresAt'] ?? '').toString(),
+      ),
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
       notes: json['notes']?.toString(),
     );
   }

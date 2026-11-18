@@ -20,11 +20,13 @@ class ParadasListWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     if (ruta.paradas.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(24),
         alignment: Alignment.center,
-        child: const Column(
+        child: Column(
           children: [
             Icon(Icons.location_off, color: AppTheme.textDim, size: 36),
             SizedBox(height: 8),
@@ -48,9 +50,7 @@ class ParadasListWidget extends StatelessWidget {
           parada: parada,
           orden: index + 1,
           onVerEpod: parada.isEntregado ? () => onVerEpod(parada) : null,
-          onEliminar: ruta.isPendiente
-              ? () => onEliminarParada(parada)
-              : null,
+          onEliminar: ruta.isPendiente ? () => onEliminarParada(parada) : null,
         );
       },
     );

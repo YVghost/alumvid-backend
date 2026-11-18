@@ -235,11 +235,6 @@ class ApiService {
     throw Exception('Error al listar choferes');
   }
 
-
-
-
-
-
   static Future<Ruta> eliminarDestinoRuta(
     String rutaId,
     String despachoId,
@@ -345,7 +340,6 @@ class ApiService {
     throw Exception(err['message'] ?? 'Error al cancelar ruta');
   }
 
-
   static Future<void> eliminarRuta(String rutaId) async {
     final apiBase = await getApiBase();
     final url = Uri.parse('$apiBase/logistica/rutas/$rutaId');
@@ -392,7 +386,9 @@ class ApiService {
 
   static Future<void> reintentarParada(String despachoId) async {
     final apiBase = await getApiBase();
-    final url = Uri.parse('$apiBase/logistica/despachos/$despachoId/reintentar');
+    final url = Uri.parse(
+      '$apiBase/logistica/despachos/$despachoId/reintentar',
+    );
     final headers = await _headers();
 
     final response = await http
@@ -403,6 +399,7 @@ class ApiService {
       throw Exception(err['message'] ?? 'Error al reactivar la parada');
     }
   }
+
   static Future<Despacho> cerrarEntrega({
     required String despachoId,
     required String fotoPodUrl,
@@ -961,12 +958,19 @@ class ApiService {
     }
   }
 
-  static Future<List<PiezaRetazo>> obtenerSugerenciasCorte(String productoId, double extent) async {
+  static Future<List<PiezaRetazo>> obtenerSugerenciasCorte(
+    String productoId,
+    double extent,
+  ) async {
     try {
       final host = await getBaseHost();
-      final url = Uri.parse('$host/api/retazos/products/$productoId/suggestions?extent=$extent');
+      final url = Uri.parse(
+        '$host/api/retazos/products/$productoId/suggestions?extent=$extent',
+      );
       final headers = await _headers();
-      final res = await http.get(url, headers: headers).timeout(const Duration(seconds: 8));
+      final res = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 8));
       if (res.statusCode == 200) {
         final List<dynamic> items = jsonDecode(res.body);
         return items.map((i) => PiezaRetazo.fromJson(i)).toList();
@@ -985,13 +989,17 @@ class ApiService {
     required String reason,
   }) async {
     final host = await getBaseHost();
-    final url = Uri.parse('$host/api/retazos/products/$productoId/pieces/$pieceId/cut');
+    final url = Uri.parse(
+      '$host/api/retazos/products/$productoId/pieces/$pieceId/cut',
+    );
     final headers = await _headers();
     headers['Content-Type'] = 'application/json';
 
     final random = math.Random();
-    String hex(int len) => List.generate(len, (_) => random.nextInt(16).toRadixString(16)).join();
-    final reqId = '${hex(8)}-${hex(4)}-4${hex(3)}-${(random.nextInt(4) + 8).toRadixString(16)}${hex(3)}-${hex(12)}';
+    String hex(int len) =>
+        List.generate(len, (_) => random.nextInt(16).toRadixString(16)).join();
+    final reqId =
+        '${hex(8)}-${hex(4)}-4${hex(3)}-${(random.nextInt(4) + 8).toRadixString(16)}${hex(3)}-${hex(12)}';
 
     final Map<String, dynamic> body = {
       'requestId': reqId,
@@ -1006,16 +1014,24 @@ class ApiService {
       body['wasteWidthCm'] = wasteWidthCm ?? 0.0;
     }
 
-    final res = await http.post(url, headers: headers, body: jsonEncode(body)).timeout(const Duration(seconds: 10));
+    final res = await http
+        .post(url, headers: headers, body: jsonEncode(body))
+        .timeout(const Duration(seconds: 10));
     if (res.statusCode == 200 || res.statusCode == 201) {
       return jsonDecode(res.body);
     } else {
       try {
         final err = jsonDecode(res.body);
-        throw Exception(err['message'] ?? 'Error al cortar retazo (${res.statusCode})');
+        throw Exception(
+          err['message'] ?? 'Error al cortar retazo (${res.statusCode})',
+        );
       } catch (e) {
-        if (e is Exception && !e.toString().contains('FormatException')) rethrow;
-        throw Exception('Error al cortar retazo en retazos-service (${res.statusCode})');
+        if (e is Exception && !e.toString().contains('FormatException')) {
+          rethrow;
+        }
+        throw Exception(
+          'Error al cortar retazo en retazos-service (${res.statusCode})',
+        );
       }
     }
   }

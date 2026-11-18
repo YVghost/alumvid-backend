@@ -1,4 +1,6 @@
+import 'package:alumvid_admin_desktop/shared/tema.dart';
 import 'package:flutter/material.dart';
+
 import '../services/api_service.dart';
 import '../utils/app_toast.dart';
 import 'login_screen.dart';
@@ -38,17 +40,24 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
     final confirm = _confirmPasswordCtrl.text.trim();
 
     if (nueva.length < 12) {
-      setState(() => _errorMensaje = 'La contraseña debe contener al menos 12 caracteres.');
+      setState(
+        () => _errorMensaje =
+            'La contraseña debe contener al menos 12 caracteres.',
+      );
       return;
     }
 
     if (nueva == widget.tempPassword.trim()) {
-      setState(() => _errorMensaje = 'La nueva contraseña debe ser diferente a la contraseña temporal asignada.');
+      setState(
+        () => _errorMensaje = 'La nueva contraseña debe ser diferente a la contraseña temporal asignada.',
+      );
       return;
     }
 
     if (nueva != confirm) {
-      setState(() => _errorMensaje = 'Las contraseñas ingresadas no coinciden.');
+      setState(
+        () => _errorMensaje = 'Las contraseñas ingresadas no coinciden.',
+      );
       return;
     }
 
@@ -65,12 +74,18 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
       );
 
       // 2. Iniciar sesión automáticamente con la nueva credencial definitiva
-      final emailOrIdent = widget.choferData['email'] ?? widget.choferData['identification'] ?? '';
+      final emailOrIdent =
+          widget.choferData['email'] ??
+          widget.choferData['identification'] ??
+          '';
       final freshLogin = await ApiService.login(emailOrIdent, nueva);
 
       final sesion = await Sesion.establecer(freshLogin);
       if (!mounted) return;
-      AppToast.success(context, 'Contraseña actualizada con éxito. ¡Bienvenido a AlumVid!');
+      AppToast.success(
+        context,
+        'Contraseña actualizada con éxito. ¡Bienvenido a AlumVid!',
+      );
 
       // 3. Redirigir directamente al panel de rutas
       Navigator.pushAndRemoveUntil(
@@ -100,10 +115,15 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final nombre = widget.choferData['nombre'] ?? widget.choferData['fullName'] ?? 'Colaborador';
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
+    final nombre =
+        widget.choferData['nombre'] ??
+        widget.choferData['fullName'] ??
+        'Colaborador';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E17),
+      backgroundColor: AppColors.background,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -116,19 +136,23 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
                 width: 70,
                 height: 70,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2563EB).withValues(alpha: 0.2),
+                  color: AppColors.primary.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFF3B82F6), width: 2),
                 ),
-                child: const Icon(Icons.lock_reset, color: Color(0xFF60A5FA), size: 36),
+                child: const Icon(
+                  Icons.lock_reset,
+                  color: Color(0xFF60A5FA),
+                  size: 36,
+                ),
               ),
               const SizedBox(height: 20),
 
-              const Text(
+              Text(
                 'Actualización Obligatoria de Contraseña',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white,
+                  color: AppColors.text,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.3,
@@ -139,8 +163,8 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
               Text(
                 'Hola $nombre, por políticas de seguridad del sistema AlumVid debes definir tu contraseña personal definitiva antes de iniciar tu jornada.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF94A3B8),
+                style: TextStyle(
+                  color: AppColors.textMuted,
                   fontSize: 13,
                   height: 1.4,
                 ),
@@ -158,12 +182,19 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: Color(0xFFFB7185), size: 18),
+                      const Icon(
+                        Icons.error_outline,
+                        color: Color(0xFFFB7185),
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _errorMensaje!,
-                          style: const TextStyle(color: Color(0xFFFB7185), fontSize: 12),
+                          style: const TextStyle(
+                            color: Color(0xFFFB7185),
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     ],
@@ -174,25 +205,32 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
               TextField(
                 controller: _newPasswordCtrl,
                 obscureText: !_mostrarPassword,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: AppColors.text),
                 decoration: InputDecoration(
                   labelText: 'Nueva Contraseña Definitiva',
                   hintText: 'Mínimo 12 caracteres',
-                  hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                  labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                  hintStyle: TextStyle(color: AppColors.textDim, fontSize: 12),
+                  labelStyle: TextStyle(color: AppColors.textMuted),
                   filled: true,
-                  fillColor: const Color(0xFF111827),
+                  fillColor: AppColors.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF334155)),
+                    borderSide: BorderSide(color: AppColors.border),
                   ),
-                  prefixIcon: const Icon(Icons.key, color: Color(0xFF60A5FA), size: 20),
+                  prefixIcon: const Icon(
+                    Icons.key,
+                    color: Color(0xFF60A5FA),
+                    size: 20,
+                  ),
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _mostrarPassword ? Icons.visibility : Icons.visibility_off,
-                      color: const Color(0xFF94A3B8),
+                      _mostrarPassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                      color: AppColors.textMuted,
                     ),
-                    onPressed: () => setState(() => _mostrarPassword = !_mostrarPassword),
+                    onPressed: () =>
+                        setState(() => _mostrarPassword = !_mostrarPassword),
                   ),
                 ),
               ),
@@ -202,19 +240,23 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
               TextField(
                 controller: _confirmPasswordCtrl,
                 obscureText: !_mostrarPassword,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: AppColors.text),
                 decoration: InputDecoration(
                   labelText: 'Confirmar Nueva Contraseña',
                   hintText: 'Repita la contraseña exactamente',
-                  hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                  labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                  hintStyle: TextStyle(color: AppColors.textDim, fontSize: 12),
+                  labelStyle: TextStyle(color: AppColors.textMuted),
                   filled: true,
-                  fillColor: const Color(0xFF111827),
+                  fillColor: AppColors.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF334155)),
+                    borderSide: BorderSide(color: AppColors.border),
                   ),
-                  prefixIcon: const Icon(Icons.check_circle_outline, color: Color(0xFF60A5FA), size: 20),
+                  prefixIcon: const Icon(
+                    Icons.check_circle_outline,
+                    color: Color(0xFF60A5FA),
+                    size: 20,
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -222,22 +264,30 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
               // Botón Guardar
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   elevation: 2,
                 ),
                 onPressed: _cargando ? null : _guardarNuevaContrasena,
                 child: _cargando
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          color: AppColors.text,
+                          strokeWidth: 2,
+                        ),
                       )
                     : const Text(
                         'Actualizar Contraseña y Continuar',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
               ),
               const SizedBox(height: 12),
@@ -245,9 +295,9 @@ class _CambiarPasswordScreenState extends State<CambiarPasswordScreen> {
               // Botón Cancelar y Cerrar Sesión
               TextButton(
                 onPressed: _cargando ? null : _cancelarYSalir,
-                child: const Text(
+                child: Text(
                   'Cancelar y Cerrar Sesión',
-                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                 ),
               ),
             ],

@@ -22,7 +22,8 @@ class Chofer {
       nombre: json['nombre']?.toString() ?? 'Chofer',
       email: json['email']?.toString() ?? '',
       telefono: json['telefono']?.toString(),
-      estadoDisponibilidad: json['estadoDisponibilidad']?.toString() ?? 'DISPONIBLE',
+      estadoDisponibilidad:
+          json['estadoDisponibilidad']?.toString() ?? 'DISPONIBLE',
     );
   }
 

@@ -145,7 +145,7 @@ class RetazosIntegrationTest {
         UUID id=product("0");
         mvc.perform(get("/api/retazos/products")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/retazos/products").header("Authorization","Bearer seller")).andExpect(status().isOk());
-        mvc.perform(get("/api/retazos/products").header("Authorization","Bearer driver")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/retazos/products").header("Authorization","Bearer driver")).andExpect(status().isOk());
         mvc.perform(get("/api/retazos/products").header("Authorization","Bearer temporary")).andExpect(status().isForbidden());
         mvc.perform(put("/api/retazos/products/"+id+"/format").header("Authorization","Bearer warehouse").contentType("application/json").content("{\"kind\":\"ALUMINIO\",\"fullLengthM\":6.4}")).andExpect(status().isForbidden());
         mvc.perform(put("/api/retazos/products/"+id+"/format").header("Authorization","Bearer admin").contentType("application/json").content("{\"kind\":\"ALUMINIO\",\"fullLengthM\":0}")).andExpect(status().isBadRequest());
@@ -202,6 +202,10 @@ class RetazosIntegrationTest {
         assertEquals(409,assertThrows(RetazosError.class,()->service.cut(id,piece,cut("1","0",UUID.randomUUID()),WAREHOUSE)).status);
         assertEquals(409,assertThrows(RetazosError.class,()->service.discard(id,piece,new RetazosApi.ReasonInput(UUID.randomUUID(),"Descarte"),WAREHOUSE)).status);
         mvc.perform(get("/api/retazos/products/"+id+"/suggestions?extent=1").header("Authorization","Bearer warehouse")).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test void driverCannotRegisterOrCutPieces() throws Exception {
+        mvc.perform(post("/api/retazos/products/"+UUID.randomUUID()+"/pieces").header("Authorization","Bearer driver").contentType("application/json").content("{}")).andExpect(status().isForbidden());
     }
 
 }

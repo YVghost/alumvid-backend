@@ -20,7 +20,9 @@ class ParadaCardWidget extends StatelessWidget {
   });
 
   Future<void> _abrirEnGoogleMaps(double lat, double lon) async {
-    final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lon');
+    final url = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lon',
+    );
     try {
       if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -32,6 +34,8 @@ class ParadaCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final ped = parada.pedido;
     final cliente = ped?.cliente ?? 'Sin cliente especificado';
     final direccion = ped?.direccionTexto ?? 'Dirección no registrada';
@@ -75,7 +79,11 @@ class ParadaCardWidget extends StatelessWidget {
                       backgroundColor: AppTheme.primary,
                       child: Text(
                         '$orden',
-                        style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textMain,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -84,12 +92,19 @@ class ParadaCardWidget extends StatelessWidget {
                       children: [
                         Text(
                           cliente,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: AppTheme.textMain,
+                          ),
                         ),
                         const SizedBox(height: 2),
-                        const Text(
+                        Text(
                           'Parada programada',
-                          style: TextStyle(fontSize: 10, color: AppTheme.textDim),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppTheme.textDim,
+                          ),
                         ),
                       ],
                     ),
@@ -98,7 +113,10 @@ class ParadaCardWidget extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: estadoColor.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(6),
@@ -106,24 +124,40 @@ class ParadaCardWidget extends StatelessWidget {
                       ),
                       child: Text(
                         estadoTexto,
-                        style: TextStyle(color: estadoColor, fontSize: 10, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: estadoColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     if (parada.isEntregado && onVerEpod != null) ...[
                       const SizedBox(width: 6),
                       TextButton.icon(
-                        style: TextButton.styleFrom(foregroundColor: AppTheme.statusCompletada, visualDensity: VisualDensity.compact),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppTheme.statusCompletada,
+                          visualDensity: VisualDensity.compact,
+                        ),
                         icon: const Icon(Icons.verified, size: 18),
-                        label: const Text('Ver evidencia', style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          'Ver evidencia',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         onPressed: onVerEpod,
                       ),
                     ],
                     if (onEliminar != null) ...[
                       const SizedBox(width: 4),
                       TextButton.icon(
-                        style: TextButton.styleFrom(foregroundColor: AppTheme.statusAlerta, visualDensity: VisualDensity.compact),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppTheme.statusAlerta,
+                          visualDensity: VisualDensity.compact,
+                        ),
                         icon: const Icon(Icons.remove_circle_outline, size: 18),
-                        label: const Text('Quitar', style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          'Quitar',
+                          style: TextStyle(fontSize: 12),
+                        ),
                         onPressed: onEliminar,
                       ),
                     ],
@@ -134,32 +168,49 @@ class ParadaCardWidget extends StatelessWidget {
           ),
 
           // 2. Qué se va a entregar (Material / Producto de inventario)
-          if (parada.comentarios != null && parada.comentarios!.trim().isNotEmpty)
+          if (parada.comentarios != null &&
+              parada.comentarios!.trim().isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF131D2E),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.25)),
+                  border: Border.all(
+                    color: AppTheme.primaryLight.withValues(alpha: 0.25),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.inventory_2_outlined, color: AppTheme.primaryLight, size: 16),
+                    Icon(
+                      Icons.inventory_2_outlined,
+                      color: AppTheme.primaryLight,
+                      size: 16,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: RichText(
                         text: TextSpan(
                           children: [
-                            const TextSpan(
+                            TextSpan(
                               text: 'Entrega: ',
-                              style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryLight, fontSize: 12),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryLight,
+                                fontSize: 12,
+                              ),
                             ),
                             TextSpan(
                               text: parada.comentarios!,
-                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                              style: TextStyle(
+                                color: AppTheme.textMain,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
@@ -176,34 +227,42 @@ class ParadaCardWidget extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: InkWell(
-              onTap: coordenadasValidas ? () => _abrirEnGoogleMaps(lat, lon) : null,
+              onTap: coordenadasValidas
+                  ? () => _abrirEnGoogleMaps(lat, lon)
+                  : null,
               borderRadius: BorderRadius.circular(10),
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
+                  color: AppTheme.surface,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF334155)),
+                  border: Border.all(color: AppTheme.border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Mini mapa interactivo fijado (Preview estilo WhatsApp)
                     ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(9)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(9),
+                      ),
                       child: SizedBox(
                         height: 100,
                         width: double.infinity,
                         child: AbsorbPointer(
-                          absorbing: true, // No intercepta clics, el clic abre Google Maps
+                          absorbing:
+                              true, // No intercepta clics, el clic abre Google Maps
                           child: FlutterMap(
                             options: MapOptions(
                               initialCenter: LatLng(lat, lon),
                               initialZoom: 15.0,
-                              interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                              interactionOptions: const InteractionOptions(
+                                flags: InteractiveFlag.none,
+                              ),
                             ),
                             children: [
                               TileLayer(
-                                urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                                urlTemplate:
+                                    'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
                                 userAgentPackageName: 'com.alumvid.admin',
                               ),
                               MarkerLayer(
@@ -213,14 +272,22 @@ class ParadaCardWidget extends StatelessWidget {
                                     width: 34,
                                     height: 34,
                                     child: Container(
-                                      decoration: const BoxDecoration(
+                                      decoration: BoxDecoration(
                                         color: AppTheme.statusAlerta,
                                         shape: BoxShape.circle,
                                         boxShadow: [
-                                          BoxShadow(color: Colors.black45, blurRadius: 4, offset: Offset(0, 2)),
+                                          BoxShadow(
+                                            color: Colors.black45,
+                                            blurRadius: 4,
+                                            offset: Offset(0, 2),
+                                          ),
                                         ],
                                       ),
-                                      child: const Icon(Icons.location_on, color: Colors.white, size: 20),
+                                      child: Icon(
+                                        Icons.location_on,
+                                        color: AppTheme.textMain,
+                                        size: 20,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -233,20 +300,27 @@ class ParadaCardWidget extends StatelessWidget {
 
                     // Franja inferior de la tarjeta de WhatsApp
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
                             child: Row(
                               children: [
-                                const Icon(Icons.pin_drop, color: AppTheme.statusAlerta, size: 16),
+                                Icon(
+                                  Icons.pin_drop,
+                                  color: AppTheme.statusAlerta,
+                                  size: 16,
+                                ),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
                                     direccion,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: AppTheme.textMain,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -259,21 +333,36 @@ class ParadaCardWidget extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: AppTheme.primary.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.4)),
+                              border: Border.all(
+                                color: AppTheme.primaryLight.withValues(
+                                  alpha: 0.4,
+                                ),
+                              ),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
                                   'Ver en Google Maps',
-                                  style: TextStyle(color: AppTheme.primaryLight, fontSize: 10, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    color: AppTheme.primaryLight,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                                 SizedBox(width: 4),
-                                Icon(Icons.open_in_new, color: AppTheme.primaryLight, size: 12),
+                                Icon(
+                                  Icons.open_in_new,
+                                  color: AppTheme.primaryLight,
+                                  size: 12,
+                                ),
                               ],
                             ),
                           ),

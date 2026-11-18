@@ -25,7 +25,7 @@ class UbicacionesIntegrationTest {
     static final PostgreSQLContainer<?> PG=new PostgreSQLContainer<>("postgres:16-alpine");
     static final AuthClient.Identity ADMIN=new AuthClient.Identity(UUID.randomUUID(),"TEST","Admin",Set.of("ADMINISTRADOR"),false,true,false);
     @TestConfiguration static class Authentication {
-        @Bean @Primary AuthClient testAuth() {return new AuthClient("http://127.0.0.1:1") {@Override Identity identity(String token) {if(token.equals("Bearer admin"))return ADMIN;if(token.equals("Bearer seller"))return new Identity(UUID.randomUUID(),"TEST","Vendedor",Set.of("VENDEDOR"),false,true,false);throw new UbicacionesError(401,"Sesion invalida");}};}
+        @Bean @Primary AuthClient testAuth() {return new AuthClient("http://127.0.0.1:1") {@Override Identity identity(String token) {if(token.equals("Bearer admin"))return ADMIN;if(token.equals("Bearer driver"))return new Identity(UUID.randomUUID(),"TEST","Chofer",Set.of("CHOFER"),false,true,false);if(token.equals("Bearer seller"))return new Identity(UUID.randomUUID(),"TEST","Vendedor",Set.of("VENDEDOR"),false,true,false);throw new UbicacionesError(401,"Sesion invalida");}};}
     }
     @DynamicPropertySource static void database(DynamicPropertyRegistry r) {PG.start();for(String module:List.of("inventario","retazos","pedidos"))Flyway.configure().dataSource(PG.getJdbcUrl(),PG.getUsername(),PG.getPassword()).schemas(module).defaultSchema(module).locations("filesystem:"+Path.of("../"+module+"-service/src/main/resources/db/migration").toAbsolutePath().normalize().toString().replace('\\','/')).load().migrate();r.add("spring.datasource.url",PG::getJdbcUrl);r.add("spring.datasource.username",PG::getUsername);r.add("spring.datasource.password",PG::getPassword);}
     @Autowired UbicacionesService service;@Autowired JdbcTemplate db;@Autowired MockMvc mvc;
@@ -42,4 +42,11 @@ class UbicacionesIntegrationTest {
     @Test void occupiedSpaceCannotBeDeactivatedAndInactiveSpaceCannotReceiveStock() {UUID a=space("A3"),b=space("B3"),p=product("2");service.move(move(p,null,a,null),ADMIN);assertEquals(409,assertThrows(UbicacionesError.class,()->service.save(a,new UbicacionesApi.Space("A3","",false),ADMIN)).status);service.save(b,new UbicacionesApi.Space("B3","",false),ADMIN);assertEquals(409,assertThrows(UbicacionesError.class,()->service.move(move(p,a,b,null),ADMIN)).status);}
     @Test void implicitLegacyPieceLocationsJoinTheCatalogueWithoutChangingStock() {UUID p=profile();assertEquals(1,db.queryForObject("SELECT count(*) FROM ubicaciones.space WHERE code='A3'",Integer.class));assertEquals(1,((List<?>)((Map<?,?>)service.contents(db.queryForObject("SELECT id FROM ubicaciones.space WHERE code='A3'",UUID.class))).get("pieces")).size());eq("1",db.queryForObject("SELECT stock FROM inventario.product WHERE id=?",BigDecimal.class,p));}
     @Test void endpointsEnforceRolesAndValidation() throws Exception {mvc.perform(get("/api/ubicaciones/spaces")).andExpect(status().isUnauthorized());mvc.perform(get("/api/ubicaciones/spaces").header("Authorization","Bearer seller")).andExpect(status().isOk());mvc.perform(post("/api/ubicaciones/moves").header("Authorization","Bearer seller").contentType("application/json").content("{}")).andExpect(status().isForbidden());mvc.perform(post("/api/ubicaciones/spaces").header("Authorization","Bearer admin").contentType("application/json").content("{}")).andExpect(status().isBadRequest());}
+    @Test void driverReadsProductLocationsButCannotMoveStockOrManageSpaces() throws Exception {
+        UUID p=product("2");
+        mvc.perform(get("/api/ubicaciones/products/"+p).header("Authorization","Bearer driver")).andExpect(status().isOk());
+        mvc.perform(get("/api/ubicaciones/spaces").header("Authorization","Bearer driver")).andExpect(status().isForbidden());
+        mvc.perform(post("/api/ubicaciones/moves").header("Authorization","Bearer driver").contentType("application/json").content("{}")).andExpect(status().isForbidden());
+    }
+
 }

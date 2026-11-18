@@ -142,4 +142,12 @@ class InventoryIntegrationTest {
         assertEquals(0,new BigDecimal("5").compareTo(products.get(p.id(),false).stock()));
     }
 
+    @Test void driverReadsInventoryButCannotModifyIt() throws Exception {
+        when(auth.identity("Bearer driver")).thenReturn(identity("CHOFER"));var p=product();
+        mvc.perform(get("/api/products/"+p.id()).header("Authorization","Bearer driver")).andExpect(status().isOk());
+        mvc.perform(get("/api/products/"+p.id()+"/movements").header("Authorization","Bearer driver")).andExpect(status().isOk());
+        mvc.perform(post("/api/products/"+p.id()+"/movements").header("Authorization","Bearer driver").contentType("application/json").content("{}")).andExpect(status().isForbidden());
+        mvc.perform(post("/api/products").header("Authorization","Bearer driver").contentType("application/json").content("{}")).andExpect(status().isForbidden());
+    }
+
 }

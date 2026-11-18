@@ -37,6 +37,7 @@ class UbicacionesSecurity {
         };
         return http.csrf(c->c.disable()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a->a.requestMatchers("/actuator/health").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET,"/api/ubicaciones/products/**").hasAnyRole("ADMINISTRADOR","VENDEDOR","BODEGUERO","CHOFER")
                 .requestMatchers(org.springframework.http.HttpMethod.GET,"/api/**").hasAnyRole("ADMINISTRADOR","VENDEDOR","BODEGUERO")
                 .requestMatchers(org.springframework.http.HttpMethod.POST,"/api/ubicaciones/moves").hasAnyRole("ADMINISTRADOR","BODEGUERO")
                 .requestMatchers("/api/**").hasRole("ADMINISTRADOR").anyRequest().denyAll())

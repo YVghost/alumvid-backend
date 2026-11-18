@@ -1,6 +1,8 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+
 import 'api_service.dart';
 
 typedef VoidCallback = void Function();
@@ -30,15 +32,19 @@ class WebSocketMobileService {
       final wsScheme = uri.scheme == 'https' ? 'wss' : 'ws';
       int wsPort = uri.port;
       if (wsPort == 8085 || wsPort == 8080) {
-        wsPort = 8083; // Conexión directa a logistica-service para STOMP WebSocket
+        wsPort =
+            8083; // Conexión directa a logistica-service para STOMP WebSocket
       }
-      final wsUri = Uri.parse('$wsScheme://${uri.host}:$wsPort/ws-logistica/websocket');
+      final wsUri = Uri.parse(
+        '$wsScheme://${uri.host}:$wsPort/ws-logistica/websocket',
+      );
 
       _channel = WebSocketChannel.connect(wsUri);
       _isConnected = true;
 
       // Frame STOMP CONNECT
-      const connectFrame = 'CONNECT\naccept-version:1.1,1.0\nheart-beat:10000,10000\n\n\x00';
+      const connectFrame =
+          'CONNECT\naccept-version:1.1,1.0\nheart-beat:10000,10000\n\n\x00';
       _channel?.sink.add(connectFrame);
 
       _subscription = _channel!.stream.listen(
@@ -62,11 +68,13 @@ class WebSocketMobileService {
 
   void _subscribeTopics() {
     // 1. Sesión revocada directa para este chofer
-    final subChofer = 'SUBSCRIBE\nid:sub-rev-0\ndestination:/topic/choferes/$choferId/sesion-revocada\n\n\x00';
+    final subChofer =
+        'SUBSCRIBE\nid:sub-rev-0\ndestination:/topic/choferes/$choferId/sesion-revocada\n\n\x00';
     _channel?.sink.add(subChofer);
 
     // 2. Broadcast de sesiones revocadas
-    const subBroadcast = 'SUBSCRIBE\nid:sub-rev-1\ndestination:/topic/sesiones-revocadas\n\n\x00';
+    const subBroadcast =
+        'SUBSCRIBE\nid:sub-rev-1\ndestination:/topic/sesiones-revocadas\n\n\x00';
     _channel?.sink.add(subBroadcast);
   }
 
@@ -78,7 +86,8 @@ class WebSocketMobileService {
     }
 
     if (message.startsWith('MESSAGE')) {
-      if (message.contains('sesion-revocada') || message.contains('SESION_REVOCADA')) {
+      if (message.contains('sesion-revocada') ||
+          message.contains('SESION_REVOCADA')) {
         // Verificar si es para este chofer o global
         if (message.contains(choferId) || !message.contains('userId')) {
           debugPrint('[WS-Mobile] ¡Sesión revocada detectada por WebSocket!');

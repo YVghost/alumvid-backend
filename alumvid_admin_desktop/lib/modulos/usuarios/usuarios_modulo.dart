@@ -29,6 +29,8 @@ class UsuariosModulo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -37,10 +39,18 @@ class UsuariosModulo extends StatelessWidget {
           bottom: const TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
-            tabs: [Tab(text: 'Colaboradores'), Tab(text: 'Auditoría de seguridad')],
+            tabs: [
+              Tab(text: 'Colaboradores'),
+              Tab(text: 'Auditoría de seguridad'),
+            ],
           ),
         ),
-        body: TabBarView(children: [_Colaboradores(permisos: permisos), const _Auditoria()]),
+        body: TabBarView(
+          children: [
+            _Colaboradores(permisos: permisos),
+            const _Auditoria(),
+          ],
+        ),
       ),
     );
   }
@@ -54,7 +64,8 @@ class _Colaboradores extends StatefulWidget {
   State<_Colaboradores> createState() => _ColaboradoresState();
 }
 
-class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveClientMixin {
+class _ColaboradoresState extends State<_Colaboradores>
+    with AutomaticKeepAliveClientMixin {
   bool _cargando = true;
   String? _error;
   List<AppUser> _usuarios = [];
@@ -104,7 +115,10 @@ class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveC
   }
 
   Future<void> _form([AppUser? u]) async {
-    final ok = await abrirPanel<bool>(context, (_) => _UsuarioForm(usuario: u, existentes: _usuarios, permisos: p));
+    final ok = await abrirPanel<bool>(
+      context,
+      (_) => _UsuarioForm(usuario: u, existentes: _usuarios, permisos: p),
+    );
     if (ok == true) _cargar();
   }
 
@@ -119,19 +133,32 @@ class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveC
           children: [
             ListTile(
               leading: AvatarIniciales(u.fullName),
-              title: Text(u.fullName, style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text([u.identification, u.email, if ((u.telefono ?? '').isNotEmpty) u.telefono!].join(' · ')),
+              title: Text(
+                u.fullName,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(
+                [
+                  u.identification,
+                  u.email,
+                  if ((u.telefono ?? '').isNotEmpty) u.telefono!,
+                ].join(' · '),
+              ),
             ),
             const Divider(),
             if (!gestiona)
               const ListTile(
                 leading: Icon(Icons.lock_outline),
-                title: Text('Solo la cuenta maestra gestiona a otros administradores'),
+                title: Text(
+                  'Solo la cuenta maestra gestiona a otros administradores',
+                ),
               ),
             if (gestiona)
               ListTile(
                 leading: const Icon(Icons.edit_outlined),
-                title: Text(u.active ? 'Editar datos y roles' : 'Editar o reactivar'),
+                title: Text(
+                  u.active ? 'Editar datos y roles' : 'Editar o reactivar',
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _form(u);
@@ -139,9 +166,11 @@ class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveC
               ),
             if (gestiona && !propio && u.active)
               ListTile(
-                leading: const Icon(Icons.key_outlined, color: AppColors.warning),
+                leading: Icon(Icons.key_outlined, color: AppColors.warning),
                 title: const Text('Restablecer contraseña'),
-                subtitle: const Text('Genera una clave temporal y cierra sus sesiones'),
+                subtitle: const Text(
+                  'Genera una clave temporal y cierra sus sesiones',
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _restablecer(u);
@@ -149,9 +178,17 @@ class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveC
               ),
             if (gestiona && !propio && !u.master && u.active)
               ListTile(
-                leading: const Icon(Icons.person_off_outlined, color: AppColors.danger),
-                title: const Text('Desactivar', style: TextStyle(color: AppColors.danger)),
-                subtitle: const Text('No podrá ingresar; su historial se conserva'),
+                leading: Icon(
+                  Icons.person_off_outlined,
+                  color: AppColors.danger,
+                ),
+                title: Text(
+                  'Desactivar',
+                  style: TextStyle(color: AppColors.danger),
+                ),
+                subtitle: const Text(
+                  'No podrá ingresar; su historial se conserva',
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _desactivar(u);
@@ -169,7 +206,8 @@ class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveC
     final ok = await confirmar(
       context,
       titulo: 'Restablecer contraseña',
-      mensaje: 'Clave temporal:\n\n$clave\n\n${u.fullName} deberá cambiarla al ingresar. Se copiará al portapapeles.',
+      mensaje:
+          'Clave temporal:\n\n$clave\n\n${u.fullName} deberá cambiarla al ingresar. Se copiará al portapapeles.',
       accion: 'Restablecer',
     );
     if (!ok || !mounted) return;
@@ -185,8 +223,13 @@ class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveC
   }
 
   Future<void> _desactivar(AppUser u) async {
-    final ok = await confirmar(context,
-        titulo: 'Desactivar colaborador', mensaje: '${u.fullName} no podrá iniciar sesión.', accion: 'Desactivar', peligro: true);
+    final ok = await confirmar(
+      context,
+      titulo: 'Desactivar colaborador',
+      mensaje: '${u.fullName} no podrá iniciar sesión.',
+      accion: 'Desactivar',
+      peligro: true,
+    );
     if (!ok || !mounted) return;
     try {
       await ApiService.eliminarUsuario(u.id);
@@ -200,6 +243,8 @@ class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveC
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     super.build(context);
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
@@ -213,10 +258,17 @@ class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveC
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-              child: CampoBusqueda(hint: 'Nombre, cédula o correo', onChanged: (v) => setState(() => _q = v)),
+              child: CampoBusqueda(
+                hint: 'Nombre, cédula o correo',
+                onChanged: (v) => setState(() => _q = v),
+              ),
             ),
             FiltrosChips<String>(
-              opciones: {'': 'Todos', for (final r in todosLosRoles) r: humanizar(r), 'INACTIVOS': 'Desactivados'},
+              opciones: {
+                '': 'Todos',
+                for (final r in todosLosRoles) r: humanizar(r),
+                'INACTIVOS': 'Desactivados',
+              },
               seleccion: _rol,
               onSeleccion: (v) => setState(() => _rol = v),
             ),
@@ -229,11 +281,15 @@ class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveC
                   : RefreshIndicator(
                       onRefresh: _cargar,
                       child: _filtrados.isEmpty
-                          ? const VistaVacia(icono: Icons.person_search, titulo: 'Sin resultados')
+                          ? const VistaVacia(
+                              icono: Icons.person_search,
+                              titulo: 'Sin resultados',
+                            )
                           : ListView.separated(
                               padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
                               itemCount: _filtrados.length,
-                              separatorBuilder: (_, _) => const SizedBox(height: 10),
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: 10),
                               itemBuilder: (_, i) => _tarjeta(_filtrados[i]),
                             ),
                     ),
@@ -253,7 +309,14 @@ class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveC
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              AvatarIniciales(u.fullName, color: !u.active ? AppColors.neutral : u.master ? AppColors.warning : AppColors.primary),
+              AvatarIniciales(
+                u.fullName,
+                color: !u.active
+                    ? AppColors.neutral
+                    : u.master
+                    ? AppColors.warning
+                    : AppColors.primary,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -262,12 +325,29 @@ class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveC
                     Row(
                       children: [
                         Flexible(
-                          child: Text(u.fullName, maxLines: 1, overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: u.active ? AppColors.text : AppColors.textDim)),
+                          child: Text(
+                            u.fullName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              color: u.active
+                                  ? AppColors.text
+                                  : AppColors.textDim,
+                            ),
+                          ),
                         ),
                         if (u.master) ...[
                           const SizedBox(width: 6),
-                          const Tooltip(message: 'Cuenta maestra', child: Icon(Icons.stars, color: AppColors.warning, size: 16)),
+                          Tooltip(
+                            message: 'Cuenta maestra',
+                            child: Icon(
+                              Icons.stars,
+                              color: AppColors.warning,
+                              size: 16,
+                            ),
+                          ),
                         ],
                       ],
                     ),
@@ -275,26 +355,44 @@ class _ColaboradoresState extends State<_Colaboradores> with AutomaticKeepAliveC
                       analizarIdentificacion(u.identification).valida
                           ? '${u.identification} · ${analizarIdentificacion(u.identification).provincia}'
                           : u.identification,
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 13,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 6,
                       runSpacing: 4,
                       children: [
-                        if (!u.active) const EstadoChip('INACTIVO', texto: 'Desactivado'),
-                        if (u.mustChangePassword) const EstadoChip('EN_CURSO', texto: 'Clave temporal'),
+                        if (!u.active)
+                          const EstadoChip('INACTIVO', texto: 'Desactivado'),
+                        if (u.mustChangePassword)
+                          const EstadoChip('EN_CURSO', texto: 'Clave temporal'),
                         if (!analizarIdentificacion(u.identification).valida)
-                          const EstadoChip('', texto: 'Cédula inválida', color: AppColors.danger),
+                          EstadoChip(
+                            '',
+                            texto: 'Cédula inválida',
+                            color: AppColors.danger,
+                          ),
                         if (normalizarTelefono(u.telefono) == null)
-                          const EstadoChip('', texto: 'Teléfono inválido', color: AppColors.danger),
-                        for (final r in u.roles) EstadoChip(r, texto: humanizar(r), color: AppColors.primaryLight),
+                          EstadoChip(
+                            '',
+                            texto: 'Teléfono inválido',
+                            color: AppColors.danger,
+                          ),
+                        for (final r in u.roles)
+                          EstadoChip(
+                            r,
+                            texto: humanizar(r),
+                            color: AppColors.primaryLight,
+                          ),
                       ],
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.more_vert, color: AppColors.textMuted),
+              Icon(Icons.more_vert, color: AppColors.textMuted),
             ],
           ),
         ),
@@ -311,13 +409,19 @@ class _Auditoria extends StatefulWidget {
   State<_Auditoria> createState() => _AuditoriaState();
 }
 
-class _AuditoriaState extends State<_Auditoria> with AutomaticKeepAliveClientMixin {
+class _AuditoriaState extends State<_Auditoria>
+    with AutomaticKeepAliveClientMixin {
   static const _grupos = <String, Set<String>>{
     '': {},
     'ACCESOS': {'LOGIN', 'LOGOUT'},
     'FALLIDOS': {'LOGIN_FAILED'},
     'CLAVES': {'PASSWORD_CHANGED', 'PASSWORD_RESET'},
-    'CUENTAS': {'USER_CREATED', 'USER_UPDATED', 'ACCESS_UPDATED', 'USER_DEACTIVATED'},
+    'CUENTAS': {
+      'USER_CREATED',
+      'USER_UPDATED',
+      'ACCESS_UPDATED',
+      'USER_DEACTIVATED',
+    },
   };
   String _grupo = '';
   late Future<List<Map<String, dynamic>>> _f = _cargar();
@@ -326,28 +430,56 @@ class _AuditoriaState extends State<_Auditoria> with AutomaticKeepAliveClientMix
   bool get wantKeepAlive => true;
 
   Future<List<Map<String, dynamic>>> _cargar() async =>
-      ((await Api.get('/api/v1/admin/audit')) as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      ((await Api.get('/api/v1/admin/audit')) as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
 
   static (String, IconData, Color) _etiqueta(String accion) => switch (accion) {
     'LOGIN' => ('Inició sesión', Icons.login, AppColors.success),
     'LOGOUT' => ('Cerró sesión', Icons.logout, AppColors.textMuted),
-    'LOGIN_FAILED' => ('Intento de acceso fallido', Icons.gpp_bad, AppColors.danger),
+    'LOGIN_FAILED' => (
+      'Intento de acceso fallido',
+      Icons.gpp_bad,
+      AppColors.danger,
+    ),
     'PASSWORD_CHANGED' => ('Cambió su contraseña', Icons.key, AppColors.info),
-    'PASSWORD_RESET' => ('Contraseña restablecida', Icons.lock_reset, AppColors.warning),
-    'USER_CREATED' => ('Usuario creado', Icons.person_add_alt, AppColors.primaryLight),
-    'USER_UPDATED' => ('Datos actualizados', Icons.edit, AppColors.primaryLight),
-    'ACCESS_UPDATED' => ('Roles o acceso modificados', Icons.admin_panel_settings, AppColors.warning),
-    'USER_DEACTIVATED' => ('Usuario desactivado', Icons.person_off, AppColors.danger),
+    'PASSWORD_RESET' => (
+      'Contraseña restablecida',
+      Icons.lock_reset,
+      AppColors.warning,
+    ),
+    'USER_CREATED' => (
+      'Usuario creado',
+      Icons.person_add_alt,
+      AppColors.primaryLight,
+    ),
+    'USER_UPDATED' => (
+      'Datos actualizados',
+      Icons.edit,
+      AppColors.primaryLight,
+    ),
+    'ACCESS_UPDATED' => (
+      'Roles o acceso modificados',
+      Icons.admin_panel_settings,
+      AppColors.warning,
+    ),
+    'USER_DEACTIVATED' => (
+      'Usuario desactivado',
+      Icons.person_off,
+      AppColors.danger,
+    ),
     _ => (humanizar(accion), Icons.shield_outlined, AppColors.textMuted),
   };
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     super.build(context);
     return AnchoLegible(
       child: Column(
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Text(
               'Registro de seguridad: quién ingresó, intentos fallidos y cambios en cuentas y permisos (últimos 200 eventos).',
@@ -355,7 +487,13 @@ class _AuditoriaState extends State<_Auditoria> with AutomaticKeepAliveClientMix
             ),
           ),
           FiltrosChips<String>(
-            opciones: const {'': 'Todo', 'ACCESOS': 'Accesos', 'FALLIDOS': 'Fallidos', 'CLAVES': 'Contraseñas', 'CUENTAS': 'Cuentas'},
+            opciones: const {
+              '': 'Todo',
+              'ACCESOS': 'Accesos',
+              'FALLIDOS': 'Fallidos',
+              'CLAVES': 'Contraseñas',
+              'CUENTAS': 'Cuentas',
+            },
             seleccion: _grupo,
             onSeleccion: (v) => setState(() => _grupo = v),
           ),
@@ -363,11 +501,25 @@ class _AuditoriaState extends State<_Auditoria> with AutomaticKeepAliveClientMix
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: _f,
               builder: (ctx, snap) {
-                if (snap.hasError) return VistaError(mensaje: limpiarError(snap.error!), onReintentar: () => setState(() => _f = _cargar()));
+                if (snap.hasError) {
+                  return VistaError(
+                    mensaje: limpiarError(snap.error!),
+                    onReintentar: () => setState(() => _f = _cargar()),
+                  );
+                }
                 if (!snap.hasData) return const CargandoLista();
                 final filtro = _grupos[_grupo]!;
-                final eventos = snap.data!.where((e) => filtro.isEmpty || filtro.contains(e['action'])).toList();
-                if (eventos.isEmpty) return const VistaVacia(icono: Icons.shield_outlined, titulo: 'Sin eventos');
+                final eventos = snap.data!
+                    .where(
+                      (e) => filtro.isEmpty || filtro.contains(e['action']),
+                    )
+                    .toList();
+                if (eventos.isEmpty) {
+                  return const VistaVacia(
+                    icono: Icons.shield_outlined,
+                    titulo: 'Sin eventos',
+                  );
+                }
                 return RefreshIndicator(
                   onRefresh: () async => setState(() => _f = _cargar()),
                   child: ListView.separated(
@@ -376,20 +528,32 @@ class _AuditoriaState extends State<_Auditoria> with AutomaticKeepAliveClientMix
                     separatorBuilder: (_, _) => const Divider(indent: 72),
                     itemBuilder: (_, i) {
                       final e = eventos[i];
-                      final (texto, icono, color) = _etiqueta(aTexto(e['action']));
+                      final (texto, icono, color) = _etiqueta(
+                        aTexto(e['action']),
+                      );
                       final quien = aTexto(e['actor']);
                       final sobre = aTexto(e['target']);
                       return ListTile(
-                        leading: CircleAvatar(backgroundColor: color.withValues(alpha: 0.14), child: Icon(icono, color: color, size: 20)),
-                        title: Text(texto, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        leading: CircleAvatar(
+                          backgroundColor: color.withValues(alpha: 0.14),
+                          child: Icon(icono, color: color, size: 20),
+                        ),
+                        title: Text(
+                          texto,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
                         subtitle: Text(
                           [
                             if (quien.isNotEmpty) 'Por $quien',
-                            if (sobre.isNotEmpty && sobre != quien) 'sobre $sobre',
+                            if (sobre.isNotEmpty && sobre != quien)
+                              'sobre $sobre',
                             aTexto(e['detail']),
                             fmtFecha(aFecha(e['occurred_at'])),
                           ].where((x) => x.isNotEmpty).join(' · '),
-                          style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 13,
+                          ),
                         ),
                       );
                     },
@@ -405,7 +569,11 @@ class _AuditoriaState extends State<_Auditoria> with AutomaticKeepAliveClientMix
 }
 
 class _UsuarioForm extends StatefulWidget {
-  const _UsuarioForm({this.usuario, required this.existentes, required this.permisos});
+  const _UsuarioForm({
+    this.usuario,
+    required this.existentes,
+    required this.permisos,
+  });
   final AppUser? usuario;
   final List<AppUser> existentes;
   final Permisos permisos;
@@ -416,8 +584,12 @@ class _UsuarioForm extends StatefulWidget {
 
 class _UsuarioFormState extends State<_UsuarioForm> {
   final _form = GlobalKey<FormState>();
-  late final _ident = TextEditingController(text: widget.usuario?.identification ?? '');
-  late final _nombre = TextEditingController(text: widget.usuario?.fullName ?? '');
+  late final _ident = TextEditingController(
+    text: widget.usuario?.identification ?? '',
+  );
+  late final _nombre = TextEditingController(
+    text: widget.usuario?.fullName ?? '',
+  );
   late final _email = TextEditingController(text: widget.usuario?.email ?? '');
   late final _tel = TextEditingController(text: widget.usuario?.telefono ?? '');
   final _clave = TextEditingController(text: claveTemporal());
@@ -447,9 +619,16 @@ class _UsuarioFormState extends State<_UsuarioForm> {
     setState(() => _guardando = true);
     try {
       if (_editando) {
-        await ApiService.actualizarUsuario(widget.usuario!.id,
-            fullName: _nombre.text.trim(), telefono: normalizarTelefono(_tel.text) ?? _tel.text.trim(), roles: _roles.toList(), active: _activo);
-        if (!_activo && widget.usuario!.active) await ApiService.notificarSesionRevocada(widget.usuario!.id);
+        await ApiService.actualizarUsuario(
+          widget.usuario!.id,
+          fullName: _nombre.text.trim(),
+          telefono: normalizarTelefono(_tel.text) ?? _tel.text.trim(),
+          roles: _roles.toList(),
+          active: _activo,
+        );
+        if (!_activo && widget.usuario!.active) {
+          await ApiService.notificarSesionRevocada(widget.usuario!.id);
+        }
       } else {
         await ApiService.crearUsuario(
           identification: _ident.text.trim(),
@@ -462,7 +641,12 @@ class _UsuarioFormState extends State<_UsuarioForm> {
         await Clipboard.setData(ClipboardData(text: _clave.text.trim()));
       }
       if (!mounted) return;
-      avisoOk(context, _editando ? 'Colaborador actualizado' : 'Usuario creado · clave temporal copiada');
+      avisoOk(
+        context,
+        _editando
+            ? 'Colaborador actualizado'
+            : 'Usuario creado · clave temporal copiada',
+      );
       Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -474,16 +658,23 @@ class _UsuarioFormState extends State<_UsuarioForm> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     const gap = SizedBox(height: 14);
     final maestro = widget.usuario?.master == true;
     // Otorgar el rol ADMINISTRADOR solo lo hace la cuenta maestra.
     final puedeAdmin = widget.permisos.esMaestro;
     return Scaffold(
-      appBar: AppBar(title: Text(_editando ? 'Editar colaborador' : 'Nuevo usuario')),
+      appBar: AppBar(
+        title: Text(_editando ? 'Editar colaborador' : 'Nuevo usuario'),
+      ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: FilledButton(onPressed: _guardando ? null : _guardar, child: Text(_editando ? 'Guardar cambios' : 'Crear usuario')),
+          child: FilledButton(
+            onPressed: _guardando ? null : _guardar,
+            child: Text(_editando ? 'Guardar cambios' : 'Crear usuario'),
+          ),
         ),
       ),
       body: Form(
@@ -495,19 +686,30 @@ class _UsuarioFormState extends State<_UsuarioForm> {
               controller: _ident,
               enabled: !_editando,
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(10),
+              ],
               autovalidateMode: AutovalidateMode.onUserInteraction,
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: 'Cédula *',
-                helperText: analizarIdentificacion(_ident.text).valida ? analizarIdentificacion(_ident.text).mensaje : '10 dígitos',
-                helperStyle: TextStyle(color: analizarIdentificacion(_ident.text).valida ? AppColors.success : AppColors.textMuted),
+                helperText: analizarIdentificacion(_ident.text).valida
+                    ? analizarIdentificacion(_ident.text).mensaje
+                    : '10 dígitos',
+                helperStyle: TextStyle(
+                  color: analizarIdentificacion(_ident.text).valida
+                      ? AppColors.success
+                      : AppColors.textMuted,
+                ),
               ),
               validator: (v) {
                 if (_editando) return null;
                 final error = validarIdentificacion(v, soloCedula: true);
                 if (error != null) return error;
-                if (widget.existentes.any((u) => u.identification == v!.trim())) return 'Ya está registrada';
+                if (widget.existentes.any((u) => u.identification == v!.trim())) {
+                  return 'Ya está registrada';
+                }
                 return null;
               },
             ),
@@ -527,8 +729,12 @@ class _UsuarioFormState extends State<_UsuarioForm> {
               validator: (v) {
                 if (_editando) return null;
                 final m = (v ?? '').trim().toLowerCase();
-                if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(m)) return 'Correo no válido';
-                if (widget.existentes.any((u) => u.email.toLowerCase() == m)) return 'Ya está registrado';
+                if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(m)) {
+                  return 'Correo no válido';
+                }
+                if (widget.existentes.any((u) => u.email.toLowerCase() == m)) {
+                  return 'Ya está registrado';
+                }
                 return null;
               },
             ),
@@ -536,9 +742,15 @@ class _UsuarioFormState extends State<_UsuarioForm> {
             TextFormField(
               controller: _tel,
               keyboardType: TextInputType.phone,
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+ ]')), LengthLimitingTextInputFormatter(16)],
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9+ ]')),
+                LengthLimitingTextInputFormatter(16),
+              ],
               autovalidateMode: AutovalidateMode.onUserInteraction,
-              decoration: const InputDecoration(labelText: 'Teléfono', helperText: 'Celular 09XXXXXXXX o fijo 02XXXXXXX'),
+              decoration: const InputDecoration(
+                labelText: 'Teléfono',
+                helperText: 'Celular 09XXXXXXXX o fijo 02XXXXXXX',
+              ),
               validator: validarTelefono,
             ),
             const SeccionTitulo('Roles'),
@@ -550,19 +762,21 @@ class _UsuarioFormState extends State<_UsuarioForm> {
                   FilterChip(
                     label: Text(humanizar(r)),
                     selected: _roles.contains(r),
-                    onSelected: (r == 'ADMINISTRADOR' && (!puedeAdmin || maestro || _propio))
+                    onSelected:
+                        (r == 'ADMINISTRADOR' &&
+                            (!puedeAdmin || maestro || _propio))
                         ? null
                         : (sel) => setState(() {
-                              if (sel) {
-                                _roles.add(r);
-                              } else if (_roles.length > 1) {
-                                _roles.remove(r);
-                              }
-                            }),
+                            if (sel) {
+                              _roles.add(r);
+                            } else if (_roles.length > 1) {
+                              _roles.remove(r);
+                            }
+                          }),
                   ),
               ],
             ),
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(top: 8),
               child: Text(
                 'Administrador: todo. Vendedor: pedidos y clientes. Bodeguero: preparación, recepciones y traslados. Chofer: rutas asignadas.',
@@ -570,9 +784,12 @@ class _UsuarioFormState extends State<_UsuarioForm> {
               ),
             ),
             if (!puedeAdmin)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 6),
-                child: Text('Solo la cuenta maestra otorga o quita el rol Administrador.', style: TextStyle(color: AppColors.textDim, fontSize: 12)),
+                child: Text(
+                  'Solo la cuenta maestra otorga o quita el rol Administrador.',
+                  style: TextStyle(color: AppColors.textDim, fontSize: 12),
+                ),
               ),
             if (!_editando) ...[
               const SeccionTitulo('Clave temporal'),
@@ -584,10 +801,12 @@ class _UsuarioFormState extends State<_UsuarioForm> {
                   suffixIcon: IconButton(
                     tooltip: 'Generar otra',
                     icon: const Icon(Icons.autorenew),
-                    onPressed: () => setState(() => _clave.text = claveTemporal()),
+                    onPressed: () =>
+                        setState(() => _clave.text = claveTemporal()),
                   ),
                 ),
-                validator: (v) => (v ?? '').length < 12 ? 'Mínimo 12 caracteres' : null,
+                validator: (v) =>
+                    (v ?? '').length < 12 ? 'Mínimo 12 caracteres' : null,
               ),
             ],
             if (_editando && !_propio) ...[
@@ -595,9 +814,15 @@ class _UsuarioFormState extends State<_UsuarioForm> {
               Card(
                 child: SwitchListTile(
                   title: const Text('Cuenta activa'),
-                  subtitle: Text(maestro ? 'La cuenta maestra no se puede desactivar' : 'Si la desactivas se cierran sus sesiones'),
+                  subtitle: Text(
+                    maestro
+                        ? 'La cuenta maestra no se puede desactivar'
+                        : 'Si la desactivas se cierran sus sesiones',
+                  ),
                   value: _activo,
-                  onChanged: maestro ? null : (v) => setState(() => _activo = v),
+                  onChanged: maestro
+                      ? null
+                      : (v) => setState(() => _activo = v),
                 ),
               ),
             ],

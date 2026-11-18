@@ -6,7 +6,10 @@ import '../../shared/ui.dart';
 
 /// Cambio de la propia contraseña. Al terminar, el backend cierra todas las
 /// sesiones, así que [alTerminar] debe llevar al inicio de sesión.
-Future<void> cambiarMiClave(BuildContext context, {required VoidCallback alTerminar}) async {
+Future<void> cambiarMiClave(
+  BuildContext context, {
+  required VoidCallback alTerminar,
+}) async {
   final ok = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -44,18 +47,28 @@ class _CambiarClaveState extends State<_CambiarClave> {
     try {
       await ApiService.cambiarPassword(_actual.text, _nueva.text);
       if (!mounted) return;
-      avisoOk(context, 'Contraseña actualizada. Inicia sesión con tu nueva clave.');
+      avisoOk(
+        context,
+        'Contraseña actualizada. Inicia sesión con tu nueva clave.',
+      );
       Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
         setState(() => _enviando = false);
-        avisoError(context, e.toString().contains('400') ? 'La contraseña actual es incorrecta o la nueva no cumple las reglas' : e);
+        avisoError(
+          context,
+          e.toString().contains('400')
+              ? 'La contraseña actual es incorrecta o la nueva no cumple las reglas'
+              : e,
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     InputDecoration deco(String label, {String? help}) => InputDecoration(
       labelText: label,
       helperText: help,
@@ -66,15 +79,26 @@ class _CambiarClaveState extends State<_CambiarClave> {
       ),
     );
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
       child: Form(
         key: _form,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Cambiar mi contraseña', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-            const Text('Por seguridad se cerrarán tus sesiones abiertas.', style: TextStyle(color: AppColors.textMuted)),
+            const Text(
+              'Cambiar mi contraseña',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              'Por seguridad se cerrarán tus sesiones abiertas.',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _actual,
@@ -86,7 +110,10 @@ class _CambiarClaveState extends State<_CambiarClave> {
             TextFormField(
               controller: _nueva,
               obscureText: !_ver,
-              decoration: deco('Contraseña nueva', help: 'Mínimo 12 caracteres'),
+              decoration: deco(
+                'Contraseña nueva',
+                help: 'Mínimo 12 caracteres',
+              ),
               validator: (v) {
                 if ((v ?? '').length < 12) return 'Mínimo 12 caracteres';
                 if (v == _actual.text) return 'Debe ser distinta de la actual';
@@ -101,7 +128,10 @@ class _CambiarClaveState extends State<_CambiarClave> {
               validator: (v) => v != _nueva.text ? 'No coincide' : null,
             ),
             const SizedBox(height: 18),
-            FilledButton(onPressed: _enviando ? null : _guardar, child: const Text('Cambiar contraseña')),
+            FilledButton(
+              onPressed: _enviando ? null : _guardar,
+              child: const Text('Cambiar contraseña'),
+            ),
           ],
         ),
       ),
