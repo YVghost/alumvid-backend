@@ -1,3 +1,4 @@
+import '../shared/tema.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
@@ -44,7 +45,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       GlobalKey<LiveMapWidgetState>();
 
   int _selectedTabIndex =
-      0; // 0 = GPS, 1 = Kanban, 2 = Planificar Rutas, 3 = Inventario, 4 = Usuarios, 5 = Simulador
+      6; // 0 = GPS, 1 = Kanban, 2 = Planificar Rutas, 3 = Inventario, 4 = Usuarios, 5 = Simulador
   int _mobileMapSubIndex = 0; // Para vista 0 en móvil: 0 = Mapa, 1 = Rutas
 
   List<Ruta> _rutas = [];
@@ -710,155 +711,189 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   // BARRA LATERAL (SIDEBAR) SLIM & ELEGANTE - NO INVASIVA
   Widget _buildSlimSidebar() {
-    final menuItems = [
-      {'index': 0, 'label': 'monitoreo', 'icon': Icons.radar_rounded},
-      {'index': 1, 'label': 'despachos', 'icon': Icons.view_kanban_rounded},
-      {'index': 2, 'label': 'rutas', 'icon': Icons.alt_route_rounded},
-      {'index': 3, 'label': 'pedidos', 'icon': Icons.receipt_long_rounded},
-      {'index': 4, 'label': 'piezas', 'icon': Icons.content_cut_rounded},
-      {'index': 5, 'label': 'bodega', 'icon': Icons.grid_view_rounded},
-      {'index': 6, 'label': 'inventario', 'icon': Icons.inventory_2_rounded},
-      {'index': 7, 'label': 'usuarios', 'icon': Icons.people_alt_rounded},
-      {'index': 8, 'label': 'simulador', 'icon': Icons.phone_android_rounded},
+    final entries = <(int, String, IconData, Color)>[
+      (6, 'Inventario', Icons.inventory_2_outlined, AppColors.sky),
+      (3, 'Pedidos', Icons.receipt_long_outlined, AppColors.lavender),
+      (4, 'Piezas y retazos', Icons.content_cut_outlined, AppColors.peach),
+      (5, 'Bodega', Icons.grid_view_outlined, AppColors.mint),
+      (2, 'Rutas y entregas', Icons.alt_route_outlined, AppColors.sky),
+      (0, 'Monitoreo', Icons.radar_outlined, AppColors.mint),
+      (1, 'Despachos', Icons.view_kanban_outlined, AppColors.peach),
+      (7, 'Usuarios', Icons.people_alt_outlined, AppColors.rose),
+      (8, 'Simulador', Icons.phone_android_outlined, AppColors.lavender),
     ];
-
+    final compact = MediaQuery.sizeOf(context).width < 1080;
     return Container(
-      width: 82,
+      width: compact ? 84 : 236,
       decoration: BoxDecoration(
-        color: AppTheme.background,
-        border: Border(
-          right: BorderSide(color: AppTheme.surfaceCard, width: 1.2),
-        ),
+        color: AppColors.surface,
+        border: Border(right: BorderSide(color: AppColors.border)),
       ),
-      child: Column(
-        children: [
-          // Logo AlumVid Pin Superior
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppTheme.primary.withValues(alpha: 0.5),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primary.withValues(alpha: 0.25),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(compact ? 16 : 22, 26, 16, 28),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.lavender,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Icon(
+                      Icons.layers_outlined,
+                      color: Color(0xFF65549C),
+                      size: 26,
+                    ),
                   ),
+                  if (!compact) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'AlumVid',
+                            style: TextStyle(
+                              color: AppColors.text,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -.7,
+                            ),
+                          ),
+                          Text(
+                            'GESTIÓN INTEGRAL',
+                            style: TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 9,
+                              letterSpacing: 1.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
-              child: Center(
-                child: Icon(
-                  Icons.location_on_rounded,
-                  color: AppTheme.primaryLight,
-                  size: 26,
+            ),
+            if (!compact)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'ESPACIO DE TRABAJO',
+                    style: TextStyle(
+                      color: AppColors.textDim,
+                      fontSize: 10,
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-
-          // Lista de Opciones de Navegación Vertical
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              itemCount: menuItems.length,
-              itemBuilder: (context, idx) {
-                final item = menuItems[idx];
-                final int tabIdx = item['index'] as int;
-                final String label = item['label'] as String;
-                final IconData icon = item['icon'] as IconData;
-                final bool active = _selectedTabIndex == tabIdx;
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Material(
-                    color: active ? AppTheme.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => setState(() => _selectedTabIndex = tabIdx),
-                      hoverColor: Colors.white.withValues(alpha: 0.05),
-                      child: Container(
-                        height: 58,
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              icon,
-                              size: 22,
-                              color: active ? Colors.white : AppTheme.textMuted,
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              label,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: active
-                                    ? FontWeight.bold
-                                    : FontWeight.w500,
-                                color: active
-                                    ? Colors.white
-                                    : AppTheme.textMuted,
-                                letterSpacing: 0.2,
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
+                  for (final e in entries)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Tooltip(
+                        message: compact ? e.$2 : '',
+                        child: Material(
+                          color: _selectedTabIndex == e.$1
+                              ? AppColors.primary.withValues(alpha: .10)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(13),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(13),
+                            onTap: () =>
+                                setState(() => _selectedTabIndex = e.$1),
+                            child: Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 34,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color: Apariencia.instancia.esOscuro
+                                          ? e.$4.withValues(alpha: .13)
+                                          : e.$4,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      e.$3,
+                                      size: 19,
+                                      color: Apariencia.instancia.esOscuro
+                                          ? e.$4
+                                          : const Color(0xFF536078),
+                                    ),
+                                  ),
+                                  if (!compact) ...[
+                                    const SizedBox(width: 11),
+                                    Expanded(
+                                      child: Text(
+                                        e.$2,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: _selectedTabIndex == e.$1
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color: _selectedTabIndex == e.$1
+                                              ? AppColors.primary
+                                              : AppColors.textMuted,
+                                        ),
+                                      ),
+                                    ),
+                                    if (_selectedTabIndex == e.$1)
+                                      Icon(
+                                        Icons.chevron_right,
+                                        size: 16,
+                                        color: AppColors.primary,
+                                      ),
+                                  ],
+                                ],
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // Configuración / Ajustes Inferior
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: _mostrarDialogoConfiguracion,
-                hoverColor: Colors.white.withValues(alpha: 0.05),
-                child: Container(
-                  height: 52,
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.settings_outlined,
-                        size: 20,
-                        color: AppTheme.textMuted,
-                      ),
-                      SizedBox(height: 3),
-                      Text(
-                        'configuración',
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          color: AppTheme.textMuted,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
+                ],
               ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  if (!compact) const SelectorTema(),
+                  if (!compact) const SizedBox(height: 16),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    leading: Icon(
+                      Icons.settings_outlined,
+                      color: AppColors.textMuted,
+                    ),
+                    title: compact
+                        ? null
+                        : const Text(
+                            'Configuración',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                    onTap: _mostrarDialogoConfiguracion,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -968,202 +1003,115 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // CABECERA SUPERIOR - ESTILO CLEAN (MOCKUP)
   Widget _buildTopBar() {
     final titles = _titulosPestana;
-
     return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      height: 88,
+      padding: const EdgeInsets.symmetric(horizontal: 26),
       decoration: BoxDecoration(
-        color: AppTheme.background,
-        border: Border(bottom: BorderSide(color: AppTheme.surfaceCard)),
+        color: AppColors.background,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Título de la Pantalla Activa
-          Text(
-            titles['title']!,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: AppTheme.textMain,
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  titles['title']!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -.45,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  titles['subtitle']!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                ),
+              ],
             ),
           ),
-
-          // Avatar y Menú de Perfil
+          const SizedBox(width: 20),
+          const SelectorTema(compacto: true),
+          IconButton(
+            tooltip: 'Actualizar datos',
+            onPressed: _inicializarDatos,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+          const SizedBox(width: 12),
+          Container(height: 36, width: 1, color: AppColors.border),
+          const SizedBox(width: 16),
           PopupMenuButton<String>(
-            tooltip: 'Menú de Usuario',
-            offset: const Offset(0, 48),
-            color: AppTheme.surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: AppTheme.surfaceCard),
-            ),
-            onSelected: (val) {
-              if (val == 'refresh') _inicializarDatos();
-              if (val == 'auditoria') _abrirAuditoriaHistorico();
-              if (val == 'config') _mostrarDialogoConfiguracion();
-              if (val == 'logout') _cerrarSesion();
-              if (val == 'clave') {
+            tooltip: 'Menú de usuario',
+            onSelected: (value) {
+              if (value == 'logout') _cerrarSesion();
+              if (value == 'clave') {
                 cambiarMiClave(context, alTerminar: _cerrarSesion);
               }
+              if (value == 'auditoria') _abrirAuditoriaHistorico();
             },
-            itemBuilder: (ctx) => [
-              PopupMenuItem(
-                enabled: false,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.user.email,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textMain,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _wsService.isConnected
-                          ? 'Streaming WebSocket Activo'
-                          : 'Sincronización Polling',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: _wsService.isConnected
-                            ? const Color(0xFF10B981)
-                            : const Color(0xFFF59E0B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(height: 1),
-              PopupMenuItem(
-                value: 'refresh',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.refresh_rounded,
-                      size: 16,
-                      color: AppTheme.primaryLight,
-                    ),
-                    SizedBox(width: 10),
-                    Text(
-                      'Actualizar Datos',
-                      style: TextStyle(color: AppTheme.textMain, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'auditoria',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.history_rounded,
-                      size: 16,
-                      color: AppTheme.primaryLight,
-                    ),
-                    SizedBox(width: 10),
-                    Text(
-                      'Auditoría Histórica',
-                      style: TextStyle(color: AppTheme.textMain, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'config',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.hub_rounded,
-                      size: 16,
-                      color: AppTheme.primaryLight,
-                    ),
-                    SizedBox(width: 10),
-                    Text(
-                      'Servicios & Sistema',
-                      style: TextStyle(color: AppTheme.textMain, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
+            itemBuilder: (_) => [
+              PopupMenuItem(enabled: false, child: Text(widget.user.email)),
+              const PopupMenuItem(
                 value: 'clave',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.key_rounded,
-                      size: 16,
-                      color: AppTheme.primaryLight,
-                    ),
-                    SizedBox(width: 10),
-                    Text(
-                      'Cambiar mi contraseña',
-                      style: TextStyle(color: AppTheme.textMain, fontSize: 13),
-                    ),
-                  ],
-                ),
+                child: Text('Cambiar contraseña'),
               ),
-              const PopupMenuDivider(height: 1),
+              const PopupMenuItem(
+                value: 'auditoria',
+                child: Text('Auditoría histórica'),
+              ),
               const PopupMenuItem(
                 value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.logout_rounded,
-                      size: 16,
-                      color: Color(0xFFEF4444),
-                    ),
-                    SizedBox(width: 10),
-                    Text(
-                      'Cerrar Sesión',
-                      style: TextStyle(
-                        color: Color(0xFFEF4444),
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
+                child: Text('Cerrar Sesión'),
               ),
             ],
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppTheme.surfaceCard),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircleAvatar(
-                    radius: 12,
-                    backgroundColor: AppTheme.primary,
-                    child: Icon(
-                      Icons.person,
-                      size: 14,
-                      color: AppTheme.textMain,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    widget.user.email,
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 19,
+                  backgroundColor: AppColors.primary.withValues(alpha: .12),
+                  child: Text(
+                    widget.user.fullName.isEmpty
+                        ? 'A'
+                        : widget.user.fullName[0].toUpperCase(),
                     style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textMain,
-                      fontWeight: FontWeight.w500,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    size: 18,
-                    color: AppTheme.textMuted,
+                ),
+                const SizedBox(width: 10),
+                if (MediaQuery.sizeOf(context).width > 960)
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.user.fullName,
+                        style: TextStyle(
+                          color: AppColors.text,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        'Administrador',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                Icon(Icons.expand_more, color: AppColors.textDim, size: 18),
+              ],
             ),
           ),
         ],
