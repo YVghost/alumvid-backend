@@ -8,6 +8,7 @@ import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Apariencia.instancia.cargar();
 
   // Verificar si ya existe una sesión activa de administrador
   AppUser? usuarioGuardado;
@@ -26,15 +27,22 @@ class AlumVidAdminApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'AlumVid — Centro de Comando Logístico',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      home: usuarioInicial != null && usuarioInicial!.isAdmin
-          ? (usuarioInicial!.mustChangePassword
-                ? const CambiarPasswordScreen()
-                : AdminDashboardScreen(user: usuarioInicial!))
-          : const LoginScreen(),
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
+    return ListenableBuilder(
+      listenable: Apariencia.instancia,
+      builder: (context, _) => MaterialApp(
+        title: 'AlumVid — Centro de Comando Logístico',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: Apariencia.instancia.modo,
+        home: usuarioInicial != null && usuarioInicial!.isAdmin
+            ? (usuarioInicial!.mustChangePassword
+                  ? const CambiarPasswordScreen()
+                  : AdminDashboardScreen(user: usuarioInicial!))
+            : const LoginScreen(),
+      ),
     );
   }
 }

@@ -42,8 +42,15 @@ class _RutasModuloState extends State<RutasModulo> {
       if (!mounted) return;
       setState(() {
         _bandeja = r[0];
-        _rutas = r[1]..sort((a, b) => aTexto(b['fechaCreacion']).compareTo(aTexto(a['fechaCreacion'])));
-        _sel.removeWhere((id) => !_bandeja.any((p) => '${p['id']}' == id && listoParaRuta(p)));
+        _rutas = r[1]
+          ..sort(
+            (a, b) => aTexto(
+              b['fechaCreacion'],
+            ).compareTo(aTexto(a['fechaCreacion'])),
+          );
+        _sel.removeWhere(
+          (id) => !_bandeja.any((p) => '${p['id']}' == id && listoParaRuta(p)),
+        );
       });
     } catch (e) {
       if (mounted) setState(() => _error = limpiarError(e));
@@ -58,18 +65,33 @@ class _RutasModuloState extends State<RutasModulo> {
       if (!estados.contains(r['estado'])) return false;
       if (q.isEmpty) return true;
       final paradas = (r['paradas'] as List? ?? const []);
-      return '${r['codigoRuta']} ${r['choferNombre'] ?? ''} ${r['comentarios'] ?? ''}'.toLowerCase().contains(q) ||
-          paradas.any((p) => '${p['pedido']?['cliente'] ?? ''} ${p['numeroPedido'] ?? ''}'.toLowerCase().contains(q));
+      return '${r['codigoRuta']} ${r['choferNombre'] ?? ''} ${r['comentarios'] ?? ''}'
+              .toLowerCase()
+              .contains(q) ||
+          paradas.any(
+            (p) => '${p['pedido']?['cliente'] ?? ''} ${p['numeroPedido'] ?? ''}'
+                .toLowerCase()
+                .contains(q),
+          );
     }).toList();
   }
 
   Future<void> _abrir(Map<String, dynamic> r) async {
-    await abrirPanel(context, (_) => RutaDetalle(rutaId: '${r['id']}', permisos: widget.permisos), ancho: 680);
+    await abrirPanel(
+      context,
+      (_) => RutaDetalle(rutaId: '${r['id']}', permisos: widget.permisos),
+      ancho: 680,
+    );
     _cargar();
   }
 
-  Future<void> _crearRuta({List<Map<String, dynamic>> pedidos = const []}) async {
-    final ruta = await abrirPanel<Map<String, dynamic>>(context, (_) => CrearRuta(pedidos: pedidos));
+  Future<void> _crearRuta({
+    List<Map<String, dynamic>> pedidos = const [],
+  }) async {
+    final ruta = await abrirPanel<Map<String, dynamic>>(
+      context,
+      (_) => CrearRuta(pedidos: pedidos),
+    );
     if (ruta == null) return;
     _sel.clear();
     await _cargar();
@@ -87,14 +109,22 @@ class _RutasModuloState extends State<RutasModulo> {
           children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text('Agregar a una ruta pendiente', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              child: Text(
+                'Agregar a una ruta pendiente',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              ),
             ),
-            if (pendientes.isEmpty) const ListTile(title: Text('No hay rutas pendientes. Crea una nueva.')),
+            if (pendientes.isEmpty)
+              const ListTile(
+                title: Text('No hay rutas pendientes. Crea una nueva.'),
+              ),
             for (final r in pendientes)
               ListTile(
                 leading: const Icon(Icons.alt_route),
                 title: Text(tituloRuta(r)),
-                subtitle: Text('${r['choferNombre'] ?? 'Sin chofer'} · ${(r['paradas'] as List).length} paradas'),
+                subtitle: Text(
+                  '${r['choferNombre'] ?? 'Sin chofer'} · ${(r['paradas'] as List).length} paradas',
+                ),
                 onTap: () => Navigator.pop(ctx, r),
               ),
           ],
@@ -107,7 +137,10 @@ class _RutasModuloState extends State<RutasModulo> {
     try {
       await Api.agregarPedidosRuta('${ruta['id']}', items);
       if (!mounted) return;
-      avisoOk(context, '${pedidos.length} pedido(s) agregados a ${tituloRuta(ruta)}');
+      avisoOk(
+        context,
+        '${pedidos.length} pedido(s) agregados a ${tituloRuta(ruta)}',
+      );
       _sel.clear();
       await _cargar();
     } catch (e) {
@@ -117,6 +150,8 @@ class _RutasModuloState extends State<RutasModulo> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final pendientes = _de({'PENDIENTE'});
     final enCurso = _de({'EN_CURSO'});
     final cerradas = _de({'COMPLETADA', 'CANCELADA'});
@@ -126,7 +161,13 @@ class _RutasModuloState extends State<RutasModulo> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Rutas y entregas'),
-          actions: [IconButton(tooltip: 'Actualizar', onPressed: _cargar, icon: const Icon(Icons.refresh))],
+          actions: [
+            IconButton(
+              tooltip: 'Actualizar',
+              onPressed: _cargar,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
           bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
@@ -163,7 +204,11 @@ class _RutasModuloState extends State<RutasModulo> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: FilledButton.icon(
-                          onPressed: () => _crearRuta(pedidos: _bandeja.where((p) => _sel.contains('${p['id']}')).toList()),
+                          onPressed: () => _crearRuta(
+                            pedidos: _bandeja
+                                .where((p) => _sel.contains('${p['id']}'))
+                                .toList(),
+                          ),
                           icon: const Icon(Icons.add_road),
                           label: Text('Crear ruta (${_sel.length})'),
                         ),
@@ -179,7 +224,11 @@ class _RutasModuloState extends State<RutasModulo> {
             : TabBarView(
                 children: [
                   _bandejaVista(),
-                  _listaRutas(pendientes, 'Sin rutas pendientes', 'Crea una ruta desde "Por asignar".'),
+                  _listaRutas(
+                    pendientes,
+                    'Sin rutas pendientes',
+                    'Crea una ruta desde "Por asignar".',
+                  ),
                   _listaRutas(enCurso, 'Ninguna ruta en curso', null),
                   _listaRutas(cerradas, 'Sin rutas finalizadas', null),
                 ],
@@ -195,8 +244,18 @@ class _RutasModuloState extends State<RutasModulo> {
         const SizedBox(width: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-          decoration: BoxDecoration(color: c.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(10)),
-          child: Text('$n', style: TextStyle(color: c, fontSize: 12, fontWeight: FontWeight.w800)),
+          decoration: BoxDecoration(
+            color: c.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            '$n',
+            style: TextStyle(
+              color: c,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
       ],
     ),
@@ -209,13 +268,14 @@ class _RutasModuloState extends State<RutasModulo> {
           ? const VistaVacia(
               icono: Icons.inbox_outlined,
               titulo: 'Sin entregas pendientes',
-              mensaje: 'Los pedidos a domicilio aparecen aquí apenas se registran.',
+              mensaje:
+                  'Los pedidos a domicilio aparecen aquí apenas se registran.',
             )
           : AnchoLegible(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
                 children: [
-                  const Text(
+                  Text(
                     'Selecciona los pedidos listos y crea la ruta. Los que siguen en preparación se habilitan cuando bodega los prepara.',
                     style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                   ),
@@ -225,7 +285,11 @@ class _RutasModuloState extends State<RutasModulo> {
                       pedido: p,
                       seleccionado: _sel.contains('${p['id']}'),
                       onSeleccion: listoParaRuta(p)
-                          ? (v) => setState(() => v ? _sel.add('${p['id']}') : _sel.remove('${p['id']}'))
+                          ? (v) => setState(
+                              () => v
+                                  ? _sel.add('${p['id']}')
+                                  : _sel.remove('${p['id']}'),
+                            )
                           : null,
                     ),
                     const SizedBox(height: 10),
@@ -236,24 +300,38 @@ class _RutasModuloState extends State<RutasModulo> {
     );
   }
 
-  Widget _listaRutas(List<Map<String, dynamic>> rutas, String vacio, String? ayuda) {
+  Widget _listaRutas(
+    List<Map<String, dynamic>> rutas,
+    String vacio,
+    String? ayuda,
+  ) {
     return RefreshIndicator(
       onRefresh: _cargar,
       child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: CampoBusqueda(hint: 'Ruta, chofer, cliente o n.º de pedido', onChanged: (v) => setState(() => _q = v)),
+            child: CampoBusqueda(
+              hint: 'Ruta, chofer, cliente o n.º de pedido',
+              onChanged: (v) => setState(() => _q = v),
+            ),
           ),
           Expanded(
             child: rutas.isEmpty
-                ? VistaVacia(icono: Icons.alt_route, titulo: vacio, mensaje: ayuda)
+                ? VistaVacia(
+                    icono: Icons.alt_route,
+                    titulo: vacio,
+                    mensaje: ayuda,
+                  )
                 : AnchoLegible(
                     child: ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
                       itemCount: rutas.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (_, i) => TarjetaRuta(ruta: rutas[i], onTap: () => _abrir(rutas[i])),
+                      itemBuilder: (_, i) => TarjetaRuta(
+                        ruta: rutas[i],
+                        onTap: () => _abrir(rutas[i]),
+                      ),
                     ),
                   ),
           ),
@@ -264,22 +342,31 @@ class _RutasModuloState extends State<RutasModulo> {
 }
 
 String tituloRuta(Map<String, dynamic> r) =>
-    aTexto(r['comentarios']).isNotEmpty && !aTexto(r['comentarios']).startsWith('Cancelada')
-        ? '${r['codigoRuta']} · ${r['comentarios']}'
-        : '${r['codigoRuta']}';
+    aTexto(r['comentarios']).isNotEmpty &&
+        !aTexto(r['comentarios']).startsWith('Cancelada')
+    ? '${r['codigoRuta']} · ${r['comentarios']}'
+    : '${r['codigoRuta']}';
 
 /// Listo para ruta: tiene material preparado en bodega y su estado permite despacharlo.
 bool listoParaRuta(Map<String, dynamic> p) =>
-    aNum(p['ready_quantity']) > 0 && {'PARCIAL', 'LISTO', 'EN_REPARTO'}.contains(p['state']);
+    aNum(p['ready_quantity']) > 0 &&
+    {'PARCIAL', 'LISTO', 'EN_REPARTO'}.contains(p['state']);
 
 class EntregaCard extends StatelessWidget {
-  const EntregaCard({super.key, required this.pedido, required this.seleccionado, this.onSeleccion});
+  const EntregaCard({
+    super.key,
+    required this.pedido,
+    required this.seleccionado,
+    this.onSeleccion,
+  });
   final Map<String, dynamic> pedido;
   final bool seleccionado;
   final ValueChanged<bool>? onSeleccion;
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final p = pedido;
     final listo = onSeleccion != null;
     final sinUbicacion = p['delivery_latitude'] == null;
@@ -288,14 +375,20 @@ class EntregaCard extends StatelessWidget {
         : switch (p['state']) {
             'PENDIENTE_MATERIAL' => ('Falta material', AppColors.danger),
             'RETRASADO' => ('Retrasado', AppColors.danger),
-            _ when aNum(p['pending_preparation']) > 0 => ('En preparación (bodega)', AppColors.info),
+            _ when aNum(p['pending_preparation']) > 0 => (
+              'En preparación (bodega)',
+              AppColors.info,
+            ),
             _ => ('En reparto', AppColors.warning),
           };
     return Card(
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: seleccionado ? AppColors.primaryLight : Colors.transparent, width: 1.6),
+        side: BorderSide(
+          color: seleccionado ? AppColors.primaryLight : Colors.transparent,
+          width: 1.6,
+        ),
       ),
       child: InkWell(
         onTap: listo ? () => onSeleccion!(!seleccionado) : null,
@@ -303,30 +396,63 @@ class EntregaCard extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(4, 10, 14, 10),
           child: Row(
             children: [
-              Checkbox(value: seleccionado, onChanged: listo ? (v) => onSeleccion!(v == true) : null),
+              Checkbox(
+                value: seleccionado,
+                onChanged: listo ? (v) => onSeleccion!(v == true) : null,
+              ),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Text('#${p['number']}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                        Text(
+                          '#${p['number']}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
                         const SizedBox(width: 8),
-                        Expanded(child: Text(aTexto(p['client_name']), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                        Expanded(
+                          child: Text(
+                            aTexto(p['client_name']),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Text(aTexto(p['delivery_address'], 'Sin dirección'),
-                        maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                    Text(
+                      aTexto(p['delivery_address'], 'Sin dirección'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 13,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,
                       children: [
                         EstadoChip('', texto: texto, color: color),
-                        if (sinUbicacion) const EstadoChip('', texto: 'Sin ubicación en mapa', color: AppColors.warning),
+                        if (sinUbicacion)
+                          EstadoChip(
+                            '',
+                            texto: 'Sin ubicación en mapa',
+                            color: AppColors.warning,
+                          ),
                         if (p['expires_at'] != null)
-                          Text('Vence ${fmtFecha(aFecha(p['expires_at']))}', style: const TextStyle(color: AppColors.textDim, fontSize: 12)),
+                          Text(
+                            'Vence ${fmtFecha(aFecha(p['expires_at']))}',
+                            style: TextStyle(
+                              color: AppColors.textDim,
+                              fontSize: 12,
+                            ),
+                          ),
                       ],
                     ),
                   ],
@@ -347,6 +473,8 @@ class TarjetaRuta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final r = ruta;
     final paradas = (r['paradas'] as List? ?? const []);
     final entregadas = paradas.where((p) => p['estado'] == 'ENTREGADO').length;
@@ -365,8 +493,15 @@ class TarjetaRuta extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text(tituloRuta(r), maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                    child: Text(
+                      tituloRuta(r),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
                   ),
                   EstadoChip(estado),
                 ],
@@ -374,22 +509,50 @@ class TarjetaRuta extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(chofer == null ? Icons.person_off_outlined : Icons.person_outline, size: 16,
-                      color: chofer == null ? AppColors.warning : AppColors.textMuted),
+                  Icon(
+                    chofer == null
+                        ? Icons.person_off_outlined
+                        : Icons.person_outline,
+                    size: 16,
+                    color: chofer == null
+                        ? AppColors.warning
+                        : AppColors.textMuted,
+                  ),
                   const SizedBox(width: 4),
                   Expanded(
-                    child: Text(chofer ?? 'Sin chofer', maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: chofer == null ? AppColors.warning : AppColors.textMuted, fontSize: 13)),
+                    child: Text(
+                      chofer ?? 'Sin chofer',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: chofer == null
+                            ? AppColors.warning
+                            : AppColors.textMuted,
+                        fontSize: 13,
+                      ),
+                    ),
                   ),
-                  const Icon(Icons.pin_drop_outlined, size: 16, color: AppColors.textMuted),
+                  Icon(
+                    Icons.pin_drop_outlined,
+                    size: 16,
+                    color: AppColors.textMuted,
+                  ),
                   const SizedBox(width: 4),
-                  Text('$entregadas/${paradas.length} entregadas', style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                  Text(
+                    '$entregadas/${paradas.length} entregadas',
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(value: avance, minHeight: 6, color: colorEstado(estado), backgroundColor: AppColors.border),
+                child: LinearProgressIndicator(
+                  value: avance,
+                  minHeight: 6,
+                  color: colorEstado(estado),
+                  backgroundColor: AppColors.border,
+                ),
               ),
             ],
           ),

@@ -20,7 +20,8 @@ class AuditoriaHistoricoDialog extends StatefulWidget {
   });
 
   @override
-  State<AuditoriaHistoricoDialog> createState() => _AuditoriaHistoricoDialogState();
+  State<AuditoriaHistoricoDialog> createState() =>
+      _AuditoriaHistoricoDialogState();
 }
 
 class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
@@ -37,8 +38,22 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
 
   bool _estaEnRango(DateTime? dt, DateTimeRange range) {
     if (dt == null) return false;
-    final start = DateTime(range.start.year, range.start.month, range.start.day, 0, 0, 0);
-    final end = DateTime(range.end.year, range.end.month, range.end.day, 23, 59, 59);
+    final start = DateTime(
+      range.start.year,
+      range.start.month,
+      range.start.day,
+      0,
+      0,
+      0,
+    );
+    final end = DateTime(
+      range.end.year,
+      range.end.month,
+      range.end.day,
+      23,
+      59,
+      59,
+    );
     return dt.isAfter(start.subtract(const Duration(seconds: 1))) &&
         dt.isBefore(end.add(const Duration(seconds: 1)));
   }
@@ -52,9 +67,11 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
       final q = _filtroTexto.toLowerCase();
       final matchCodigo = r.codigoRuta.toLowerCase().contains(q);
       final matchChofer = (r.choferNombre ?? '').toLowerCase().contains(q);
-      final matchParada = r.paradas.any((p) =>
-          (p.pedido?.cliente ?? '').toLowerCase().contains(q) ||
-          (p.pedido?.direccionTexto ?? '').toLowerCase().contains(q));
+      final matchParada = r.paradas.any(
+        (p) =>
+            (p.pedido?.cliente ?? '').toLowerCase().contains(q) ||
+            (p.pedido?.direccionTexto ?? '').toLowerCase().contains(q),
+      );
       return matchCodigo || matchChofer || matchParada;
     }).toList();
 
@@ -76,7 +93,7 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
       builder: (ctx, child) {
         return Theme(
           data: Theme.of(ctx).copyWith(
-            colorScheme: const ColorScheme.dark(
+            colorScheme: ColorScheme.dark(
               primary: AppTheme.primary,
               onPrimary: Colors.white,
               surface: AppTheme.surface,
@@ -96,7 +113,9 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
 
   String _formatearRango(DateTimeRange r) {
     final f = DateFormat('dd MMM yyyy');
-    if (r.start.year == r.end.year && r.start.month == r.end.month && r.start.day == r.end.day) {
+    if (r.start.year == r.end.year &&
+        r.start.month == r.end.month &&
+        r.start.day == r.end.day) {
       return f.format(r.start);
     }
     return '${DateFormat('dd MMM').format(r.start)} - ${f.format(r.end)}';
@@ -104,6 +123,8 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final rutasFiltradas = _obtenerRutasFiltradas();
 
     // Cálculos de métricas para el periodo seleccionado
@@ -124,7 +145,9 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
           totalEntregadas++;
         } else if (p.isEnCurso) {
           totalEnCurso++;
-        } else if (p.estado == 'CANCELADA' || p.estado == 'CANCELADO' || r.estado == 'CANCELADA') {
+        } else if (p.estado == 'CANCELADA' ||
+            p.estado == 'CANCELADO' ||
+            r.estado == 'CANCELADA') {
           totalCanceladas++;
         }
       }
@@ -134,7 +157,7 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
       backgroundColor: AppTheme.background,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppTheme.border),
+        side: BorderSide(color: AppTheme.border),
       ),
       child: Container(
         width: 960,
@@ -155,31 +178,42 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                         color: AppTheme.primary.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.history_edu, color: AppTheme.primaryLight, size: 24),
+                      child: Icon(
+                        Icons.history_edu,
+                        color: AppTheme.primaryLight,
+                        size: 24,
+                      ),
                     ),
                     const SizedBox(width: 12),
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Auditoría e Histórico de Rutas y Despachos',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textMain,
+                          ),
                         ),
                         Text(
                           'Desglose cronológico detallado de hojas de ruta, choferes y paradas asignadas',
-                          style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textMuted,
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: AppTheme.textMuted),
+                  icon: Icon(Icons.close, color: AppTheme.textMuted),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
             ),
-            const Divider(color: AppTheme.border, height: 24),
+            Divider(color: AppTheme.border, height: 24),
 
             // Barra de Filtro de Rango de Fechas y Búsqueda
             Row(
@@ -189,23 +223,40 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                   onTap: _abrirSelectorRango,
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.surfaceCard,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.6)),
+                      border: Border.all(
+                        color: AppTheme.primaryLight.withValues(alpha: 0.6),
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.calendar_month, size: 16, color: AppTheme.primaryLight),
+                        Icon(
+                          Icons.calendar_month,
+                          size: 16,
+                          color: AppTheme.primaryLight,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Periodo: ${_formatearRango(_rango)}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                          style: TextStyle(
+                            color: AppTheme.textMain,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
                         ),
                         const SizedBox(width: 6),
-                        const Icon(Icons.edit_calendar, size: 14, color: AppTheme.textMuted),
+                        Icon(
+                          Icons.edit_calendar,
+                          size: 14,
+                          color: AppTheme.textMuted,
+                        ),
                       ],
                     ),
                   ),
@@ -216,17 +267,34 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                 Expanded(
                   child: TextField(
                     onChanged: (val) => setState(() => _filtroTexto = val),
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    style: TextStyle(color: AppTheme.textMain, fontSize: 12),
                     decoration: InputDecoration(
-                      hintText: 'Buscar por código de ruta, chofer o cliente...',
-                      hintStyle: const TextStyle(color: AppTheme.textDim, fontSize: 11),
-                      prefixIcon: const Icon(Icons.search, size: 16, color: AppTheme.textMuted),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      hintText:
+                          'Buscar por código de ruta, chofer o cliente...',
+                      hintStyle: TextStyle(
+                        color: AppTheme.textDim,
+                        fontSize: 11,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        size: 16,
+                        color: AppTheme.textMuted,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       isDense: true,
                       filled: true,
                       fillColor: AppTheme.surfaceCard,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.border)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.border)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: AppTheme.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: AppTheme.border),
+                      ),
                     ),
                   ),
                 ),
@@ -235,15 +303,25 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                 // Botón de Orden Cronológico
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppTheme.border),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    side: BorderSide(color: AppTheme.border),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                   ),
-                  icon: Icon(_ordenAscendente ? Icons.arrow_upward : Icons.arrow_downward, size: 14, color: AppTheme.primaryLight),
+                  icon: Icon(
+                    _ordenAscendente
+                        ? Icons.arrow_upward
+                        : Icons.arrow_downward,
+                    size: 14,
+                    color: AppTheme.primaryLight,
+                  ),
                   label: Text(
                     _ordenAscendente ? 'Más antiguas 1°' : 'Más recientes 1°',
-                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                    style: TextStyle(color: AppTheme.textMain, fontSize: 11),
                   ),
-                  onPressed: () => setState(() => _ordenAscendente = !_ordenAscendente),
+                  onPressed: () =>
+                      setState(() => _ordenAscendente = !_ordenAscendente),
                 ),
               ],
             ),
@@ -260,17 +338,47 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildMetricStat('Rutas Totales', '$totalRutas', AppTheme.primaryLight, Icons.alt_route),
+                  _buildMetricStat(
+                    'Rutas Totales',
+                    '$totalRutas',
+                    AppTheme.primaryLight,
+                    Icons.alt_route,
+                  ),
                   _buildMetricDivider(),
-                  _buildMetricStat('Paradas Totales', '$totalParadas', Colors.white, Icons.pin_drop),
+                  _buildMetricStat(
+                    'Paradas Totales',
+                    '$totalParadas',
+                    Colors.white,
+                    Icons.pin_drop,
+                  ),
                   _buildMetricDivider(),
-                  _buildMetricStat('Entregas Exitosas', '$totalEntregadas', AppTheme.statusCompletada, Icons.check_circle),
+                  _buildMetricStat(
+                    'Entregas Exitosas',
+                    '$totalEntregadas',
+                    AppTheme.statusCompletada,
+                    Icons.check_circle,
+                  ),
                   _buildMetricDivider(),
-                  _buildMetricStat('En Curso', '$totalEnCurso', AppTheme.statusEnCurso, Icons.local_shipping),
+                  _buildMetricStat(
+                    'En Curso',
+                    '$totalEnCurso',
+                    AppTheme.statusEnCurso,
+                    Icons.local_shipping,
+                  ),
                   _buildMetricDivider(),
-                  _buildMetricStat('Canceladas', '$totalCanceladas', AppTheme.statusCancelada, Icons.cancel),
+                  _buildMetricStat(
+                    'Canceladas',
+                    '$totalCanceladas',
+                    AppTheme.statusCancelada,
+                    Icons.cancel,
+                  ),
                   _buildMetricDivider(),
-                  _buildMetricStat('Choferes Activos', '${choferesSet.length}', const Color(0xFF38BDF8), Icons.people),
+                  _buildMetricStat(
+                    'Choferes Activos',
+                    '${choferesSet.length}',
+                    AppTheme.primaryLight,
+                    Icons.people,
+                  ),
                 ],
               ),
             ),
@@ -283,16 +391,26 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.event_busy, size: 48, color: AppTheme.textDim),
+                          Icon(
+                            Icons.event_busy,
+                            size: 48,
+                            color: AppTheme.textDim,
+                          ),
                           const SizedBox(height: 10),
                           Text(
                             'No se encontraron rutas para el periodo ${_formatearRango(_rango)}.',
-                            style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                            style: TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 13,
+                            ),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
+                          Text(
                             'Intente ampliando el rango de fechas con el selector superior.',
-                            style: TextStyle(color: AppTheme.textDim, fontSize: 11),
+                            style: TextStyle(
+                              color: AppTheme.textDim,
+                              fontSize: 11,
+                            ),
                           ),
                         ],
                       ),
@@ -313,15 +431,21 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
               children: [
                 Text(
                   'Mostrando ${rutasFiltradas.length} hojas de ruta en orden cronológico.',
-                  style: const TextStyle(color: AppTheme.textDim, fontSize: 11),
+                  style: TextStyle(color: AppTheme.textDim, fontSize: 11),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.surfaceCard,
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 10,
+                    ),
                   ),
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cerrar Auditoría', style: TextStyle(color: Colors.white, fontSize: 12)),
+                  child: Text(
+                    'Cerrar Auditoría',
+                    style: TextStyle(color: AppTheme.textMain, fontSize: 12),
+                  ),
                 ),
               ],
             ),
@@ -331,7 +455,12 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
     );
   }
 
-  Widget _buildMetricStat(String label, String value, Color color, IconData icon) {
+  Widget _buildMetricStat(
+    String label,
+    String value,
+    Color color,
+    IconData icon,
+  ) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -341,8 +470,18 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: color)),
-            Text(label, style: const TextStyle(fontSize: 9.5, color: AppTheme.textMuted)),
+            Text(
+              value,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 15,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(fontSize: 9.5, color: AppTheme.textMuted),
+            ),
           ],
         ),
       ],
@@ -357,7 +496,9 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
     Color tagColor = AppTheme.statusPendiente;
     if (r.isEnCurso) tagColor = AppTheme.statusEnCurso;
     if (r.isCompletada) tagColor = AppTheme.statusCompletada;
-    if (r.estado == 'CANCELADA' || r.estado == 'CANCELADO') tagColor = AppTheme.statusCancelada;
+    if (r.estado == 'CANCELADA' || r.estado == 'CANCELADO') {
+      tagColor = AppTheme.statusCancelada;
+    }
 
     final fechaStr = r.fechaCreacion != null
         ? DateFormat('dd MMM yyyy, HH:mm').format(r.fechaCreacion!)
@@ -371,7 +512,9 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: isExpanded ? AppTheme.primaryLight : AppTheme.border),
+        border: Border.all(
+          color: isExpanded ? AppTheme.primaryLight : AppTheme.border,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -398,7 +541,9 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                     decoration: BoxDecoration(
                       color: tagColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: tagColor.withValues(alpha: 0.4)),
+                      border: Border.all(
+                        color: tagColor.withValues(alpha: 0.4),
+                      ),
                     ),
                     child: Icon(Icons.alt_route, color: tagColor, size: 20),
                   ),
@@ -411,32 +556,67 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                           children: [
                             Text(
                               r.codigoRuta,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: AppTheme.textMain,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: tagColor.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                                 border: Border.all(color: tagColor),
                               ),
-                              child: Text(r.estado, style: TextStyle(color: tagColor, fontSize: 9.5, fontWeight: FontWeight.bold)),
+                              child: Text(
+                                r.estado,
+                                style: TextStyle(
+                                  color: tagColor,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 3),
                         Row(
                           children: [
-                            const Icon(Icons.schedule, size: 12, color: AppTheme.textDim),
-                            const SizedBox(width: 4),
-                            Text(fechaStr, style: const TextStyle(color: AppTheme.textMuted, fontSize: 11)),
-                            const SizedBox(width: 14),
-                            const Icon(Icons.person, size: 12, color: AppTheme.textDim),
+                            Icon(
+                              Icons.schedule,
+                              size: 12,
+                              color: AppTheme.textDim,
+                            ),
                             const SizedBox(width: 4),
                             Text(
-                              r.choferNombre != null && r.choferNombre!.isNotEmpty ? r.choferNombre! : 'Sin chofer asignado',
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                              fechaStr,
+                              style: TextStyle(
+                                color: AppTheme.textMuted,
+                                fontSize: 11,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Icon(
+                              Icons.person,
+                              size: 12,
+                              color: AppTheme.textDim,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              r.choferNombre != null &&
+                                      r.choferNombre!.isNotEmpty
+                                  ? r.choferNombre!
+                                  : 'Sin chofer asignado',
+                              style: TextStyle(
+                                color: AppTheme.textMain,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
                         ),
@@ -451,7 +631,11 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                     children: [
                       Text(
                         '$entregadas / $total paradas (${(r.porcentajeAvance * 100).toStringAsFixed(0)}%)',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Colors.white),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11.5,
+                          color: AppTheme.textMain,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       SizedBox(
@@ -460,7 +644,7 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                           borderRadius: BorderRadius.circular(2),
                           child: LinearProgressIndicator(
                             value: total == 0 ? 0 : (entregadas / total),
-                            backgroundColor: const Color(0xFF0F172A),
+                            backgroundColor: AppTheme.surface,
                             color: tagColor,
                             minHeight: 4,
                           ),
@@ -470,7 +654,9 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                   ),
                   const SizedBox(width: 10),
                   Icon(
-                    isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    isExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
                     color: AppTheme.textMuted,
                   ),
                 ],
@@ -480,7 +666,7 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
 
           // Desglose de Paradas al expandirse
           if (isExpanded) ...[
-            const Divider(color: AppTheme.border, height: 1),
+            Divider(color: AppTheme.border, height: 1),
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -491,17 +677,30 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                     children: [
                       Text(
                         'Desglose Cronológico de Paradas (${r.paradas.length}):',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.primaryLight),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: AppTheme.primaryLight,
+                        ),
                       ),
                       if (widget.onVerEnMapa != null)
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primary,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             visualDensity: VisualDensity.compact,
                           ),
                           icon: const Icon(Icons.radar, size: 13),
-                          label: const Text('Ver en Monitoreo en Vivo', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          label: const Text(
+                            'Ver en Monitoreo en Vivo',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           onPressed: () {
                             Navigator.pop(context);
                             widget.onVerEnMapa!(r);
@@ -512,9 +711,12 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                   const SizedBox(height: 8),
 
                   if (r.paradas.isEmpty)
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Text('Esta ruta no registró paradas.', style: TextStyle(fontSize: 11, color: AppTheme.textDim)),
+                      child: Text(
+                        'Esta ruta no registró paradas.',
+                        style: TextStyle(fontSize: 11, color: AppTheme.textDim),
+                      ),
                     )
                   else
                     ...r.paradas.map((p) => _buildParadaAuditItem(p)),
@@ -552,7 +754,7 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
       decoration: BoxDecoration(
         color: const Color(0xFF131D2E),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFF1E293B)),
+        border: Border.all(color: AppTheme.surfaceCard),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -563,7 +765,14 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
               color: col.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(4),
             ),
-            child: Text('#${p.ordenParada}', style: TextStyle(color: col, fontWeight: FontWeight.bold, fontSize: 10.5)),
+            child: Text(
+              '#${p.ordenParada}',
+              style: TextStyle(
+                color: col,
+                fontWeight: FontWeight.bold,
+                fontSize: 10.5,
+              ),
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -574,13 +783,21 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                   children: [
                     Text(
                       p.pedido?.cliente ?? 'Cliente no registrado',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: AppTheme.textMain,
+                      ),
                     ),
                     if (horaEntregaStr != null) ...[
                       const SizedBox(width: 8),
                       Text(
                         '• Entregado a las $horaEntregaStr',
-                        style: const TextStyle(fontSize: 10, color: AppTheme.statusCompletada, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: AppTheme.statusCompletada,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ],
@@ -588,7 +805,7 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                 const SizedBox(height: 2),
                 Text(
                   p.pedido?.direccionTexto ?? 'Sin dirección',
-                  style: const TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+                  style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -596,7 +813,11 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                   const SizedBox(height: 2),
                   Text(
                     'Entregado: ${p.comentarios}',
-                    style: const TextStyle(fontSize: 10, color: AppTheme.primaryLight, fontStyle: FontStyle.italic),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppTheme.primaryLight,
+                      fontStyle: FontStyle.italic,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -612,7 +833,14 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
               borderRadius: BorderRadius.circular(4),
               border: Border.all(color: col.withValues(alpha: 0.4)),
             ),
-            child: Text(txt, style: TextStyle(color: col, fontSize: 9.5, fontWeight: FontWeight.bold)),
+            child: Text(
+              txt,
+              style: TextStyle(
+                color: col,
+                fontSize: 9.5,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
           if (p.isEntregado) ...[
             const SizedBox(width: 6),
@@ -629,12 +857,23 @@ class _AuditoriaHistoricoDialogState extends State<AuditoriaHistoricoDialog> {
                   color: AppTheme.statusCompletada.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.attachment, size: 10, color: AppTheme.statusCompletada),
+                    Icon(
+                      Icons.attachment,
+                      size: 10,
+                      color: AppTheme.statusCompletada,
+                    ),
                     SizedBox(width: 2),
-                    Text('e-PoD', style: TextStyle(color: AppTheme.statusCompletada, fontSize: 9, fontWeight: FontWeight.bold)),
+                    Text(
+                      'e-PoD',
+                      style: TextStyle(
+                        color: AppTheme.statusCompletada,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ),

@@ -56,7 +56,9 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
       if (!mounted) return;
       setState(() {
         _gps = res[0] as List<TelemetriaGps>;
-        _enCurso = (res[1] as List<Map<String, dynamic>>).where((r) => r['estado'] == 'EN_CURSO').toList();
+        _enCurso = (res[1] as List<Map<String, dynamic>>)
+            .where((r) => r['estado'] == 'EN_CURSO')
+            .toList();
         _error = null;
         _actualizado = DateTime.now();
       });
@@ -75,20 +77,28 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
     if (pts.length == 1) {
       _map.move(pts.first, 15);
     } else {
-      _map.fitCamera(CameraFit.coordinates(coordinates: pts, padding: const EdgeInsets.all(60)));
+      _map.fitCamera(
+        CameraFit.coordinates(
+          coordinates: pts,
+          padding: const EdgeInsets.all(60),
+        ),
+      );
     }
   }
 
   String _hace(int ts) {
     final ms = ts > 1e12 ? ts : ts * 1000;
-    final d = DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(ms));
+    final d = DateTime.now().difference(
+      DateTime.fromMillisecondsSinceEpoch(ms),
+    );
     if (d.inSeconds < 60) return 'hace ${math.max(0, d.inSeconds)} s';
     if (d.inMinutes < 60) return 'hace ${d.inMinutes} min';
     return 'hace ${d.inHours} h';
   }
 
-  Map<String, dynamic>? _rutaDe(TelemetriaGps t) =>
-      _enCurso.where((r) => r['choferId'] != null && r['choferId'] == t.choferId).firstOrNull;
+  Map<String, dynamic>? _rutaDe(TelemetriaGps t) => _enCurso
+      .where((r) => r['choferId'] != null && r['choferId'] == t.choferId)
+      .firstOrNull;
 
   String _avance(Map<String, dynamic> r) {
     final paradas = (r['paradas'] as List? ?? const []);
@@ -97,11 +107,16 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
 
   void _abrirRuta(Map<String, dynamic> r) => Navigator.push(
     context,
-    MaterialPageRoute(builder: (_) => RutaDetalle(rutaId: '${r['id']}', permisos: widget.permisos)),
+    MaterialPageRoute(
+      builder: (_) =>
+          RutaDetalle(rutaId: '${r['id']}', permisos: widget.permisos),
+    ),
   );
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Scaffold(
       body: Stack(
         children: [
@@ -109,7 +124,10 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
             mapController: _map,
             options: const MapOptions(initialCenter: _quito, initialZoom: 12),
             children: [
-              TileLayer(urlTemplate: mapaTiles, userAgentPackageName: mapaAgente),
+              TileLayer(
+                urlTemplate: mapaTiles,
+                userAgentPackageName: mapaAgente,
+              ),
               MarkerLayer(
                 markers: [
                   for (final t in _gps)
@@ -125,10 +143,19 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
                             decoration: BoxDecoration(
                               color: AppColors.primary,
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2.5),
-                              boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 8)],
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 2.5,
+                              ),
+                              boxShadow: const [
+                                BoxShadow(color: Colors.black45, blurRadius: 8),
+                              ],
                             ),
-                            child: const Icon(Icons.navigation, color: Colors.white, size: 22),
+                            child: const Icon(
+                              Icons.navigation,
+                              color: Colors.white,
+                              size: 22,
+                            ),
                           ),
                         ),
                       ),
@@ -160,7 +187,7 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
             maxChildSize: 0.75,
             snap: true,
             builder: (ctx, scroll) => Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                 boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 16)],
@@ -182,7 +209,10 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
                   const SizedBox(height: 12),
                   Text(
                     '${_gps.length} choferes transmitiendo · ${_enCurso.length} rutas en curso',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   if (_gps.isEmpty)
@@ -190,7 +220,9 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(Icons.gps_off),
                       title: Text('Sin señal GPS activa'),
-                      subtitle: Text('Los choferes aparecen al iniciar una ruta en la app.'),
+                      subtitle: Text(
+                        'Los choferes aparecen al iniciar una ruta en la app.',
+                      ),
                     ),
                   for (final t in _gps)
                     ListTile(
@@ -200,7 +232,7 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
                       subtitle: Text(
                         '${t.velocidadKmh.round()} km/h · ${_hace(t.timestamp)}'
                         '${_rutaDe(t) != null ? ' · ${_avance(_rutaDe(t)!)}' : ''}',
-                        style: const TextStyle(color: AppColors.textMuted),
+                        style: TextStyle(color: AppColors.textMuted),
                       ),
                       trailing: const Icon(Icons.my_location),
                       onTap: () => _map.move(LatLng(t.latitud, t.longitud), 16),
@@ -233,7 +265,11 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
       ),
       child: Row(
         children: [
-          Icon(Icons.circle, size: 10, color: enVivo ? AppColors.success : AppColors.danger),
+          Icon(
+            Icons.circle,
+            size: 10,
+            color: enVivo ? AppColors.success : AppColors.danger,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -265,11 +301,22 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
             children: [
               Text(
                 t.choferNombre ?? 'Chofer',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               const SizedBox(height: 8),
-              DatoFila('Velocidad', '${t.velocidadKmh.round()} km/h', icono: Icons.speed),
-              DatoFila('Última señal', _hace(t.timestamp), icono: Icons.access_time),
+              DatoFila(
+                'Velocidad',
+                '${t.velocidadKmh.round()} km/h',
+                icono: Icons.speed,
+              ),
+              DatoFila(
+                'Última señal',
+                _hace(t.timestamp),
+                icono: Icons.access_time,
+              ),
               DatoFila(
                 'Posición',
                 '${t.latitud.toStringAsFixed(5)}, ${t.longitud.toStringAsFixed(5)}',

@@ -34,10 +34,12 @@ class _HomeShellState extends State<HomeShell> {
 
   late final List<Modulo> _modulos = widget.sesion.modulos;
   late final bool _conMas = _modulos.length > _maxPestanas;
-  late final List<Modulo> _principales =
-      _conMas ? _modulos.take(_maxPestanas - 1).toList() : _modulos;
-  late final List<Modulo> _extra =
-      _conMas ? _modulos.skip(_maxPestanas - 1).toList() : const [];
+  late final List<Modulo> _principales = _conMas
+      ? _modulos.take(_maxPestanas - 1).toList()
+      : _modulos;
+  late final List<Modulo> _extra = _conMas
+      ? _modulos.skip(_maxPestanas - 1).toList()
+      : const [];
 
   int _indice = 0;
 
@@ -117,6 +119,8 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return PopScope(
       canPop: _indice == 0,
       onPopInvokedWithResult: (didPop, _) {
@@ -177,6 +181,8 @@ class _MasScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Scaffold(
       appBar: AppBar(title: const Text('Más')),
       body: ListView(
@@ -189,7 +195,10 @@ class _MasScreen extends StatelessWidget {
                 for (final m in modulos)
                   ListTile(
                     leading: Icon(m.iconoActivo, color: AppColors.primaryLight),
-                    title: Text(m.etiqueta, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(
+                      m.etiqueta,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => onAbrir(m),
                   ),
@@ -200,7 +209,10 @@ class _MasScreen extends StatelessWidget {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: _PerfilContenido(sesion: sesion, onCerrarSesion: onCerrarSesion),
+              child: _PerfilContenido(
+                sesion: sesion,
+                onCerrarSesion: onCerrarSesion,
+              ),
             ),
           ),
         ],
@@ -216,8 +228,11 @@ class _PerfilContenido extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final u = sesion.usuario;
-    final servidor = Uri.tryParse(ApiService.baseUrl)?.authority ?? ApiService.baseUrl;
+    final servidor =
+        Uri.tryParse(ApiService.baseUrl)?.authority ?? ApiService.baseUrl;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -230,8 +245,17 @@ class _PerfilContenido extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(u.fullName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                  Text(u.identification, style: const TextStyle(color: AppColors.textMuted)),
+                  Text(
+                    u.fullName,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    u.identification,
+                    style: TextStyle(color: AppColors.textMuted),
+                  ),
                 ],
               ),
             ),
@@ -251,14 +275,17 @@ class _PerfilContenido extends StatelessWidget {
         DatoFila('Servidor', servidor, icono: Icons.dns_outlined),
         const SizedBox(height: 12),
         OutlinedButton.icon(
-          onPressed: () => cambiarMiClave(context, alTerminar: () async {
-            await Sesion.cerrar();
-            if (!context.mounted) return;
-            Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-              (_) => false,
-            );
-          }),
+          onPressed: () => cambiarMiClave(
+            context,
+            alTerminar: () async {
+              await Sesion.cerrar();
+              if (!context.mounted) return;
+              Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (_) => false,
+              );
+            },
+          ),
           icon: const Icon(Icons.key_outlined),
           label: const Text('Cambiar mi contraseña'),
         ),

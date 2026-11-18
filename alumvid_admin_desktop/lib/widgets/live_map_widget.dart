@@ -61,6 +61,8 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     // Recopilar paradas a mostrar
     final List<Despacho> paradasAMostrar = [];
     if (widget.rutaSeleccionada != null) {
@@ -98,19 +100,22 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
                   .where((p) => p.pedido != null)
                   .map(
                     (p) => CircleMarker(
-                      point: LatLng(p.pedido!.latitudDestino, p.pedido!.longitudDestino),
+                      point: LatLng(
+                        p.pedido!.latitudDestino,
+                        p.pedido!.longitudDestino,
+                      ),
                       radius: 35, // Representación de tolerancia espacial
                       useRadiusInMeter: false,
                       color: p.isEntregado
                           ? AppTheme.statusCompletada.withValues(alpha: 0.15)
                           : p.hasAlertaDesviacion
-                              ? AppTheme.statusAlerta.withValues(alpha: 0.25)
-                              : AppTheme.primaryLight.withValues(alpha: 0.15),
+                          ? AppTheme.statusAlerta.withValues(alpha: 0.25)
+                          : AppTheme.primaryLight.withValues(alpha: 0.15),
                       borderColor: p.isEntregado
                           ? AppTheme.statusCompletada.withValues(alpha: 0.6)
                           : p.hasAlertaDesviacion
-                              ? AppTheme.statusAlerta
-                              : AppTheme.primaryLight.withValues(alpha: 0.6),
+                          ? AppTheme.statusAlerta
+                          : AppTheme.primaryLight.withValues(alpha: 0.6),
                       borderStrokeWidth: 1.5,
                     ),
                   )
@@ -141,14 +146,25 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
                     message: 'Bodega Central AlumVid (Quito)',
                     child: Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
+                        color: AppTheme.surfaceCard,
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF38BDF8), width: 2),
+                        border: Border.all(
+                          color: AppTheme.primaryLight,
+                          width: 2,
+                        ),
                         boxShadow: const [
-                          BoxShadow(color: Colors.black87, blurRadius: 8, offset: Offset(0, 3)),
+                          BoxShadow(
+                            color: Colors.black87,
+                            blurRadius: 8,
+                            offset: Offset(0, 3),
+                          ),
                         ],
                       ),
-                      child: const Icon(Icons.warehouse, color: Color(0xFF38BDF8), size: 26),
+                      child: Icon(
+                        Icons.warehouse,
+                        color: AppTheme.primaryLight,
+                        size: 26,
+                      ),
                     ),
                   ),
                 ),
@@ -180,16 +196,24 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
                         widget.onParadaTap?.call(parada);
                       },
                       child: Tooltip(
-                        message: 'Parada #${parada.ordenParada}: ${ped.cliente} (${parada.estado})',
+                        message:
+                            'Parada #${parada.ordenParada}: ${ped.cliente} (${parada.estado})',
                         child: Column(
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
                                 color: badgeColor,
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: const [
-                                  BoxShadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 2)),
+                                  BoxShadow(
+                                    color: Colors.black54,
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
                                 ],
                               ),
                               child: Row(
@@ -197,18 +221,26 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
                                 children: [
                                   Text(
                                     '#${parada.ordenParada}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: AppTheme.textMain,
                                       fontWeight: FontWeight.w900,
                                       fontSize: 11,
                                     ),
                                   ),
                                   const SizedBox(width: 2),
-                                  Icon(iconData, color: Colors.white, size: 12),
+                                  Icon(
+                                    iconData,
+                                    color: AppTheme.textMain,
+                                    size: 12,
+                                  ),
                                 ],
                               ),
                             ),
-                            Icon(Icons.arrow_drop_down, color: badgeColor, size: 18),
+                            Icon(
+                              Icons.arrow_drop_down,
+                              color: badgeColor,
+                              size: 18,
+                            ),
                           ],
                         ),
                       ),
@@ -219,8 +251,11 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
                 // Marcadores de Choferes en tiempo real (filtrados por unicidad y acotados a zona operativa Quito)
                 ...{
                   for (final tel in widget.telemetriaChoferes.values)
-                    if (tel.latitud > -0.5 && tel.latitud < 0.2 && tel.longitud > -78.8 && tel.longitud < -78.2)
-                      (tel.choferId ?? tel.choferNombre ?? 'chofer'): tel
+                    if (tel.latitud > -0.5 &&
+                        tel.latitud < 0.2 &&
+                        tel.longitud > -78.8 &&
+                        tel.longitud < -78.2)
+                      (tel.choferId ?? tel.choferNombre ?? 'chofer'): tel,
                 }.values.map((tel) {
                   final pos = LatLng(tel.latitud, tel.longitud);
                   return Marker(
@@ -228,19 +263,27 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
                     width: 70,
                     height: 60,
                     child: Tooltip(
-                      message: '${tel.choferNombre ?? "Chofer"} • ${tel.velocidadKmh.toStringAsFixed(0)} km/h',
+                      message:
+                          '${tel.choferNombre ?? "Chofer"} • ${tel.velocidadKmh.toStringAsFixed(0)} km/h',
                       child: Column(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0F172A).withValues(alpha: 0.9),
+                              color: AppTheme.surface.withValues(alpha: 0.9),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: AppTheme.statusEnCurso),
                             ),
                             child: Text(
                               tel.choferNombre ?? 'Chofer',
-                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: AppTheme.textMain,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -250,14 +293,22 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
                             angle: tel.rumbo * (3.141592653589793 / 180.0),
                             child: Container(
                               padding: const EdgeInsets.all(5),
-                              decoration: const BoxDecoration(
+                              decoration: BoxDecoration(
                                 color: AppTheme.statusEnCurso,
                                 shape: BoxShape.circle,
                                 boxShadow: [
-                                  BoxShadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 2)),
+                                  BoxShadow(
+                                    color: Colors.black87,
+                                    blurRadius: 6,
+                                    offset: Offset(0, 2),
+                                  ),
                                 ],
                               ),
-                              child: const Icon(Icons.navigation, color: Colors.white, size: 18),
+                              child: Icon(
+                                Icons.navigation,
+                                color: AppTheme.textMain,
+                                size: 18,
+                              ),
                             ),
                           ),
                         ],
@@ -281,7 +332,11 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppTheme.border),
               boxShadow: const [
-                BoxShadow(color: Colors.black45, blurRadius: 8, offset: Offset(0, 2)),
+                BoxShadow(
+                  color: Colors.black45,
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
               ],
             ),
             child: Row(
@@ -308,7 +363,10 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
                 icon: Icons.add,
                 tooltip: 'Acercar zoom',
                 onPressed: () {
-                  _mapController.move(_mapController.camera.center, _mapController.camera.zoom + 1);
+                  _mapController.move(
+                    _mapController.camera.center,
+                    _mapController.camera.zoom + 1,
+                  );
                 },
               ),
               const SizedBox(height: 8),
@@ -316,7 +374,10 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
                 icon: Icons.remove,
                 tooltip: 'Alejar zoom',
                 onPressed: () {
-                  _mapController.move(_mapController.camera.center, _mapController.camera.zoom - 1);
+                  _mapController.move(
+                    _mapController.camera.center,
+                    _mapController.camera.zoom - 1,
+                  );
                 },
               ),
               const SizedBox(height: 8),
@@ -332,9 +393,14 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
                   icon: Icons.navigation,
                   tooltip: 'Centrar en Chofer Activo',
                   onPressed: () {
-                    final choferesValidos = widget.telemetriaChoferes.values.where(
-                      (t) => t.latitud > -0.5 && t.latitud < 0.2 && t.longitud > -78.8 && t.longitud < -78.2,
-                    );
+                    final choferesValidos = widget.telemetriaChoferes.values
+                        .where(
+                          (t) =>
+                              t.latitud > -0.5 &&
+                              t.latitud < 0.2 &&
+                              t.longitud > -78.8 &&
+                              t.longitud < -78.2,
+                        );
                     if (choferesValidos.isNotEmpty) {
                       final c = choferesValidos.first;
                       enfocarCoordenada(LatLng(c.latitud, c.longitud), 15.0);
@@ -357,9 +423,15 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
               decoration: BoxDecoration(
                 color: AppTheme.surface.withValues(alpha: 0.95),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.5)),
+                border: Border.all(
+                  color: AppTheme.primaryLight.withValues(alpha: 0.5),
+                ),
                 boxShadow: const [
-                  BoxShadow(color: Colors.black54, blurRadius: 8, offset: Offset(0, 2)),
+                  BoxShadow(
+                    color: Colors.black54,
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
                 ],
               ),
               child: Row(
@@ -369,48 +441,74 @@ class LiveMapWidgetState extends State<LiveMapWidget> {
                     width: 10,
                     height: 10,
                     decoration: BoxDecoration(
-                      color: widget.rutaSeleccionada!.isEnCurso ? AppTheme.statusEnCurso : AppTheme.statusPendiente,
+                      color: widget.rutaSeleccionada!.isEnCurso
+                          ? AppTheme.statusEnCurso
+                          : AppTheme.statusPendiente,
                       shape: BoxShape.circle,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Text(
                     'Visualizando: ${widget.rutaSeleccionada!.codigoRuta} (${widget.rutaSeleccionada!.estado})',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: AppTheme.textMain,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Text(
                     '• Chofer: ${widget.rutaSeleccionada!.choferNombre ?? "Sin asignar"}',
-                    style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
                   ),
                   Builder(
                     builder: (context) {
                       final tel = widget.rutaSeleccionada?.choferId != null
-                          ? widget.telemetriaChoferes[widget.rutaSeleccionada!.choferId!]
+                          ? widget.telemetriaChoferes[widget
+                                .rutaSeleccionada!
+                                .choferId!]
                           : (widget.rutaSeleccionada?.choferNombre != null
-                              ? widget.telemetriaChoferes[widget.rutaSeleccionada!.choferNombre!]
-                              : null);
+                                ? widget.telemetriaChoferes[widget
+                                      .rutaSeleccionada!
+                                      .choferNombre!]
+                                : null);
                       if (tel == null) return const SizedBox.shrink();
 
                       return Padding(
                         padding: const EdgeInsets.only(left: 10),
                         child: InkWell(
-                          onTap: () => enfocarCoordenada(LatLng(tel.latitud, tel.longitud), 15.0),
+                          onTap: () => enfocarCoordenada(
+                            LatLng(tel.latitud, tel.longitud),
+                            15.0,
+                          ),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
-                              color: AppTheme.statusEnCurso.withValues(alpha: 0.2),
+                              color: AppTheme.statusEnCurso.withValues(
+                                alpha: 0.2,
+                              ),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: AppTheme.statusEnCurso),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.gps_fixed, size: 12, color: AppTheme.statusEnCurso),
+                                Icon(
+                                  Icons.gps_fixed,
+                                  size: 12,
+                                  color: AppTheme.statusEnCurso,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'GPS En Vivo • ${tel.velocidadKmh.toStringAsFixed(0)} km/h',
-                                  style: const TextStyle(color: AppTheme.statusEnCurso, fontSize: 11, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    color: AppTheme.statusEnCurso,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ],
                             ),

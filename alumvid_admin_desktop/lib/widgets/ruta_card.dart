@@ -38,6 +38,8 @@ class RutaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final statusColor = _getStatusColor();
 
     return Card(
@@ -49,7 +51,7 @@ class RutaCard extends StatelessWidget {
           width: isSelected ? 2.0 : 1.0,
         ),
       ),
-      color: isSelected ? const Color(0xFF1E293B) : AppTheme.surface,
+      color: isSelected ? AppTheme.surfaceCard : AppTheme.surface,
       child: InkWell(
         onTap: onSelect,
         borderRadius: BorderRadius.circular(12),
@@ -74,8 +76,8 @@ class RutaCard extends StatelessWidget {
                           ruta.isEnCurso
                               ? Icons.local_shipping
                               : ruta.isCompletada
-                                  ? Icons.task_alt
-                                  : Icons.alt_route,
+                              ? Icons.task_alt
+                              : Icons.alt_route,
                           color: statusColor,
                           size: 18,
                         ),
@@ -83,8 +85,8 @@ class RutaCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(
                         ruta.codigoRuta,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: AppTheme.textMain,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -92,11 +94,16 @@ class RutaCard extends StatelessWidget {
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: statusColor.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: statusColor.withValues(alpha: 0.5)),
+                      border: Border.all(
+                        color: statusColor.withValues(alpha: 0.5),
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -131,7 +138,7 @@ class RutaCard extends StatelessWidget {
               // Información del Chofer
               Row(
                 children: [
-                  const Icon(Icons.person, color: AppTheme.textMuted, size: 14),
+                  Icon(Icons.person, color: AppTheme.textMuted, size: 14),
                   const SizedBox(width: 5),
                   Expanded(
                     child: Text(
@@ -139,7 +146,9 @@ class RutaCard extends StatelessWidget {
                           ? ruta.choferNombre!
                           : 'Sin chofer asignado',
                       style: TextStyle(
-                        color: ruta.choferNombre != null ? AppTheme.textMain : AppTheme.statusAlerta,
+                        color: ruta.choferNombre != null
+                            ? AppTheme.textMain
+                            : AppTheme.statusAlerta,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -147,10 +156,11 @@ class RutaCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (ruta.choferTelefono != null && ruta.choferTelefono!.isNotEmpty)
+                  if (ruta.choferTelefono != null &&
+                      ruta.choferTelefono!.isNotEmpty)
                     Text(
                       '(${ruta.choferTelefono})',
-                      style: const TextStyle(color: AppTheme.textDim, fontSize: 11),
+                      style: TextStyle(color: AppTheme.textDim, fontSize: 11),
                     ),
                 ],
               ),
@@ -166,12 +176,17 @@ class RutaCard extends StatelessWidget {
                     children: [
                       Text(
                         'Paradas: ${ruta.paradasEntregadas} de ${ruta.totalParadas} completadas',
-                        style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                        style: TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 11,
+                        ),
                       ),
                       Text(
                         '${(ruta.porcentajeAvance * 100).toInt()}%',
                         style: TextStyle(
-                          color: ruta.isCompletada ? AppTheme.statusCompletada : AppTheme.primaryLight,
+                          color: ruta.isCompletada
+                              ? AppTheme.statusCompletada
+                              : AppTheme.primaryLight,
                           fontWeight: FontWeight.bold,
                           fontSize: 11,
                         ),
@@ -183,9 +198,11 @@ class RutaCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: ruta.porcentajeAvance,
-                      backgroundColor: const Color(0xFF0F172A),
+                      backgroundColor: AppTheme.surface,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        ruta.isCompletada ? AppTheme.statusCompletada : AppTheme.primaryLight,
+                        ruta.isCompletada
+                            ? AppTheme.statusCompletada
+                            : AppTheme.primaryLight,
                       ),
                       minHeight: 6,
                     ),
@@ -202,24 +219,45 @@ class RutaCard extends StatelessWidget {
                   // Botón Agregar Parada
                   TextButton.icon(
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       visualDensity: VisualDensity.compact,
                     ),
-                    icon: const Icon(Icons.edit_location_alt_outlined, size: 14, color: AppTheme.primaryLight),
-                    label: const Text('Gestionar paradas', style: TextStyle(fontSize: 11, color: AppTheme.primaryLight)),
+                    icon: Icon(
+                      Icons.edit_location_alt_outlined,
+                      size: 14,
+                      color: AppTheme.primaryLight,
+                    ),
+                    label: Text(
+                      'Gestionar paradas',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.primaryLight,
+                      ),
+                    ),
                     onPressed: onAgregarParada,
                   ),
-
-
 
                   // Botón Reasignar Chofer
                   TextButton.icon(
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       visualDensity: VisualDensity.compact,
                     ),
-                    icon: const Icon(Icons.swap_horiz, size: 14, color: AppTheme.textMuted),
-                    label: const Text('Chofer', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                    icon: Icon(
+                      Icons.swap_horiz,
+                      size: 14,
+                      color: AppTheme.textMuted,
+                    ),
+                    label: Text(
+                      'Chofer',
+                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                    ),
                     onPressed: onReasignarChofer,
                   ),
 
@@ -228,22 +266,37 @@ class RutaCard extends StatelessWidget {
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.statusEnCurso,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         visualDensity: VisualDensity.compact,
                       ),
                       onPressed: onIniciar,
-                      child: const Text('Iniciar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Iniciar',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     )
                   else if (ruta.isEnCurso)
                     OutlinedButton(
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppTheme.statusAlerta,
-                        side: const BorderSide(color: AppTheme.statusAlerta),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        side: BorderSide(color: AppTheme.statusAlerta),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         visualDensity: VisualDensity.compact,
                       ),
                       onPressed: onCancelar,
-                      child: const Text('Cancelar', style: TextStyle(fontSize: 10)),
+                      child: const Text(
+                        'Cancelar',
+                        style: TextStyle(fontSize: 10),
+                      ),
                     ),
                 ],
               ),

@@ -46,7 +46,10 @@ class Despacho {
   String get direccionTexto => pedido?.direccionTexto ?? 'Dirección de entrega';
   double get latitud => latitudEntrega ?? pedido?.latitudDestino ?? -0.1807;
   double get longitud => longitudEntrega ?? pedido?.longitudDestino ?? -78.4678;
-  bool get isNoEntregado => estado == 'CANCELADA' || estado == 'CANCELADO' || estado == 'NO_ENTREGADO';
+  bool get isNoEntregado =>
+      estado == 'CANCELADA' ||
+      estado == 'CANCELADO' ||
+      estado == 'NO_ENTREGADO';
 
   factory Despacho.fromJson(Map<String, dynamic> json) {
     return Despacho(
@@ -55,9 +58,15 @@ class Despacho {
       ordenParada: (json['ordenParada'] as num?)?.toInt() ?? 1,
       pedido: json['pedido'] != null ? Pedido.fromJson(json['pedido']) : null,
       chofer: json['chofer'] != null ? Chofer.fromJson(json['chofer']) : null,
-      fechaAsignacion: json['fechaAsignacion'] != null ? DateTime.tryParse(json['fechaAsignacion'].toString()) : null,
-      fechaInicioRuta: json['fechaInicioRuta'] != null ? DateTime.tryParse(json['fechaInicioRuta'].toString()) : null,
-      fechaEntrega: json['fechaEntrega'] != null ? DateTime.tryParse(json['fechaEntrega'].toString()) : null,
+      fechaAsignacion: json['fechaAsignacion'] != null
+          ? DateTime.tryParse(json['fechaAsignacion'].toString())
+          : null,
+      fechaInicioRuta: json['fechaInicioRuta'] != null
+          ? DateTime.tryParse(json['fechaInicioRuta'].toString())
+          : null,
+      fechaEntrega: json['fechaEntrega'] != null
+          ? DateTime.tryParse(json['fechaEntrega'].toString())
+          : null,
       fotoPodUrl: json['fotoPodUrl']?.toString(),
       firmaUrl: json['firmaUrl']?.toString(),
       latitudEntrega: (json['latitudEntrega'] as num?)?.toDouble(),

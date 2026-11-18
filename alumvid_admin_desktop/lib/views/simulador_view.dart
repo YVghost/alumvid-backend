@@ -61,7 +61,9 @@ class _SimuladorViewState extends State<SimuladorView> {
   bool _fotoCapturada = false;
   String _fotoTimestamp = '';
   final List<Offset?> _puntosFirma = [];
-  final TextEditingController _comentariosPodCtrl = TextEditingController(text: 'Material recibido conforme y verificado en obra.');
+  final TextEditingController _comentariosPodCtrl = TextEditingController(
+    text: 'Material recibido conforme y verificado en obra.',
+  );
   bool _enviandoEpod = false;
 
   // Datos para vista Bodeguero
@@ -75,8 +77,6 @@ class _SimuladorViewState extends State<SimuladorView> {
   bool _cargandoVentas = false;
   final _metrosCotizarCtrl = TextEditingController(text: '3.0');
   Producto? _productoCotizar;
-
-
 
   @override
   void initState() {
@@ -110,7 +110,9 @@ class _SimuladorViewState extends State<SimuladorView> {
           _usuarioSeleccionado = choferUser;
           _rolActivo = choferUser.roles.contains('CHOFER')
               ? 'CHOFER'
-              : (choferUser.roles.isNotEmpty ? choferUser.roles.first : 'CHOFER');
+              : (choferUser.roles.isNotEmpty
+                    ? choferUser.roles.first
+                    : 'CHOFER');
         }
       });
     } catch (e) {
@@ -166,8 +168,15 @@ class _SimuladorViewState extends State<SimuladorView> {
 
     final asignadas = widget.rutas.where((r) {
       if (r.choferId != null && r.choferId == uId) return true;
-      if (r.choferNombre != null && r.choferNombre!.toLowerCase().contains(uName)) return true;
-      if (widget.choferes.any((c) => c.nombre.toLowerCase().contains(uName) && r.choferId == c.id)) return true;
+      if (r.choferNombre != null &&
+          r.choferNombre!.toLowerCase().contains(uName)) {
+        return true;
+      }
+      if (widget.choferes.any(
+        (c) => c.nombre.toLowerCase().contains(uName) && r.choferId == c.id,
+      )) {
+        return true;
+      }
       return false;
     }).toList();
 
@@ -191,8 +200,14 @@ class _SimuladorViewState extends State<SimuladorView> {
     final destino = LatLng(p.latitud, p.longitud);
     final List<LatLng> camino = [
       const LatLng(-0.089290, -78.439607), // Inicio Bodega
-      LatLng((-0.089290 + destino.latitude) * 0.7, (-78.439607 + destino.longitude) * 0.7),
-      LatLng((-0.089290 + destino.latitude) * 0.4, (-78.439607 + destino.longitude) * 0.4),
+      LatLng(
+        (-0.089290 + destino.latitude) * 0.7,
+        (-78.439607 + destino.longitude) * 0.7,
+      ),
+      LatLng(
+        (-0.089290 + destino.latitude) * 0.4,
+        (-78.439607 + destino.longitude) * 0.4,
+      ),
       destino,
     ];
 
@@ -280,38 +295,74 @@ class _SimuladorViewState extends State<SimuladorView> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDState) => AlertDialog(
-          backgroundColor: const Color(0xFF101728),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: Color(0xFF1E293B))),
-          title: const Row(
+          backgroundColor: AppTheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: AppTheme.surfaceCard),
+          ),
+          title: Row(
             children: [
-              Icon(Icons.report_problem_rounded, color: Color(0xFFEF4444), size: 20),
+              Icon(
+                Icons.report_problem_rounded,
+                color: Color(0xFFEF4444),
+                size: 20,
+              ),
               SizedBox(width: 8),
-              Text('Marcar Parada como Fallida', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+              Text(
+                'Marcar Parada como Fallida',
+                style: TextStyle(
+                  color: AppTheme.textMain,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Parada: ${p.cliente} (${p.direccionTexto})', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+              Text(
+                'Parada: ${p.cliente} (${p.direccionTexto})',
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+              ),
               const SizedBox(height: 14),
-              const Text('Seleccione el motivo del fallo en la entrega:', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+              Text(
+                'Seleccione el motivo del fallo en la entrega:',
+                style: TextStyle(
+                  color: AppTheme.textMain,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 key: ValueKey('motivo_$motivo'),
                 initialValue: motivo,
-                dropdownColor: const Color(0xFF0F172A),
-                style: const TextStyle(color: Colors.white, fontSize: 12),
+                dropdownColor: AppTheme.surface,
+                style: TextStyle(color: AppTheme.textMain, fontSize: 12),
                 decoration: const InputDecoration(isDense: true),
-                items: motivos.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                onChanged: (val) => setDState(() => motivo = val ?? motivos.first),
+                items: motivos
+                    .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                    .toList(),
+                onChanged: (val) =>
+                    setDState(() => motivo = val ?? motivos.first),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar', style: TextStyle(color: Color(0xFF94A3B8)))),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(color: AppTheme.textMuted),
+              ),
+            ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+              ),
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('Confirmar Fallida'),
             ),
@@ -324,7 +375,10 @@ class _SimuladorViewState extends State<SimuladorView> {
       try {
         await ApiService.cancelarDespacho(p.id, motivo);
         if (!mounted) return;
-        AppToast.info(context, 'Parada marcada como no entregada (Fallida: $motivo)');
+        AppToast.info(
+          context,
+          'Parada marcada como no entregada (Fallida: $motivo)',
+        );
         widget.onRefresh();
         setState(() {});
       } catch (e) {
@@ -338,7 +392,10 @@ class _SimuladorViewState extends State<SimuladorView> {
     try {
       await ApiService.reintentarParada(p.id);
       if (!mounted) return;
-      AppToast.success(context, 'Parada reactivada para un nuevo intento de entrega.');
+      AppToast.success(
+        context,
+        'Parada reactivada para un nuevo intento de entrega.',
+      );
       widget.onRefresh();
       setState(() {});
     } catch (e) {
@@ -349,9 +406,16 @@ class _SimuladorViewState extends State<SimuladorView> {
 
   Future<void> _optimizarRutaChofer(Ruta r) async {
     try {
-      await ApiService.optimizarRutaChofer(r.id, latitud: _posicionVehiculo.latitude, longitud: _posicionVehiculo.longitude);
+      await ApiService.optimizarRutaChofer(
+        r.id,
+        latitud: _posicionVehiculo.latitude,
+        longitud: _posicionVehiculo.longitude,
+      );
       if (!mounted) return;
-      AppToast.success(context, 'Paradas optimizadas por menor tiempo de viaje.');
+      AppToast.success(
+        context,
+        'Paradas optimizadas por menor tiempo de viaje.',
+      );
       widget.onRefresh();
     } catch (e) {
       if (!mounted) return;
@@ -364,7 +428,10 @@ class _SimuladorViewState extends State<SimuladorView> {
       _fotoCapturada = true;
       _fotoTimestamp = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
     });
-    AppToast.success(context, 'Fotografía satelital con marca de agua capturada.');
+    AppToast.success(
+      context,
+      'Fotografía satelital con marca de agua capturada.',
+    );
   }
 
   Future<void> _finalizarEntregaEpod() async {
@@ -376,7 +443,10 @@ class _SimuladorViewState extends State<SimuladorView> {
     }
 
     if (_puntosFirma.isEmpty) {
-      AppToast.error(context, 'El cliente receptor debe firmar en el recuadro digital.');
+      AppToast.error(
+        context,
+        'El cliente receptor debe firmar en el recuadro digital.',
+      );
       return;
     }
 
@@ -392,8 +462,10 @@ class _SimuladorViewState extends State<SimuladorView> {
       finalLon = -78.4350;
     }
 
-    final fotoBase64 = 'data:image/jpeg;base64,AlumVid_ePoD_Watermark_${DateTime.now().millisecondsSinceEpoch}';
-    final firmaBase64 = 'data:image/png;base64,AlumVid_Signature_${DateTime.now().millisecondsSinceEpoch}';
+    final fotoBase64 =
+        'data:image/jpeg;base64,AlumVid_ePoD_Watermark_${DateTime.now().millisecondsSinceEpoch}';
+    final firmaBase64 =
+        'data:image/png;base64,AlumVid_Signature_${DateTime.now().millisecondsSinceEpoch}';
 
     try {
       final res = await ApiService.cerrarEntrega(
@@ -414,9 +486,15 @@ class _SimuladorViewState extends State<SimuladorView> {
       });
 
       if (res.hasAlertaDesviacion) {
-        AppToast.error(context, 'Entrega documentada con ALERTA: Desvío de ${res.desviacionMetros?.round() ?? 0}m detectado por PostGIS.');
+        AppToast.error(
+          context,
+          'Entrega documentada con ALERTA: Desvío de ${res.desviacionMetros?.round() ?? 0}m detectado por PostGIS.',
+        );
       } else {
-        AppToast.success(context, '¡Entrega cerrada exitosamente con prueba documental e-PoD!');
+        AppToast.success(
+          context,
+          '¡Entrega cerrada exitosamente con prueba documental e-PoD!',
+        );
       }
 
       widget.onRefresh();
@@ -429,6 +507,8 @@ class _SimuladorViewState extends State<SimuladorView> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Container(
       color: const Color(0xFF070B14),
       child: SingleChildScrollView(
@@ -440,25 +520,32 @@ class _SimuladorViewState extends State<SimuladorView> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Simulador de Dispositivo Móvil AlumVid',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: AppTheme.textMain,
+                      ),
                     ),
                     SizedBox(height: 2),
                     Text(
                       'Prueba la experiencia móvil interactiva de cualquier cuenta de empleado de la empresa en tiempo real.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                      style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                     ),
                   ],
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E293B),
-                    foregroundColor: const Color(0xFF38BDF8),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    backgroundColor: AppTheme.surfaceCard,
+                    foregroundColor: AppTheme.primaryLight,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                   ),
                   icon: const Icon(Icons.refresh_rounded, size: 16),
                   label: const Text('Actualizar Datos'),
@@ -516,34 +603,54 @@ class _SimuladorViewState extends State<SimuladorView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.person_pin_rounded, color: Color(0xFF38BDF8), size: 18),
+              Icon(
+                Icons.person_pin_rounded,
+                color: AppTheme.primaryLight,
+                size: 18,
+              ),
               SizedBox(width: 8),
               Text(
                 'Seleccionar Cuenta de Empleado a Simular',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: AppTheme.textMain,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Elige a cualquier colaborador de la empresa para ver y utilizar la aplicación móvil tal como aparece en su teléfono.',
-            style: TextStyle(fontSize: 11, color: AppTheme.textMuted, height: 1.3),
+            style: TextStyle(
+              fontSize: 11,
+              color: AppTheme.textMuted,
+              height: 1.3,
+            ),
           ),
-          const Divider(color: AppTheme.border, height: 20),
+          Divider(color: AppTheme.border, height: 20),
 
           if (_cargandoUsuarios)
-            const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()))
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator(),
+              ),
+            )
           else if (_usuarios.isEmpty)
-            const Text('No se encontraron usuarios registrados.', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12))
+            const Text(
+              'No se encontraron usuarios registrados.',
+              style: TextStyle(color: Color(0xFFEF4444), fontSize: 12),
+            )
           else ...[
             DropdownButtonFormField<AppUser>(
               key: ValueKey('user_sel_${_usuarioSeleccionado?.id}'),
               initialValue: _usuarioSeleccionado,
               isExpanded: true,
               dropdownColor: AppTheme.surfaceCard,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
+              style: TextStyle(color: AppTheme.textMain, fontSize: 13),
               decoration: const InputDecoration(
                 labelText: 'Usuario / Colaborador Autenticado',
                 isDense: true,
@@ -585,9 +692,9 @@ class _SimuladorViewState extends State<SimuladorView> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF090E1A),
+                  color: AppTheme.background,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF1E293B)),
+                  border: Border.all(color: AppTheme.surfaceCard),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -596,10 +703,19 @@ class _SimuladorViewState extends State<SimuladorView> {
                       children: [
                         CircleAvatar(
                           radius: 16,
-                          backgroundColor: const Color(0xFF1D72FE).withValues(alpha: 0.2),
+                          backgroundColor: AppTheme.primary.withValues(
+                            alpha: 0.2,
+                          ),
                           child: Text(
-                            _usuarioSeleccionado!.fullName.isNotEmpty ? _usuarioSeleccionado!.fullName[0].toUpperCase() : 'U',
-                            style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 13),
+                            _usuarioSeleccionado!.fullName.isNotEmpty
+                                ? _usuarioSeleccionado!.fullName[0]
+                                      .toUpperCase()
+                                : 'U',
+                            style: TextStyle(
+                              color: AppTheme.primaryLight,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -609,11 +725,18 @@ class _SimuladorViewState extends State<SimuladorView> {
                             children: [
                               Text(
                                 _usuarioSeleccionado!.fullName,
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                style: TextStyle(
+                                  color: AppTheme.textMain,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
                               ),
                               Text(
                                 '${_usuarioSeleccionado!.email} • Cédula: ${_usuarioSeleccionado!.identification}',
-                                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                                style: TextStyle(
+                                  color: AppTheme.textMuted,
+                                  fontSize: 11,
+                                ),
                               ),
                             ],
                           ),
@@ -623,16 +746,25 @@ class _SimuladorViewState extends State<SimuladorView> {
                     const SizedBox(height: 10),
 
                     // Selector de Rol Activo para Simulación
-                    const Text('Cambiar modo de vista móvil según rol:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
+                    Text(
+                      'Cambiar modo de vista móvil según rol:',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 10),
+                    ),
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 8,
                       children: ['CHOFER', 'BODEGUERO', 'VENDEDOR'].map((r) {
                         final esActivo = _rolActivo == r;
                         return ChoiceChip(
-                          label: Text(r == 'CHOFER' ? '📱 Chofer / Rutas' : (r == 'BODEGUERO' ? '📦 Bodeguero' : '💼 Vendedor')),
+                          label: Text(
+                            r == 'CHOFER'
+                                ? '📱 Chofer / Rutas'
+                                : (r == 'BODEGUERO'
+                                      ? '📦 Bodeguero'
+                                      : '💼 Vendedor'),
+                          ),
                           selected: esActivo,
-                          selectedColor: const Color(0xFF1D72FE),
+                          selectedColor: AppTheme.primary,
                           onSelected: (selected) {
                             if (selected) {
                               setState(() {
@@ -671,7 +803,14 @@ class _SimuladorViewState extends State<SimuladorView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Controles del Entorno de Pruebas', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+          Text(
+            'Controles del Entorno de Pruebas',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: AppTheme.textMain,
+            ),
+          ),
           const SizedBox(height: 8),
 
           // Modo de Ubicación para Cierre
@@ -687,11 +826,17 @@ class _SimuladorViewState extends State<SimuladorView> {
             items: const [
               DropdownMenuItem(
                 value: 'match',
-                child: Text('Entrega en sitio acordado (Desvío < 10m)', overflow: TextOverflow.ellipsis),
+                child: Text(
+                  'Entrega en sitio acordado (Desvío < 10m)',
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               DropdownMenuItem(
                 value: 'deviation',
-                child: Text('Simular desvío (> 150m / Alerta Auditoría)', overflow: TextOverflow.ellipsis),
+                child: Text(
+                  'Simular desvío (> 150m / Alerta Auditoría)',
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
             onChanged: (val) => setState(() => _gpsMode = val ?? 'match'),
@@ -702,8 +847,18 @@ class _SimuladorViewState extends State<SimuladorView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Velocidad de Desplazamiento:', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-              Text('${_velocidadKmh.toInt()} km/h', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryLight)),
+              Text(
+                'Velocidad de Desplazamiento:',
+                style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+              ),
+              Text(
+                '${_velocidadKmh.toInt()} km/h',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryLight,
+                ),
+              ),
             ],
           ),
           Slider(
@@ -719,9 +874,9 @@ class _SimuladorViewState extends State<SimuladorView> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFF090E1A),
+              color: AppTheme.background,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF1E293B)),
+              border: Border.all(color: AppTheme.surfaceCard),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -729,15 +884,23 @@ class _SimuladorViewState extends State<SimuladorView> {
                 Row(
                   children: [
                     Icon(
-                      _streamingGps ? Icons.sensors_rounded : Icons.sensors_off_rounded,
+                      _streamingGps
+                          ? Icons.sensors_rounded
+                          : Icons.sensors_off_rounded,
                       size: 16,
-                      color: _streamingGps ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                      color: _streamingGps
+                          ? const Color(0xFF10B981)
+                          : AppTheme.textMuted,
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      _streamingGps ? 'Transmisión GPS en vivo activa' : 'GPS en reposo (Inicia navegación para transmitir)',
+                      _streamingGps
+                          ? 'Transmisión GPS en vivo activa'
+                          : 'GPS en reposo (Inicia navegación para transmitir)',
                       style: TextStyle(
-                        color: _streamingGps ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                        color: _streamingGps
+                            ? const Color(0xFF10B981)
+                            : AppTheme.textMuted,
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
@@ -749,11 +912,17 @@ class _SimuladorViewState extends State<SimuladorView> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFEF4444),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       visualDensity: VisualDensity.compact,
                     ),
                     onPressed: _detenerStreamingGps,
-                    child: const Text('Pausar GPS', style: TextStyle(fontSize: 10)),
+                    child: const Text(
+                      'Pausar GPS',
+                      style: TextStyle(fontSize: 10),
+                    ),
                   ),
               ],
             ),
@@ -772,15 +941,34 @@ class _SimuladorViewState extends State<SimuladorView> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Reglas de Negocio Validadas en la App Móvil', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.statusCompletada)),
+          Text(
+            'Reglas de Negocio Validadas en la App Móvil',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: AppTheme.statusCompletada,
+            ),
+          ),
           SizedBox(height: 10),
-          _ReglaItem(texto: 'El chofer selecciona la ruta y decide el orden de entrega o la optimiza.'),
-          _ReglaItem(texto: 'Solo puede haber una parada en curso a la vez por unidad de transporte.'),
-          _ReglaItem(texto: 'La cancelación o fallo exige registrar el motivo para reintento posterior.'),
-          _ReglaItem(texto: 'El cierre exige firma digital, foto con marca de agua y auditoría PostGIS.'),
+          _ReglaItem(
+            texto:
+                'El chofer selecciona la ruta y decide el orden de entrega o la optimiza.',
+          ),
+          _ReglaItem(
+            texto:
+                'Solo puede haber una parada en curso a la vez por unidad de transporte.',
+          ),
+          _ReglaItem(
+            texto:
+                'La cancelación o fallo exige registrar el motivo para reintento posterior.',
+          ),
+          _ReglaItem(
+            texto:
+                'El cierre exige firma digital, foto con marca de agua y auditoría PostGIS.',
+          ),
         ],
       ),
     );
@@ -794,9 +982,9 @@ class _SimuladorViewState extends State<SimuladorView> {
       width: 360,
       height: 680,
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(38),
-        border: Border.all(color: const Color(0xFF334155), width: 6),
+        border: Border.all(color: AppTheme.border, width: 6),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.6),
@@ -817,9 +1005,12 @@ class _SimuladorViewState extends State<SimuladorView> {
                 child: Container(
                   width: 90,
                   height: 14,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1E293B),
-                    borderRadius: BorderRadius.only(bottomLeft: Radius.circular(10), bottomRight: Radius.circular(10)),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceCard,
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(10),
+                      bottomRight: Radius.circular(10),
+                    ),
                   ),
                 ),
               ),
@@ -834,15 +1025,35 @@ class _SimuladorViewState extends State<SimuladorView> {
                 children: [
                   Text(
                     DateFormat('HH:mm').format(DateTime.now()),
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: AppTheme.textMain,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Row(
                     children: [
-                      Icon(Icons.wifi, size: 11, color: Colors.white.withValues(alpha: 0.8)),
+                      Icon(
+                        Icons.wifi,
+                        size: 11,
+                        color: AppTheme.textMain.withValues(alpha: 0.8),
+                      ),
                       const SizedBox(width: 4),
-                      Icon(Icons.gps_fixed, size: 10, color: _streamingGps ? const Color(0xFF10B981) : const Color(0xFF94A3B8)),
+                      Icon(
+                        Icons.gps_fixed,
+                        size: 10,
+                        color: _streamingGps
+                            ? const Color(0xFF10B981)
+                            : AppTheme.textMuted,
+                      ),
                       const SizedBox(width: 4),
-                      const Text('100%', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9)),
+                      Text(
+                        '100%',
+                        style: TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 9,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -860,17 +1071,34 @@ class _SimuladorViewState extends State<SimuladorView> {
                     children: [
                       Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(color: const Color(0xFF1D72FE).withValues(alpha: 0.2), borderRadius: BorderRadius.circular(6)),
-                        child: const Icon(Icons.blur_on_rounded, color: Color(0xFF38BDF8), size: 16),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(
+                          Icons.blur_on_rounded,
+                          color: AppTheme.primaryLight,
+                          size: 16,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('AlumVid Móvil', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                          Text(
+                            'AlumVid Móvil',
+                            style: TextStyle(
+                              color: AppTheme.textMain,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                           Text(
                             _usuarioSeleccionado?.fullName ?? 'Empleado',
-                            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10),
+                            style: TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 10,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
@@ -878,14 +1106,21 @@ class _SimuladorViewState extends State<SimuladorView> {
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1D72FE).withValues(alpha: 0.2),
+                      color: AppTheme.primary.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       _rolActivo,
-                      style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 9, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: AppTheme.primaryLight,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -898,7 +1133,9 @@ class _SimuladorViewState extends State<SimuladorView> {
                 color: const Color(0xFF090D16),
                 child: _rolActivo == 'CHOFER'
                     ? _buildInteriorChofer()
-                    : (_rolActivo == 'BODEGUERO' ? _buildInteriorBodeguero() : _buildInteriorVendedor()),
+                    : (_rolActivo == 'BODEGUERO'
+                          ? _buildInteriorBodeguero()
+                          : _buildInteriorVendedor()),
               ),
             ),
           ],
@@ -929,10 +1166,20 @@ class _SimuladorViewState extends State<SimuladorView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('HOJAS DE RUTA ASIGNADAS', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.bold)),
+              Text(
+                'HOJAS DE RUTA ASIGNADAS',
+                style: TextStyle(
+                  color: AppTheme.textMuted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               InkWell(
                 onTap: widget.onRefresh,
-                child: const Text('Actualizar', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 10)),
+                child: Text(
+                  'Actualizar',
+                  style: TextStyle(color: AppTheme.primaryLight, fontSize: 10),
+                ),
               ),
             ],
           ),
@@ -940,10 +1187,10 @@ class _SimuladorViewState extends State<SimuladorView> {
 
           Expanded(
             child: rutas.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       'No hay rutas registradas.',
-                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
                     ),
                   )
                 : ListView.separated(
@@ -951,14 +1198,18 @@ class _SimuladorViewState extends State<SimuladorView> {
                     separatorBuilder: (_, index) => const SizedBox(height: 8),
                     itemBuilder: (ctx, idx) {
                       final r = rutas[idx];
-                      final entregadas = r.paradas.where((p) => p.isEntregado).length;
+                      final entregadas = r.paradas
+                          .where((p) => p.isEntregado)
+                          .length;
                       final total = r.paradas.length;
                       final ratio = total > 0 ? (entregadas / total) : 0.0;
 
                       Color estadoColor = const Color(0xFFFBBF24);
-                      if (r.isEnCurso) estadoColor = const Color(0xFF38BDF8);
+                      if (r.isEnCurso) estadoColor = AppTheme.primaryLight;
                       if (r.isCompletada) estadoColor = const Color(0xFF10B981);
-                      if (r.estado == 'CANCELADA') estadoColor = const Color(0xFFEF4444);
+                      if (r.estado == 'CANCELADA') {
+                        estadoColor = const Color(0xFFEF4444);
+                      }
 
                       return InkWell(
                         onTap: () => _abrirRutaEnTelefono(r),
@@ -966,26 +1217,43 @@ class _SimuladorViewState extends State<SimuladorView> {
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF101728),
+                            color: AppTheme.surface,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFF1E293B)),
+                            border: Border.all(color: AppTheme.surfaceCard),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     r.codigoRuta,
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                    style: TextStyle(
+                                      color: AppTheme.textMain,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(color: estadoColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: estadoColor.withValues(
+                                        alpha: 0.15,
+                                      ),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
                                     child: Text(
                                       r.estado,
-                                      style: TextStyle(color: estadoColor, fontSize: 9, fontWeight: FontWeight.bold),
+                                      style: TextStyle(
+                                        color: estadoColor,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -993,20 +1261,28 @@ class _SimuladorViewState extends State<SimuladorView> {
                               const SizedBox(height: 4),
                               Text(
                                 '$total Destinos de Entrega Programados',
-                                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                                style: TextStyle(
+                                  color: AppTheme.textMuted,
+                                  fontSize: 11,
+                                ),
                               ),
                               const SizedBox(height: 8),
                               LinearProgressIndicator(
                                 value: ratio,
-                                backgroundColor: const Color(0xFF1E293B),
-                                valueColor: AlwaysStoppedAnimation<Color>(estadoColor),
+                                backgroundColor: AppTheme.surfaceCard,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  estadoColor,
+                                ),
                                 minHeight: 4,
                                 borderRadius: BorderRadius.circular(2),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 '$entregadas de $total entregas completadas',
-                                style: const TextStyle(color: Color(0xFF64748B), fontSize: 9),
+                                style: TextStyle(
+                                  color: AppTheme.textDim,
+                                  fontSize: 9,
+                                ),
                               ),
                             ],
                           ),
@@ -1036,23 +1312,48 @@ class _SimuladorViewState extends State<SimuladorView> {
             children: [
               InkWell(
                 onTap: () => setState(() => _rutaActiva = null),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.arrow_back_ios_new_rounded, size: 12, color: Color(0xFF38BDF8)),
+                    Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 12,
+                      color: AppTheme.primaryLight,
+                    ),
                     SizedBox(width: 4),
-                    Text('Rutas', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Rutas',
+                      style: TextStyle(
+                        color: AppTheme.primaryLight,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ),
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF38BDF8)),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  side: BorderSide(color: AppTheme.primaryLight),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                icon: const Icon(Icons.auto_mode_rounded, size: 12, color: Color(0xFF38BDF8)),
-                label: const Text('Optimizar', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold)),
+                icon: Icon(
+                  Icons.auto_mode_rounded,
+                  size: 12,
+                  color: AppTheme.primaryLight,
+                ),
+                label: Text(
+                  'Optimizar',
+                  style: TextStyle(
+                    color: AppTheme.primaryLight,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 onPressed: () => _optimizarRutaChofer(r),
               ),
             ],
@@ -1063,9 +1364,9 @@ class _SimuladorViewState extends State<SimuladorView> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF101728),
+              color: AppTheme.surface,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF1E293B)),
+              border: Border.all(color: AppTheme.surfaceCard),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1073,26 +1374,61 @@ class _SimuladorViewState extends State<SimuladorView> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(r.codigoRuta, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                    Text('$entregadas de $total paradas documentadas', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
+                    Text(
+                      r.codigoRuta,
+                      style: TextStyle(
+                        color: AppTheme.textMain,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    Text(
+                      '$entregadas de $total paradas documentadas',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 10),
+                    ),
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: const Color(0xFF1D72FE).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
-                  child: Text(r.estado, style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 9, fontWeight: FontWeight.bold)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    r.estado,
+                    style: TextStyle(
+                      color: AppTheme.primaryLight,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 10),
 
-          const Text('DESTINOS DE ENTREGA DE ESTA RUTA', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.bold)),
+          Text(
+            'DESTINOS DE ENTREGA DE ESTA RUTA',
+            style: TextStyle(
+              color: AppTheme.textMuted,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 6),
 
           Expanded(
             child: r.paradas.isEmpty
-                ? const Center(child: Text('Esta ruta aún no tiene paradas agregadas.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)))
+                ? Center(
+                    child: Text(
+                      'Esta ruta aún no tiene paradas agregadas.',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                    ),
+                  )
                 : ListView.separated(
                     itemCount: r.paradas.length,
                     separatorBuilder: (_, index) => const SizedBox(height: 8),
@@ -1108,9 +1444,13 @@ class _SimuladorViewState extends State<SimuladorView> {
                       return Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF101728),
+                          color: AppTheme.surface,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: esFallida ? const Color(0xFFEF4444).withValues(alpha: 0.4) : const Color(0xFF1E293B)),
+                          border: Border.all(
+                            color: esFallida
+                                ? const Color(0xFFEF4444).withValues(alpha: 0.4)
+                                : AppTheme.surfaceCard,
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1118,33 +1458,96 @@ class _SimuladorViewState extends State<SimuladorView> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('Parada #${idx + 1}', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold)),
+                                Text(
+                                  'Parada #${idx + 1}',
+                                  style: TextStyle(
+                                    color: AppTheme.primaryLight,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                  decoration: BoxDecoration(color: badgeColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
-                                  child: Text(p.estado, style: TextStyle(color: badgeColor, fontSize: 8, fontWeight: FontWeight.bold)),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 5,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: badgeColor.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    p.estado,
+                                    style: TextStyle(
+                                      color: badgeColor,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 4),
-                            Text(p.cliente, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                            Text(p.direccionTexto, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
-                            if (p.comentarios != null && p.comentarios!.isNotEmpty) ...[
+                            Text(
+                              p.cliente,
+                              style: TextStyle(
+                                color: AppTheme.textMain,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              p.direccionTexto,
+                              style: TextStyle(
+                                color: AppTheme.textMuted,
+                                fontSize: 10,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (p.comentarios != null &&
+                                p.comentarios!.isNotEmpty) ...[
                               const SizedBox(height: 2),
-                              Text(p.comentarios!, style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 9), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              Text(
+                                p.comentarios!,
+                                style: TextStyle(
+                                  color: AppTheme.primaryLight,
+                                  fontSize: 9,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ],
                             const SizedBox(height: 8),
 
                             if (esEntregado)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(color: const Color(0xFF10B981).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF10B981,
+                                  ).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
                                 child: const Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF10B981)),
+                                    Icon(
+                                      Icons.check_circle_rounded,
+                                      size: 12,
+                                      color: Color(0xFF10B981),
+                                    ),
                                     SizedBox(width: 4),
-                                    Text('Entrega Finalizada y Documentada con e-PoD', style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold)),
+                                    Text(
+                                      'Entrega Finalizada y Documentada con e-PoD',
+                                      style: TextStyle(
+                                        color: Color(0xFF10B981),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               )
@@ -1154,14 +1557,28 @@ class _SimuladorViewState extends State<SimuladorView> {
                                   Expanded(
                                     child: ElevatedButton.icon(
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFFF59E0B),
+                                        backgroundColor: const Color(
+                                          0xFFF59E0B,
+                                        ),
                                         foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 6),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 6,
+                                        ),
                                         minimumSize: Size.zero,
-                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
                                       ),
-                                      icon: const Icon(Icons.replay_rounded, size: 12),
-                                      label: const Text('Reintentar Parada', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                      icon: const Icon(
+                                        Icons.replay_rounded,
+                                        size: 12,
+                                      ),
+                                      label: const Text(
+                                        'Reintentar Parada',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                       onPressed: () => _reintentarParada(p),
                                     ),
                                   ),
@@ -1174,15 +1591,28 @@ class _SimuladorViewState extends State<SimuladorView> {
                                     flex: 6,
                                     child: ElevatedButton.icon(
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF1D72FE),
+                                        backgroundColor: AppTheme.primary,
                                         foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 6),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 6,
+                                        ),
                                         minimumSize: Size.zero,
-                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
                                       ),
-                                      icon: const Icon(Icons.navigation_rounded, size: 12),
-                                      label: const Text('Iniciar Navegación', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                                      onPressed: () => _iniciarNavegacionParada(p),
+                                      icon: const Icon(
+                                        Icons.navigation_rounded,
+                                        size: 12,
+                                      ),
+                                      label: const Text(
+                                        'Iniciar Navegación',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      onPressed: () =>
+                                          _iniciarNavegacionParada(p),
                                     ),
                                   ),
                                   const SizedBox(width: 6),
@@ -1190,14 +1620,30 @@ class _SimuladorViewState extends State<SimuladorView> {
                                     flex: 4,
                                     child: OutlinedButton.icon(
                                       style: OutlinedButton.styleFrom(
-                                        side: const BorderSide(color: Color(0xFFEF4444)),
-                                        foregroundColor: const Color(0xFFEF4444),
-                                        padding: const EdgeInsets.symmetric(vertical: 6),
+                                        side: const BorderSide(
+                                          color: Color(0xFFEF4444),
+                                        ),
+                                        foregroundColor: const Color(
+                                          0xFFEF4444,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 6,
+                                        ),
                                         minimumSize: Size.zero,
-                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
                                       ),
-                                      icon: const Icon(Icons.close_rounded, size: 12),
-                                      label: const Text('Fallida', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                      icon: const Icon(
+                                        Icons.close_rounded,
+                                        size: 12,
+                                      ),
+                                      label: const Text(
+                                        'Fallida',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                       onPressed: () => _marcarParadaFallida(p),
                                     ),
                                   ),
@@ -1224,7 +1670,7 @@ class _SimuladorViewState extends State<SimuladorView> {
         // Cabecera Navegación
         Container(
           padding: const EdgeInsets.all(10),
-          color: const Color(0xFF101728),
+          color: AppTheme.surface,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1236,33 +1682,76 @@ class _SimuladorViewState extends State<SimuladorView> {
                       _detenerStreamingGps();
                       setState(() => _enNavegacion = false);
                     },
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.arrow_back_ios_new_rounded, size: 12, color: Color(0xFF38BDF8)),
+                        Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 12,
+                          color: AppTheme.primaryLight,
+                        ),
                         SizedBox(width: 4),
-                        Text('Itinerario', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold)),
+                        Text(
+                          'Itinerario',
+                          style: TextStyle(
+                            color: AppTheme.primaryLight,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: _streamingGps ? const Color(0xFF10B981).withValues(alpha: 0.2) : const Color(0xFF64748B).withValues(alpha: 0.2),
+                      color: _streamingGps
+                          ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                          : AppTheme.textDim.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.sensors, size: 10, color: _streamingGps ? const Color(0xFF10B981) : const Color(0xFF64748B)),
+                        Icon(
+                          Icons.sensors,
+                          size: 10,
+                          color: _streamingGps
+                              ? const Color(0xFF10B981)
+                              : AppTheme.textDim,
+                        ),
                         const SizedBox(width: 4),
-                        Text(_streamingGps ? 'GPS EN VIVO' : 'PAUSA', style: TextStyle(color: _streamingGps ? const Color(0xFF10B981) : const Color(0xFF64748B), fontSize: 8, fontWeight: FontWeight.bold)),
+                        Text(
+                          _streamingGps ? 'GPS EN VIVO' : 'PAUSA',
+                          style: TextStyle(
+                            color: _streamingGps
+                                ? const Color(0xFF10B981)
+                                : AppTheme.textDim,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
-              Text('Destino: ${p.cliente}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-              Text(p.direccionTexto, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(
+                'Destino: ${p.cliente}',
+                style: TextStyle(
+                  color: AppTheme.textMain,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+              Text(
+                p.direccionTexto,
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 10),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),
@@ -1279,14 +1768,15 @@ class _SimuladorViewState extends State<SimuladorView> {
                 ),
                 children: [
                   TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'com.alumvid.admin',
                   ),
                   PolylineLayer(
                     polylines: [
                       Polyline(
                         points: _trayectoria,
-                        color: const Color(0xFF38BDF8),
+                        color: AppTheme.primaryLight,
                         strokeWidth: 4.0,
                       ),
                     ],
@@ -1298,7 +1788,11 @@ class _SimuladorViewState extends State<SimuladorView> {
                         point: LatLng(p.latitud, p.longitud),
                         width: 28,
                         height: 28,
-                        child: const Icon(Icons.location_on, color: Color(0xFFEF4444), size: 28),
+                        child: const Icon(
+                          Icons.location_on,
+                          color: Color(0xFFEF4444),
+                          size: 28,
+                        ),
                       ),
                       // Camión AlumVid en movimiento
                       Marker(
@@ -1308,9 +1802,16 @@ class _SimuladorViewState extends State<SimuladorView> {
                         child: Transform.rotate(
                           angle: (_rumboVehiculo * 3.14159 / 180),
                           child: Container(
-                            decoration: const BoxDecoration(color: Color(0xFF1D72FE), shape: BoxShape.circle),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary,
+                              shape: BoxShape.circle,
+                            ),
                             padding: const EdgeInsets.all(4),
-                            child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 16),
+                            child: Icon(
+                              Icons.navigation_rounded,
+                              color: AppTheme.textMain,
+                              size: 16,
+                            ),
                           ),
                         ),
                       ),
@@ -1325,7 +1826,11 @@ class _SimuladorViewState extends State<SimuladorView> {
                 right: 8,
                 child: FloatingActionButton.small(
                   backgroundColor: const Color(0xEE101728),
-                  child: const Icon(Icons.my_location, color: Color(0xFF38BDF8), size: 16),
+                  child: Icon(
+                    Icons.my_location,
+                    color: AppTheme.primaryLight,
+                    size: 16,
+                  ),
                   onPressed: () => _miniMapCtrl.move(_posicionVehiculo, 15.0),
                 ),
               ),
@@ -1336,16 +1841,23 @@ class _SimuladorViewState extends State<SimuladorView> {
         // Barra inferior: Velocidad y botón e-PoD
         Container(
           padding: const EdgeInsets.all(12),
-          color: const Color(0xFF101728),
+          color: AppTheme.surface,
           child: Column(
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Velocidad: ${_velocidadKmh.toInt()} km/h', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
+                  Text(
+                    'Velocidad: ${_velocidadKmh.toInt()} km/h',
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 10),
+                  ),
                   Text(
                     'Paso ${_pasoActual + 1} de ${_trayectoria.length}',
-                    style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: AppTheme.primaryLight,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -1358,8 +1870,14 @@ class _SimuladorViewState extends State<SimuladorView> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
-                  icon: const Icon(Icons.assignment_turned_in_rounded, size: 16),
-                  label: const Text('Finalizar Entrega (e-PoD)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  icon: const Icon(
+                    Icons.assignment_turned_in_rounded,
+                    size: 16,
+                  ),
+                  label: const Text(
+                    'Finalizar Entrega (e-PoD)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
                   onPressed: () => setState(() => _enEpod = true),
                 ),
               ),
@@ -1384,25 +1902,60 @@ class _SimuladorViewState extends State<SimuladorView> {
             children: [
               InkWell(
                 onTap: () => setState(() => _enEpod = false),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.arrow_back_ios_new_rounded, size: 12, color: Color(0xFF38BDF8)),
+                    Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 12,
+                      color: AppTheme.primaryLight,
+                    ),
                     SizedBox(width: 4),
-                    Text('Volver', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Volver',
+                      style: TextStyle(
+                        color: AppTheme.primaryLight,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const Text('Prueba de Entrega (e-PoD)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+              Text(
+                'Prueba de Entrega (e-PoD)',
+                style: TextStyle(
+                  color: AppTheme.textMain,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 10),
 
-          Text('Cliente: ${p.cliente}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-          Text(p.direccionTexto, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
-          const Divider(color: Color(0xFF1E293B), height: 16),
+          Text(
+            'Cliente: ${p.cliente}',
+            style: TextStyle(
+              color: AppTheme.textMain,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+          Text(
+            p.direccionTexto,
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 10),
+          ),
+          Divider(color: AppTheme.surfaceCard, height: 16),
 
           // 1. Fotografía Satelital
-          const Text('1. Fotografía del Material Entregado:', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+          Text(
+            '1. Fotografía del Material Entregado:',
+            style: TextStyle(
+              color: AppTheme.textMain,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 6),
           InkWell(
             onTap: _capturarFotoSimulada,
@@ -1411,9 +1964,15 @@ class _SimuladorViewState extends State<SimuladorView> {
               height: 90,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: _fotoCapturada ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFF101728),
+                color: _fotoCapturada
+                    ? const Color(0xFF064E3B).withValues(alpha: 0.3)
+                    : AppTheme.surface,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _fotoCapturada ? const Color(0xFF10B981) : const Color(0xFF1E293B)),
+                border: Border.all(
+                  color: _fotoCapturada
+                      ? const Color(0xFF10B981)
+                      : AppTheme.surfaceCard,
+                ),
               ),
               child: _fotoCapturada
                   ? Padding(
@@ -1424,23 +1983,56 @@ class _SimuladorViewState extends State<SimuladorView> {
                         children: [
                           const Row(
                             children: [
-                              Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 14),
+                              Icon(
+                                Icons.check_circle_rounded,
+                                color: Color(0xFF10B981),
+                                size: 14,
+                              ),
                               SizedBox(width: 4),
-                              Text('FOTO REGISTRADA CON WATERMARK', style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold)),
+                              Text(
+                                'FOTO REGISTRADA CON WATERMARK',
+                                style: TextStyle(
+                                  color: Color(0xFF10B981),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 4),
-                          Text('GPS: ${_posicionVehiculo.latitude.toStringAsFixed(4)}, ${_posicionVehiculo.longitude.toStringAsFixed(4)}', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 9)),
-                          Text('Timestamp: $_fotoTimestamp', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 8)),
+                          Text(
+                            'GPS: ${_posicionVehiculo.latitude.toStringAsFixed(4)}, ${_posicionVehiculo.longitude.toStringAsFixed(4)}',
+                            style: TextStyle(
+                              color: AppTheme.primaryLight,
+                              fontSize: 9,
+                            ),
+                          ),
+                          Text(
+                            'Timestamp: $_fotoTimestamp',
+                            style: TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 8,
+                            ),
+                          ),
                         ],
                       ),
                     )
-                  : const Column(
+                  : Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.camera_alt_rounded, color: Color(0xFF38BDF8), size: 24),
+                        Icon(
+                          Icons.camera_alt_rounded,
+                          color: AppTheme.primaryLight,
+                          size: 24,
+                        ),
                         SizedBox(height: 4),
-                        Text('Tocar para capturar foto en vivo', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
+                        Text(
+                          'Tocar para capturar foto en vivo',
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 10,
+                          ),
+                        ),
                       ],
                     ),
             ),
@@ -1451,10 +2043,20 @@ class _SimuladorViewState extends State<SimuladorView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('2. Firma Digital del Receptor:', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+              Text(
+                '2. Firma Digital del Receptor:',
+                style: TextStyle(
+                  color: AppTheme.textMain,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               InkWell(
                 onTap: () => setState(() => _puntosFirma.clear()),
-                child: const Text('Limpiar', style: TextStyle(color: Color(0xFFEF4444), fontSize: 10)),
+                child: const Text(
+                  'Limpiar',
+                  style: TextStyle(color: Color(0xFFEF4444), fontSize: 10),
+                ),
               ),
             ],
           ),
@@ -1465,7 +2067,7 @@ class _SimuladorViewState extends State<SimuladorView> {
             decoration: BoxDecoration(
               color: Colors.black,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF1E293B)),
+              border: Border.all(color: AppTheme.surfaceCard),
             ),
             child: GestureDetector(
               onPanUpdate: (details) {
@@ -1483,12 +2085,22 @@ class _SimuladorViewState extends State<SimuladorView> {
           const SizedBox(height: 10),
 
           // 3. Observaciones
-          const Text('3. Observaciones:', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+          Text(
+            '3. Observaciones:',
+            style: TextStyle(
+              color: AppTheme.textMain,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 4),
           TextField(
             controller: _comentariosPodCtrl,
-            style: const TextStyle(color: Colors.white, fontSize: 11),
-            decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.all(8)),
+            style: TextStyle(color: AppTheme.textMain, fontSize: 11),
+            decoration: const InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.all(8),
+            ),
           ),
           const SizedBox(height: 14),
 
@@ -1503,8 +2115,21 @@ class _SimuladorViewState extends State<SimuladorView> {
               ),
               onPressed: _enviandoEpod ? null : _finalizarEntregaEpod,
               child: _enviandoEpod
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Confirmar y Cerrar Entrega', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppTheme.textMain,
+                      ),
+                    )
+                  : const Text(
+                      'Confirmar y Cerrar Entrega',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -1524,10 +2149,20 @@ class _SimuladorViewState extends State<SimuladorView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('BODEGA & INVENTARIO', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.bold)),
+              Text(
+                'BODEGA & INVENTARIO',
+                style: TextStyle(
+                  color: AppTheme.textMuted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               InkWell(
                 onTap: _cargarDatosBodega,
-                child: const Text('Refrescar', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 10)),
+                child: Text(
+                  'Refrescar',
+                  style: TextStyle(color: AppTheme.primaryLight, fontSize: 10),
+                ),
               ),
             ],
           ),
@@ -1540,7 +2175,7 @@ class _SimuladorViewState extends State<SimuladorView> {
                 child: ChoiceChip(
                   label: const Text('Stock', style: TextStyle(fontSize: 10)),
                   selected: _tabBodega == 0,
-                  selectedColor: const Color(0xFF1D72FE),
+                  selectedColor: AppTheme.primary,
                   onSelected: (val) => setState(() => _tabBodega = 0),
                 ),
               ),
@@ -1549,7 +2184,7 @@ class _SimuladorViewState extends State<SimuladorView> {
                 child: ChoiceChip(
                   label: const Text('Retazos', style: TextStyle(fontSize: 10)),
                   selected: _tabBodega == 1,
-                  selectedColor: const Color(0xFF1D72FE),
+                  selectedColor: AppTheme.primary,
                   onSelected: (val) {
                     setState(() => _tabBodega = 1);
                     _cargarDatosBodega();
@@ -1563,7 +2198,9 @@ class _SimuladorViewState extends State<SimuladorView> {
           Expanded(
             child: _cargandoBodega
                 ? const Center(child: CircularProgressIndicator())
-                : (_tabBodega == 0 ? _buildTabStockBodega() : _buildTabRetazosBodega()),
+                : (_tabBodega == 0
+                      ? _buildTabStockBodega()
+                      : _buildTabRetazosBodega()),
           ),
         ],
       ),
@@ -1586,7 +2223,11 @@ class _SimuladorViewState extends State<SimuladorView> {
         final p = _stockBodega[idx];
         return Container(
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: const Color(0xFF101728), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFF1E293B))),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.surfaceCard),
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1594,15 +2235,35 @@ class _SimuladorViewState extends State<SimuladorView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(p.name, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                    Text('Cat: ${p.category}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 9)),
+                    Text(
+                      p.name,
+                      style: TextStyle(
+                        color: AppTheme.textMain,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Cat: ${p.category}',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 9),
+                    ),
                   ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: const Color(0xFF1D72FE).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
-                child: Text('${p.stock} ${p.unit}', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold)),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${p.stock} ${p.unit}',
+                  style: TextStyle(
+                    color: AppTheme.primaryLight,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -1613,7 +2274,12 @@ class _SimuladorViewState extends State<SimuladorView> {
 
   Widget _buildTabRetazosBodega() {
     if (_retazosBodega.isEmpty) {
-      return const Center(child: Text('No hay retazos registrados.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)));
+      return Center(
+        child: Text(
+          'No hay retazos registrados.',
+          style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
+        ),
+      );
     }
     return ListView.separated(
       itemCount: _retazosBodega.length,
@@ -1622,12 +2288,26 @@ class _SimuladorViewState extends State<SimuladorView> {
         final r = _retazosBodega[idx];
         return Container(
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: const Color(0xFF101728), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFF1E293B))),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.surfaceCard),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(r.name, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-              Text('Tipo: ${r.kind ?? "General"}', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 9)),
+              Text(
+                r.name,
+                style: TextStyle(
+                  color: AppTheme.textMain,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Tipo: ${r.kind ?? "General"}',
+                style: TextStyle(color: AppTheme.primaryLight, fontSize: 9),
+              ),
             ],
           ),
         );
@@ -1647,10 +2327,20 @@ class _SimuladorViewState extends State<SimuladorView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('VENTAS & COTIZADOR MÓVIL', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.bold)),
+              Text(
+                'VENTAS & COTIZADOR MÓVIL',
+                style: TextStyle(
+                  color: AppTheme.textMuted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               InkWell(
                 onTap: _cargarDatosVentas,
-                child: const Text('Refrescar', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 10)),
+                child: Text(
+                  'Refrescar',
+                  style: TextStyle(color: AppTheme.primaryLight, fontSize: 10),
+                ),
               ),
             ],
           ),
@@ -1659,24 +2349,53 @@ class _SimuladorViewState extends State<SimuladorView> {
           if (_cargandoVentas)
             const Center(child: CircularProgressIndicator())
           else if (_catalogoVentas.isEmpty)
-            Center(child: ElevatedButton(onPressed: _cargarDatosVentas, child: const Text('Cargar Catálogo Comercial')))
+            Center(
+              child: ElevatedButton(
+                onPressed: _cargarDatosVentas,
+                child: const Text('Cargar Catálogo Comercial'),
+              ),
+            )
           else ...[
             Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: const Color(0xFF101728), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFF1E293B))),
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.surfaceCard),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Simulador Rápido de Cotización', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  Text(
+                    'Simulador Rápido de Cotización',
+                    style: TextStyle(
+                      color: AppTheme.textMain,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<Producto>(
                     key: ValueKey('cotiz_prod_${_productoCotizar?.id}'),
                     initialValue: _productoCotizar,
                     isExpanded: true,
-                    dropdownColor: const Color(0xFF0F172A),
-                    style: const TextStyle(color: Colors.white, fontSize: 11),
-                    decoration: const InputDecoration(isDense: true, labelText: 'Producto'),
-                    items: _catalogoVentas.map((p) => DropdownMenuItem(value: p, child: Text(p.name, overflow: TextOverflow.ellipsis))).toList(),
+                    dropdownColor: AppTheme.surface,
+                    style: TextStyle(color: AppTheme.textMain, fontSize: 11),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      labelText: 'Producto',
+                    ),
+                    items: _catalogoVentas
+                        .map(
+                          (p) => DropdownMenuItem(
+                            value: p,
+                            child: Text(
+                              p.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
                     onChanged: (val) => setState(() => _productoCotizar = val),
                   ),
                   const SizedBox(height: 8),
@@ -1685,22 +2404,45 @@ class _SimuladorViewState extends State<SimuladorView> {
                       Expanded(
                         child: TextField(
                           controller: _metrosCotizarCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: const TextStyle(color: Colors.white, fontSize: 11),
-                          decoration: const InputDecoration(isDense: true, labelText: 'Metros / Cant.'),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          style: TextStyle(
+                            color: AppTheme.textMain,
+                            fontSize: 11,
+                          ),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            labelText: 'Metros / Cant.',
+                          ),
                           onChanged: (_) => setState(() {}),
                         ),
                       ),
                       const SizedBox(width: 10),
                       Builder(
                         builder: (_) {
-                          final cant = double.tryParse(_metrosCotizarCtrl.text) ?? 1.0;
-                          final total = cant * 18.50; // Precio referencial AlumVid
+                          final cant =
+                              double.tryParse(_metrosCotizarCtrl.text) ?? 1.0;
+                          final total =
+                              cant * 18.50; // Precio referencial AlumVid
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              const Text('Total Estimado:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9)),
-                              Text('\$${total.toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 13)),
+                              Text(
+                                'Total Estimado:',
+                                style: TextStyle(
+                                  color: AppTheme.textMuted,
+                                  fontSize: 9,
+                                ),
+                              ),
+                              Text(
+                                '\$${total.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  color: Color(0xFF10B981),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ],
                           );
                         },
@@ -1712,7 +2454,14 @@ class _SimuladorViewState extends State<SimuladorView> {
             ),
             const SizedBox(height: 10),
 
-            const Text('CATÁLOGO DE PRODUCTOS', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9, fontWeight: FontWeight.bold)),
+            Text(
+              'CATÁLOGO DE PRODUCTOS',
+              style: TextStyle(
+                color: AppTheme.textMuted,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 6),
             Expanded(
               child: ListView.separated(
@@ -1722,7 +2471,11 @@ class _SimuladorViewState extends State<SimuladorView> {
                   final p = _catalogoVentas[idx];
                   return Container(
                     padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: const Color(0xFF101728), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFF1E293B))),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppTheme.surfaceCard),
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -1730,12 +2483,29 @@ class _SimuladorViewState extends State<SimuladorView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(p.name, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                              Text('Unidad: ${p.unit} • Stock: ${p.stock}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 9)),
+                              Text(
+                                p.name,
+                                style: TextStyle(
+                                  color: AppTheme.textMain,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                'Unidad: ${p.unit} • Stock: ${p.stock}',
+                                style: TextStyle(
+                                  color: AppTheme.textMuted,
+                                  fontSize: 9,
+                                ),
+                              ),
                             ],
                           ),
                         ),
-                        const Icon(Icons.arrow_forward_ios_rounded, size: 10, color: Color(0xFF38BDF8)),
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 10,
+                          color: AppTheme.primaryLight,
+                        ),
                       ],
                     ),
                   );
@@ -1756,14 +2526,29 @@ class _ReglaItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('• ', style: TextStyle(color: AppTheme.statusCompletada, fontWeight: FontWeight.bold)),
+          Text(
+            '• ',
+            style: TextStyle(
+              color: AppTheme.statusCompletada,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           Expanded(
-            child: Text(texto, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted, height: 1.3)),
+            child: Text(
+              texto,
+              style: TextStyle(
+                fontSize: 11,
+                color: AppTheme.textMuted,
+                height: 1.3,
+              ),
+            ),
           ),
         ],
       ),
@@ -1779,7 +2564,7 @@ class _FirmaPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF60A5FA)
+      ..color = AppTheme.primaryLight
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 2.5;
 

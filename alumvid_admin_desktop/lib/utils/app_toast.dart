@@ -2,12 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-enum AppToastType {
-  success,
-  error,
-  info,
-  warning,
-}
+enum AppToastType { success, error, info, warning }
 
 /// Sistema de alertas discretas flotantes para AlumVid Desktop.
 /// Se posiciona en la zona inferior izquierda de la pantalla, sin estorbar
@@ -58,8 +53,12 @@ class AppToast {
   static void success(BuildContext context, String message) =>
       show(context, message, type: AppToastType.success);
 
-  static void error(BuildContext context, String message) =>
-      show(context, message, type: AppToastType.error, duration: const Duration(seconds: 5));
+  static void error(BuildContext context, String message) => show(
+    context,
+    message,
+    type: AppToastType.error,
+    duration: const Duration(seconds: 5),
+  );
 
   static void info(BuildContext context, String message) =>
       show(context, message, type: AppToastType.info);
@@ -97,10 +96,13 @@ class _ToastWidgetState extends State<_ToastWidget>
       duration: const Duration(milliseconds: 250),
     );
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
-    _slideAnim = Tween<Offset>(
-      begin: const Offset(-0.08, 0.05),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic));
+    _slideAnim =
+        Tween<Offset>(
+          begin: const Offset(-0.08, 0.05),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
+        );
 
     _animController.forward();
   }
@@ -139,6 +141,8 @@ class _ToastWidgetState extends State<_ToastWidget>
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Positioned(
       // Zona inferior izquierda, con separación estética de los bordes
       bottom: 28,
@@ -150,12 +154,12 @@ class _ToastWidgetState extends State<_ToastWidget>
           child: SlideTransition(
             position: _slideAnim,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: 460,
-                minWidth: 160,
-              ),
+              constraints: const BoxConstraints(maxWidth: 460, minWidth: 160),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xF20F172A), // Slate oscuro elegante
                   borderRadius: BorderRadius.circular(10),
@@ -191,8 +195,8 @@ class _ToastWidgetState extends State<_ToastWidget>
                     Flexible(
                       child: Text(
                         widget.message,
-                        style: const TextStyle(
-                          color: Color(0xFFF1F5F9),
+                        style: TextStyle(
+                          color: AppTheme.textMain,
                           fontSize: 12.5,
                           fontWeight: FontWeight.w500,
                           height: 1.3,
@@ -203,14 +207,16 @@ class _ToastWidgetState extends State<_ToastWidget>
                     InkWell(
                       borderRadius: BorderRadius.circular(12),
                       onTap: () {
-                        _animController.reverse().then((_) => widget.onDismiss());
+                        _animController.reverse().then(
+                          (_) => widget.onDismiss(),
+                        );
                       },
                       child: Padding(
                         padding: const EdgeInsets.all(3.0),
                         child: Icon(
                           Icons.close,
                           size: 14,
-                          color: Colors.white.withValues(alpha: 0.5),
+                          color: AppTheme.textMain.withValues(alpha: 0.5),
                         ),
                       ),
                     ),

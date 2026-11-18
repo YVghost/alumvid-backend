@@ -44,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
-        title: const Row(
+        title: Row(
           children: [
             Icon(
               Icons.settings_ethernet,
@@ -59,7 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'En Windows Escritorio usa http://localhost:8080.\nPara emulador Android usa http://10.0.2.2:8080.',
               style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
             ),
@@ -76,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text(
+            child: Text(
               'Cancelar',
               style: TextStyle(color: AppTheme.textMuted),
             ),
@@ -140,6 +140,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: Center(
@@ -168,8 +170,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF2563EB), Color(0xFF38BDF8)],
+                    gradient: LinearGradient(
+                      colors: [AppTheme.primary, AppTheme.primaryLight],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -183,28 +185,28 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   alignment: Alignment.center,
-                  child: const Text(
+                  child: Text(
                     'AV',
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w900,
-                      color: Colors.white,
+                      color: AppTheme.textMain,
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
 
-                const Text(
+                Text(
                   'AlumVid — Centro de Control',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppTheme.textMain,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Supervisión y Gestión Logística en Tiempo Real',
                   style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
                   textAlign: TextAlign.center,
@@ -215,7 +217,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Campo Identificación
                 TextField(
                   controller: _identCtrl,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Identificación o Correo',
                     hintText: '1700000000 o admin@alumvid.com',
                     prefixIcon: Icon(
@@ -233,7 +235,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: _ocultarPass,
                   decoration: InputDecoration(
                     labelText: 'Contraseña de Administrador',
-                    prefixIcon: const Icon(
+                    prefixIcon: Icon(
                       Icons.lock,
                       size: 20,
                       color: AppTheme.primaryLight,
@@ -264,12 +266,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     onPressed: _cargando ? null : _iniciarSesion,
                     child: _cargando
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: AppTheme.textMain,
                             ),
                           )
                         : const Text(
@@ -291,7 +293,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Container(
                       width: 8,
                       height: 8,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         color: AppTheme.statusCompletada,
                         shape: BoxShape.circle,
                       ),
@@ -300,15 +302,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     Flexible(
                       child: Text(
                         'Servidor: $_hostActual',
-                        style: const TextStyle(
-                          color: AppTheme.textDim,
-                          fontSize: 11,
-                        ),
+                        style: TextStyle(color: AppTheme.textDim, fontSize: 11),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.settings,
                         size: 16,
                         color: AppTheme.primaryLight,

@@ -9,7 +9,14 @@ import '../../shared/ui.dart';
 import 'producto_detalle.dart';
 import 'producto_form.dart';
 
-const categoriasProducto = ['VIDRIO', 'ALUMINIO', 'ACCESORIOS', 'VYNIL', 'ACRILICO', 'ACERO INOXIDABLE'];
+const categoriasProducto = [
+  'VIDRIO',
+  'ALUMINIO',
+  'ACCESORIOS',
+  'VYNIL',
+  'ACRILICO',
+  'ACERO INOXIDABLE',
+];
 const unidadesProducto = <String, String>{
   'UNIDAD': 'Unidad',
   'METRO': 'Metro lineal (m)',
@@ -68,8 +75,12 @@ class _InventarioModuloState extends State<InventarioModulo> {
         size: 100,
       );
       var items = (r['items'] as List).cast<Producto>();
-      if (_filtro == _Filtro.inactivos) items = items.where((p) => !p.active).toList();
-      if (_filtro == _Filtro.porMedida) items = items.where((p) => p.piecesManaged).toList();
+      if (_filtro == _Filtro.inactivos) {
+        items = items.where((p) => !p.active).toList();
+      }
+      if (_filtro == _Filtro.porMedida) {
+        items = items.where((p) => p.piecesManaged).toList();
+      }
       if (mounted) {
         setState(() {
           _items = items;
@@ -84,7 +95,11 @@ class _InventarioModuloState extends State<InventarioModulo> {
   }
 
   Future<void> _abrir(Producto p) async {
-    await abrirPanel(context, (_) => ProductoDetalle(producto: p, permisos: widget.permisos), ancho: 640);
+    await abrirPanel(
+      context,
+      (_) => ProductoDetalle(producto: p, permisos: widget.permisos),
+      ancho: 640,
+    );
     _cargar();
   }
 
@@ -95,21 +110,31 @@ class _InventarioModuloState extends State<InventarioModulo> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Inventario'),
         actions: [
           PopupMenuButton<String>(
             tooltip: 'Categoría',
-            icon: Badge(isLabelVisible: _categoria.isNotEmpty, smallSize: 8, child: const Icon(Icons.filter_list)),
+            icon: Badge(
+              isLabelVisible: _categoria.isNotEmpty,
+              smallSize: 8,
+              child: const Icon(Icons.filter_list),
+            ),
             initialValue: _categoria,
             onSelected: (v) {
               setState(() => _categoria = v);
               _cargar();
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(value: '', child: Text('Todas las categorías')),
-              for (final c in categoriasProducto) PopupMenuItem(value: c, child: Text(humanizar(c))),
+              const PopupMenuItem(
+                value: '',
+                child: Text('Todas las categorías'),
+              ),
+              for (final c in categoriasProducto)
+                PopupMenuItem(value: c, child: Text(humanizar(c))),
             ],
           ),
         ],
@@ -140,7 +165,8 @@ class _InventarioModuloState extends State<InventarioModulo> {
                 _Filtro.todos: 'Todos',
                 _Filtro.stockBajo: 'Stock bajo',
                 _Filtro.porMedida: 'Perfiles y vidrios',
-                if (widget.permisos.editaCatalogo) _Filtro.inactivos: 'Inactivos',
+                if (widget.permisos.editaCatalogo)
+                  _Filtro.inactivos: 'Inactivos',
               },
               seleccion: _filtro,
               onSeleccion: (v) {
@@ -155,7 +181,7 @@ class _InventarioModuloState extends State<InventarioModulo> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     '${_items.length} de $_total productos${_categoria.isEmpty ? '' : ' · ${humanizar(_categoria)}'}',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                   ),
                 ),
               ),
@@ -168,16 +194,25 @@ class _InventarioModuloState extends State<InventarioModulo> {
 
   Widget _cuerpo() {
     if (_cargando) return const CargandoLista();
-    if (_error != null) return VistaError(mensaje: _error!, onReintentar: _cargar);
+    if (_error != null) {
+      return VistaError(mensaje: _error!, onReintentar: _cargar);
+    }
     return RefreshIndicator(
       onRefresh: _cargar,
       child: _items.isEmpty
-          ? const VistaVacia(icono: Icons.inventory_2_outlined, titulo: 'Sin productos', mensaje: 'Prueba con otra búsqueda o filtro.')
+          ? const VistaVacia(
+              icono: Icons.inventory_2_outlined,
+              titulo: 'Sin productos',
+              mensaje: 'Prueba con otra búsqueda o filtro.',
+            )
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
               itemCount: _items.length,
               separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (_, i) => ProductoCard(producto: _items[i], onTap: () => _abrir(_items[i])),
+              itemBuilder: (_, i) => ProductoCard(
+                producto: _items[i],
+                onTap: () => _abrir(_items[i]),
+              ),
             ),
     );
   }
@@ -190,14 +225,31 @@ class StockBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = p.isAgotado ? AppColors.danger : p.isStockBajo ? AppColors.warning : AppColors.success;
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
+    final color = p.isAgotado
+        ? AppColors.danger
+        : p.isStockBajo
+        ? AppColors.warning
+        : AppColors.success;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(fmtNum(p.stock), style: TextStyle(color: color, fontSize: grande ? 34 : 20, fontWeight: FontWeight.w800, height: 1)),
+        Text(
+          fmtNum(p.stock),
+          style: TextStyle(
+            color: color,
+            fontSize: grande ? 34 : 20,
+            fontWeight: FontWeight.w800,
+            height: 1,
+          ),
+        ),
         const SizedBox(height: 2),
-        Text(p.piecesManaged ? 'unid. equiv.' : unidadCorta(p.unit), style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+        Text(
+          p.piecesManaged ? 'unid. equiv.' : unidadCorta(p.unit),
+          style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+        ),
       ],
     );
   }
@@ -210,6 +262,8 @@ class ProductoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final p = producto;
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -227,21 +281,46 @@ class ProductoCard extends StatelessWidget {
                       p.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: p.active ? AppColors.text : AppColors.textDim),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: p.active ? AppColors.text : AppColors.textDim,
+                      ),
                     ),
                     const SizedBox(height: 4),
-                    Text([p.code, humanizar(p.category)].join(' · '),
-                        maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
-                    if (p.piecesManaged || p.isAgotado || p.isStockBajo || !p.active) ...[
+                    Text(
+                      [p.code, humanizar(p.category)].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 13,
+                      ),
+                    ),
+                    if (p.piecesManaged ||
+                        p.isAgotado ||
+                        p.isStockBajo ||
+                        !p.active) ...[
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 6,
                         runSpacing: 6,
                         children: [
-                          if (p.piecesManaged) const EstadoChip('INFO', texto: 'Por medida', color: AppColors.info),
-                          if (!p.active) const EstadoChip('INACTIVO', texto: 'Inactivo'),
-                          if (p.isAgotado) const EstadoChip('AGOTADO', texto: 'Agotado'),
-                          if (p.isStockBajo) EstadoChip('EN_CURSO', texto: 'Bajo mínimo (${fmtNum(p.minStock)})'),
+                          if (p.piecesManaged)
+                            EstadoChip(
+                              'INFO',
+                              texto: 'Por medida',
+                              color: AppColors.info,
+                            ),
+                          if (!p.active)
+                            const EstadoChip('INACTIVO', texto: 'Inactivo'),
+                          if (p.isAgotado)
+                            const EstadoChip('AGOTADO', texto: 'Agotado'),
+                          if (p.isStockBajo)
+                            EstadoChip(
+                              'EN_CURSO',
+                              texto: 'Bajo mínimo (${fmtNum(p.minStock)})',
+                            ),
                         ],
                       ),
                     ],

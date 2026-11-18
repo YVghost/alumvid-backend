@@ -11,7 +11,11 @@ import 'tema.dart';
 // ---------------------------------------------------------------------------
 
 final _num = NumberFormat.decimalPatternDigits(locale: 'es', decimalDigits: 2);
-final _dinero = NumberFormat.currency(locale: 'es', symbol: r'$', decimalDigits: 2);
+final _dinero = NumberFormat.currency(
+  locale: 'es',
+  symbol: r'$',
+  decimalDigits: 2,
+);
 final _fecha = DateFormat('dd/MM/yyyy HH:mm');
 final _fechaCorta = DateFormat('dd MMM', 'es');
 
@@ -29,10 +33,16 @@ String fmtFechaCorta(DateTime? d) {
 }
 
 /// Conversores tolerantes para datos JSON del backend (números como texto, fechas ISO).
-double aNum(dynamic v) => v is num ? v.toDouble() : double.tryParse('${v ?? ''}') ?? 0;
-double? aNumONulo(dynamic v) => v == null ? null : v is num ? v.toDouble() : double.tryParse('$v');
+double aNum(dynamic v) =>
+    v is num ? v.toDouble() : double.tryParse('${v ?? ''}') ?? 0;
+double? aNumONulo(dynamic v) => v == null
+    ? null
+    : v is num
+    ? v.toDouble()
+    : double.tryParse('$v');
 DateTime? aFecha(dynamic v) => v == null ? null : DateTime.tryParse('$v');
-String aTexto(dynamic v, [String vacio = '']) => v == null || '$v'.trim().isEmpty ? vacio : '$v';
+String aTexto(dynamic v, [String vacio = '']) =>
+    v == null || '$v'.trim().isEmpty ? vacio : '$v';
 
 /// Medidas de una pieza o línea: "3,2 m" o "40 × 244 cm".
 String medidas(dynamic largoM, dynamic anchoCm, dynamic altoCm) {
@@ -102,6 +112,8 @@ class EstadoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final c = color ?? colorEstado(estado);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -128,6 +140,8 @@ class CargandoLista extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return ListView.separated(
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
@@ -159,6 +173,8 @@ class VistaVacia extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return LayoutBuilder(
       builder: (context, c) => SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -192,7 +208,7 @@ class VistaVacia extends StatelessWidget {
                     Text(
                       mensaje!,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppColors.textMuted),
+                      style: TextStyle(color: AppColors.textMuted),
                     ),
                   ],
                   if (accion != null) ...[const SizedBox(height: 20), accion!],
@@ -207,12 +223,18 @@ class VistaVacia extends StatelessWidget {
 }
 
 class VistaError extends StatelessWidget {
-  const VistaError({super.key, required this.mensaje, required this.onReintentar});
+  const VistaError({
+    super.key,
+    required this.mensaje,
+    required this.onReintentar,
+  });
   final String mensaje;
   final VoidCallback onReintentar;
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return VistaVacia(
       icono: Icons.cloud_off_rounded,
       titulo: 'No se pudo cargar la información',
@@ -236,17 +258,20 @@ class KpiCard extends StatelessWidget {
     required this.titulo,
     required this.valor,
     required this.icono,
-    this.color = AppColors.primaryLight,
+    Color? color,
     this.onTap,
-  });
+  }) : _color = color;
   final String titulo;
   final String valor;
   final IconData icono;
-  final Color color;
+  final Color? _color;
+  Color get color => _color ?? AppColors.primaryLight;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -268,7 +293,7 @@ class KpiCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   if (onTap != null)
-                    const Icon(
+                    Icon(
                       Icons.chevron_right,
                       color: AppColors.textDim,
                       size: 20,
@@ -289,7 +314,7 @@ class KpiCard extends StatelessWidget {
                 titulo,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13),
               ),
             ],
           ),
@@ -306,6 +331,8 @@ class SeccionTitulo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 20, 4, 10),
       child: Row(
@@ -313,7 +340,7 @@ class SeccionTitulo extends StatelessWidget {
           Expanded(
             child: Text(
               texto.toUpperCase(),
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textMuted,
                 fontSize: 12,
                 letterSpacing: 0.8,
@@ -337,6 +364,8 @@ class DatoFila extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
@@ -350,7 +379,7 @@ class DatoFila extends StatelessWidget {
             width: 112,
             child: Text(
               etiqueta,
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+              style: TextStyle(color: AppColors.textMuted, fontSize: 14),
             ),
           ),
           Expanded(
@@ -388,12 +417,17 @@ class _CampoBusquedaState extends State<CampoBusqueda> {
 
   void _cambio(String v) {
     _t?.cancel();
-    _t = Timer(const Duration(milliseconds: 350), () => widget.onChanged(v.trim()));
+    _t = Timer(
+      const Duration(milliseconds: 350),
+      () => widget.onChanged(v.trim()),
+    );
     setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return TextField(
       controller: _ctrl,
       onChanged: _cambio,
@@ -430,6 +464,8 @@ class FiltrosChips<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return SizedBox(
       height: 44,
       child: ListView(
@@ -460,7 +496,12 @@ class AvatarIniciales extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final partes = nombre.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
+    final partes = nombre
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty);
     final ini = partes.take(2).map((p) => p[0].toUpperCase()).join();
     final c = color ?? AppColors.primary;
     return CircleAvatar(
@@ -493,7 +534,7 @@ Future<bool> confirmar(
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(titulo),
-      content: Text(mensaje, style: const TextStyle(color: AppColors.textMuted)),
+      content: Text(mensaje, style: TextStyle(color: AppColors.textMuted)),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
@@ -535,7 +576,10 @@ Future<String?> pedirTexto(
           decoration: InputDecoration(labelText: etiqueta),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
           FilledButton(
             style: peligro
                 ? FilledButton.styleFrom(backgroundColor: AppColors.danger)
@@ -560,7 +604,7 @@ void avisoOk(BuildContext context, String msg) {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle, color: AppColors.success),
+            Icon(Icons.check_circle, color: AppColors.success),
             const SizedBox(width: 10),
             Expanded(child: Text(msg)),
           ],
@@ -577,7 +621,7 @@ void avisoError(BuildContext context, Object e) {
         duration: const Duration(seconds: 5),
         content: Row(
           children: [
-            const Icon(Icons.error_outline, color: AppColors.danger),
+            Icon(Icons.error_outline, color: AppColors.danger),
             const SizedBox(width: 10),
             Expanded(child: Text(limpiarError(e))),
           ],

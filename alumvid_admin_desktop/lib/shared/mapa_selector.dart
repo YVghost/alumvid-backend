@@ -20,7 +20,11 @@ class UbicacionElegida {
 
 /// Pantalla para marcar la ubicación de entrega: buscando la dirección o tocando el mapa.
 class MapaSelectorScreen extends StatefulWidget {
-  const MapaSelectorScreen({super.key, this.inicial, this.titulo = 'Ubicación de entrega'});
+  const MapaSelectorScreen({
+    super.key,
+    this.inicial,
+    this.titulo = 'Ubicación de entrega',
+  });
   final LatLng? inicial;
   final String titulo;
 
@@ -53,7 +57,10 @@ class _MapaSelectorScreenState extends State<MapaSelectorScreen> {
     _espera = Timer(const Duration(milliseconds: 450), () async {
       setState(() => _buscando = true);
       try {
-        final r = await LocationSearchService.searchPlaces(texto, center: _punto ?? quito);
+        final r = await LocationSearchService.searchPlaces(
+          texto,
+          center: _punto ?? quito,
+        );
         if (mounted) setState(() => _resultados = r.take(6).toList());
       } catch (_) {
         if (mounted) setState(() => _resultados = []);
@@ -76,15 +83,26 @@ class _MapaSelectorScreenState extends State<MapaSelectorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Scaffold(
       appBar: AppBar(title: Text(widget.titulo)),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: FilledButton.icon(
-            onPressed: _punto == null ? null : () => Navigator.pop(context, UbicacionElegida(_punto!, _direccion)),
+            onPressed: _punto == null
+                ? null
+                : () => Navigator.pop(
+                    context,
+                    UbicacionElegida(_punto!, _direccion),
+                  ),
             icon: const Icon(Icons.check),
-            label: Text(_punto == null ? 'Busca la dirección o toca el mapa' : 'Usar esta ubicación'),
+            label: Text(
+              _punto == null
+                  ? 'Busca la dirección o toca el mapa'
+                  : 'Usar esta ubicación',
+            ),
           ),
         ),
       ),
@@ -102,17 +120,26 @@ class _MapaSelectorScreenState extends State<MapaSelectorScreen> {
               }),
             ),
             children: [
-              TileLayer(urlTemplate: mapaTiles, userAgentPackageName: mapaAgente),
+              TileLayer(
+                urlTemplate: mapaTiles,
+                userAgentPackageName: mapaAgente,
+              ),
               if (_punto != null)
-                MarkerLayer(markers: [
-                  Marker(
-                    point: _punto!,
-                    width: 48,
-                    height: 48,
-                    alignment: Alignment.topCenter,
-                    child: const Icon(Icons.location_on, color: AppColors.danger, size: 48),
-                  ),
-                ]),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _punto!,
+                      width: 48,
+                      height: 48,
+                      alignment: Alignment.topCenter,
+                      child: Icon(
+                        Icons.location_on,
+                        color: AppColors.danger,
+                        size: 48,
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
           Positioned(
@@ -135,7 +162,13 @@ class _MapaSelectorScreenState extends State<MapaSelectorScreen> {
                       suffixIcon: _buscando
                           ? const Padding(
                               padding: EdgeInsets.all(14),
-                              child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
                             )
                           : null,
                     ),
@@ -150,8 +183,16 @@ class _MapaSelectorScreenState extends State<MapaSelectorScreen> {
                           ListTile(
                             dense: true,
                             leading: const Icon(Icons.place_outlined),
-                            title: Text(r.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            subtitle: Text(r.address, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            title: Text(
+                              r.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              r.address,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             onTap: () => _elegir(r),
                           ),
                       ],
@@ -163,7 +204,8 @@ class _MapaSelectorScreenState extends State<MapaSelectorScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(10),
                       child: Text(
-                        _direccion ?? '${_punto!.latitude.toStringAsFixed(5)}, ${_punto!.longitude.toStringAsFixed(5)}',
+                        _direccion ??
+                            '${_punto!.latitude.toStringAsFixed(5)}, ${_punto!.longitude.toStringAsFixed(5)}',
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -187,6 +229,8 @@ class MiniMapa extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: SizedBox(
@@ -195,19 +239,27 @@ class MiniMapa extends StatelessWidget {
           options: MapOptions(
             initialCenter: punto,
             initialZoom: 15,
-            interactionOptions: const InteractionOptions(flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag),
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
+            ),
           ),
           children: [
             TileLayer(urlTemplate: mapaTiles, userAgentPackageName: mapaAgente),
-            MarkerLayer(markers: [
-              Marker(
-                point: punto,
-                width: 40,
-                height: 40,
-                alignment: Alignment.topCenter,
-                child: const Icon(Icons.location_on, color: AppColors.danger, size: 40),
-              ),
-            ]),
+            MarkerLayer(
+              markers: [
+                Marker(
+                  point: punto,
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.topCenter,
+                  child: Icon(
+                    Icons.location_on,
+                    color: AppColors.danger,
+                    size: 40,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),

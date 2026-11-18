@@ -27,6 +27,8 @@ class AlumVidApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return MaterialApp(
       title: 'AlumVid',
       debugShowCheckedModeBanner: false,
