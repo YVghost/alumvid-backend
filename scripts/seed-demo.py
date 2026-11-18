@@ -33,6 +33,8 @@ def once(name,fn):
     return state['steps'][name]
 def request_id(name):return str(uuid.uuid5(uuid.UUID(state['namespace']),name))
 def action(order,name,lines=None,token=None,step=None):
+    if name=='start-preparation' and call('/api/pedidos/orders/'+order,token=token or admin)['order']['state'] not in ('POR_PREPARAR','RESERVADO'):
+        return call('/api/pedidos/orders/'+order,token=token or admin)
     key=step or order+':'+name
     body={'requestId':request_id(key),'reason':'DEMO: '+key,'receiverName':'Receptor ficticio'}
     if lines is not None:body['lines']=lines
@@ -121,16 +123,16 @@ try:
     def keep(key,o,shipment=None):scenarios[key]={'orderId':o['order']['id'],'number':o['order']['number'],**({'shipmentId':shipment['id'],'dispatchId':shipment['dispatch_id'],'routeId':shipment['route_id']} if shipment else {})}
     o=order('RESERVADO',[line(screw,10)]);keep('RESERVADO',o)
     o=order('FALTANTE',[line(missing,5)]);keep('PENDIENTE_MATERIAL',o)
-    o=order('RETIRO_LISTO',[line(aluminum,2,lengthM='1.6'),line(screw,6)]);action(o['order']['id'],'prepare');keep('RETIRO_LISTO',o)
-    o=order('RETIRO_PARCIAL',[line(glass,2,widthCm='30',heightCm='244')]);action(o['order']['id'],'prepare');action(o['order']['id'],'deliver',[{'lineId':o['lines'][0]['id'],'quantity':'1'}]);keep('RETIRO_PARCIAL',o)
-    o=order('LISTO_DESPACHO',[line(glass,1,widthCm='40',heightCm='244'),line(screw,4)],True);action(o['order']['id'],'prepare');keep('LISTO_PARA_DESPACHAR',o)
-    o=order('RUTA_PENDIENTE',[line(aluminum,2,lengthM='1.6'),line(screw,3)],True);action(o['order']['id'],'prepare');s=ship('RUTA_PENDIENTE',o,d1);keep('RUTA_PENDIENTE_CHOFER1',o,s)
-    o=order('EN_RUTA',[line(glass,1,widthCm='25',heightCm='244')],True);action(o['order']['id'],'prepare');s=ship('EN_RUTA',o,d2)
+    o=order('RETIRO_LISTO',[line(aluminum,2,lengthM='1.6'),line(screw,6)]);action(o['order']['id'],'start-preparation');action(o['order']['id'],'prepare');keep('RETIRO_LISTO',o)
+    o=order('RETIRO_PARCIAL',[line(glass,2,widthCm='30',heightCm='244')]);action(o['order']['id'],'start-preparation');action(o['order']['id'],'prepare');action(o['order']['id'],'deliver',[{'lineId':o['lines'][0]['id'],'quantity':'1'}]);keep('RETIRO_PARCIAL',o)
+    o=order('LISTO_DESPACHO',[line(glass,1,widthCm='40',heightCm='244'),line(screw,4)],True);action(o['order']['id'],'start-preparation');action(o['order']['id'],'prepare');keep('LISTO_PARA_DESPACHAR',o)
+    o=order('RUTA_PENDIENTE',[line(aluminum,2,lengthM='1.6'),line(screw,3)],True);action(o['order']['id'],'start-preparation');action(o['order']['id'],'prepare');s=ship('RUTA_PENDIENTE',o,d1);keep('RUTA_PENDIENTE_CHOFER1',o,s)
+    o=order('EN_RUTA',[line(glass,1,widthCm='25',heightCm='244')],True);action(o['order']['id'],'start-preparation');action(o['order']['id'],'prepare');s=ship('EN_RUTA',o,d2)
     once('start:EN_RUTA',lambda:call('/api/v1/logistica/despachos/'+s['dispatch_id']+'/aceptar-inicio','POST',{},t2));keep('EN_RUTA_CHOFER2',o,s)
-    o=order('CANCELADO_REPARTO',[line(screw,4)],True);action(o['order']['id'],'prepare');s=ship('CANCELADO_REPARTO',o,d1,[{'lineId':o['lines'][0]['id'],'quantity':'2'}]);action(o['order']['id'],'cancel');keep('RETORNO_PENDIENTE',o,s)
+    o=order('CANCELADO_REPARTO',[line(screw,4)],True);action(o['order']['id'],'start-preparation');action(o['order']['id'],'prepare');s=ship('CANCELADO_REPARTO',o,d1,[{'lineId':o['lines'][0]['id'],'quantity':'2'}]);action(o['order']['id'],'cancel');keep('RETORNO_PENDIENTE',o,s)
     o=order('RETRASADO',[line(screw,2)],True);action(o['order']['id'],'delay');keep('RETRASADO',o)
-    o=order('ENTREGADO',[line(screw,2)]);action(o['order']['id'],'prepare');action(o['order']['id'],'deliver');keep('ENTREGADO_RETIRO',o)
-    o=order('CANCELADO_CORTE',[line(glass,1,widthCm='15',heightCm='244')]);action(o['order']['id'],'prepare');action(o['order']['id'],'cancel');keep('CORTE_DEVUELTO_AL_INVENTARIO',o)
+    o=order('ENTREGADO',[line(screw,2)]);action(o['order']['id'],'start-preparation');action(o['order']['id'],'prepare');action(o['order']['id'],'deliver');keep('ENTREGADO_RETIRO',o)
+    o=order('CANCELADO_CORTE',[line(glass,1,widthCm='15',heightCm='244')]);action(o['order']['id'],'start-preparation');action(o['order']['id'],'prepare');action(o['order']['id'],'cancel');keep('CORTE_DEVUELTO_AL_INVENTARIO',o)
     o=order('VENCIDO',[line(screw,2)]);oid=str(uuid.UUID(o['order']['id']))
     once('expire:VENCIDO',lambda:(sql("UPDATE pedidos.sale_order SET expires_at=CURRENT_TIMESTAMP-interval '1 second' WHERE id='"+oid+"'"),True)[1])
     for attempt in range(40):
@@ -138,7 +140,7 @@ try:
         time.sleep(.2)
     else:raise RuntimeError('El proceso automático aún no marcó el escenario vencido.')
     keep('VENCIDO',o)
-    o=order('ENTREGA_HISTORICA',[line(screw,1)],True);action(o['order']['id'],'prepare');s=ship('ENTREGA_HISTORICA',o,d1)
+    o=order('ENTREGA_HISTORICA',[line(screw,1)],True);action(o['order']['id'],'start-preparation');action(o['order']['id'],'prepare');s=ship('ENTREGA_HISTORICA',o,d1)
     once('start:HISTORICA',lambda:call('/api/v1/logistica/despachos/'+s['dispatch_id']+'/aceptar-inicio','POST',{},t1))
     once('complete:HISTORICA',lambda:call('/api/v1/logistica/despachos/'+s['dispatch_id']+'/cerrar-entrega','POST',{'fotoPodUrl':'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jp9sAAAAASUVORK5CYII=','firmaUrl':'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jp9sAAAAASUVORK5CYII=','latitud':-0.1807,'longitud':-78.4678,'comentarios':'DEMO evidencia sintética; no representa una entrega real'},t1));keep('ENTREGADO_LOGISTICA',o,s)
     def migrar_ids():
@@ -154,8 +156,8 @@ try:
     once('ids:validas',migrar_ids)
     # Lotes creados antes de que el pedido guardara su ubicación: se completa con puntos ficticios.
     once('coords:backfill',lambda:(sql("UPDATE pedidos.sale_order SET delivery_latitude=-0.1807+((number%7)-3)*0.012,delivery_longitude=-78.4678+((number%5)-2)*0.010 WHERE delivery_mode='ENTREGA' AND delivery_latitude IS NULL AND external_invoice_reference LIKE '"+state['prefix']+"-%'"),True)[1])
-    o=order('POR_ASIGNAR_NORTE',[line(screw,5),line(aluminum,1,lengthM='2.4')],True);action(o['order']['id'],'prepare');keep('POR_ASIGNAR_NORTE',o)
-    o=order('POR_ASIGNAR_SUR',[line(glass,1,widthCm='35',heightCm='244')],True);action(o['order']['id'],'prepare');keep('POR_ASIGNAR_SUR',o)
+    o=order('POR_ASIGNAR_NORTE',[line(screw,5),line(aluminum,1,lengthM='2.4')],True);action(o['order']['id'],'start-preparation');action(o['order']['id'],'prepare');keep('POR_ASIGNAR_NORTE',o)
+    o=order('POR_ASIGNAR_SUR',[line(glass,1,widthCm='35',heightCm='244')],True);action(o['order']['id'],'start-preparation');action(o['order']['id'],'prepare');keep('POR_ASIGNAR_SUR',o)
     o=order('EN_PREPARACION',[line(screw,3)],True);keep('EN_PREPARACION_BODEGA',o)
     for entry in scenarios.values():entry['state']=call('/api/pedidos/orders/'+entry['orderId'],token=admin)['order']['state']
     manifest={'prefix':state['prefix'],'createdAt':state['createdAt'],'clients':clients,'products':{'tornillos':screw,'silicona':silicone,'faltante':missing,'vidrio':glass,'aluminio':aluminum},'spaces':spaces,'scenarios':scenarios,'users':[{'id':a['id'],'identification':a['identification'],'roles':a['roles'],'temporary':a['temporary'],'inactive':a['inactive']} for a in state['accounts'].values()]}

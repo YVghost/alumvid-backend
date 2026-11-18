@@ -1,3 +1,4 @@
+import '../../shared/permisos.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/api_negocio.dart';
@@ -42,19 +43,21 @@ Future<List<Map<String, dynamic>>?> completarUbicaciones(
 Future<Map<String, dynamic>?> elegirChofer(
   BuildContext context, {
   String? actualId,
+  String? soloId,
 }) {
   return showModalBottomSheet<Map<String, dynamic>>(
     context: context,
     isScrollControlled: true,
     builder: (_) => FractionallySizedBox(
       heightFactor: 0.7,
-      child: _SelectorChofer(actualId: actualId),
+      child: _SelectorChofer(actualId: actualId, soloId: soloId),
     ),
   );
 }
 
 class _SelectorChofer extends StatefulWidget {
-  const _SelectorChofer({this.actualId});
+  const _SelectorChofer({this.actualId, this.soloId});
+  final String? soloId;
   final String? actualId;
 
   @override
@@ -81,12 +84,16 @@ class _SelectorChoferState extends State<_SelectorChofer> {
           return const Center(child: CircularProgressIndicator());
         }
         final orden = {'DISPONIBLE': 0, 'EN_RUTA': 1, 'INACTIVO': 2};
-        final choferes = [...snap.data!]
-          ..sort(
-            (a, b) => (orden[a['estadoDisponibilidad']] ?? 3).compareTo(
-              orden[b['estadoDisponibilidad']] ?? 3,
-            ),
-          );
+        final choferes =
+            [
+              ...snap.data!.where(
+                (c) => widget.soloId == null || c["id"] == widget.soloId,
+              ),
+            ]..sort(
+              (a, b) => (orden[a['estadoDisponibilidad']] ?? 3).compareTo(
+                orden[b['estadoDisponibilidad']] ?? 3,
+              ),
+            );
         return ListView(
           children: [
             const Padding(
@@ -257,7 +264,8 @@ class _SelectorPedidosState extends State<_SelectorPedidos> {
 
 /// Crear ruta: chofer disponible + pedidos (opcional). Devuelve la ruta creada.
 class CrearRuta extends StatefulWidget {
-  const CrearRuta({super.key, this.pedidos = const []});
+  const CrearRuta({super.key, this.pedidos = const [], this.permisos});
+  final Permisos? permisos;
   final List<Map<String, dynamic>> pedidos;
 
   @override
@@ -279,7 +287,16 @@ class _CrearRutaState extends State<CrearRuta> {
   }
 
   Future<void> _elegirChofer() async {
-    final c = await elegirChofer(context, actualId: _chofer?['id']?.toString());
+    final c = await elegirChofer(
+      context,
+      actualId: _chofer?['id']?.toString(),
+      soloId:
+          widget.permisos != null &&
+              !widget.permisos!.bodega &&
+              widget.permisos!.tiene('CHOFER')
+          ? widget.permisos!.usuario.id
+          : null,
+    );
     if (c != null) setState(() => _chofer = c);
   }
 

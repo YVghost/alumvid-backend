@@ -27,7 +27,11 @@ enum Modulo {
     'CHOFER',
   }),
   monitoreo('Monitoreo', Icons.radar_outlined, Icons.radar, {'ADMINISTRADOR'}),
-  rutas('Rutas', Icons.alt_route_outlined, Icons.alt_route, {'ADMINISTRADOR'}),
+  rutas('Crear rutas', Icons.alt_route_outlined, Icons.alt_route, {
+    'ADMINISTRADOR',
+    'BODEGUERO',
+    'CHOFER',
+  }),
   pedidos('Pedidos', Icons.receipt_long_outlined, Icons.receipt_long, {
     'ADMINISTRADOR',
     'VENDEDOR',

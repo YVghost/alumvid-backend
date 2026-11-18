@@ -57,7 +57,7 @@ void main() {
       final s = sesionCon(['BODEGUERO']);
       expect(s.puede(Modulo.inventario), isTrue);
       expect(s.puede(Modulo.usuarios), isFalse);
-      expect(s.puede(Modulo.rutas), isFalse);
+      expect(s.puede(Modulo.rutas), isTrue);
       expect(s.puedeMoverStock, isTrue);
       expect(s.puedeEditarCatalogo, isFalse);
     });
@@ -87,6 +87,7 @@ void main() {
       Modulo.inicio,
       Modulo.inventario,
       Modulo.misRutas,
+      Modulo.rutas,
     ]);
     expect(s.vista('VENDEDOR').puede(Modulo.misRutas), isFalse);
     expect(s.roles, ['VENDEDOR', 'CHOFER']);
@@ -142,7 +143,7 @@ void main() {
             )
             .map((d) => d.label)
             .toList();
-        expect(labels, ['Inicio', 'Inventario', 'Mis rutas']);
+        expect(labels, ['Inicio', 'Inventario', 'Mis rutas', 'Crear rutas']);
         expect(find.text('Usuarios'), findsNothing);
         expect(find.text('Pedidos'), findsNothing);
         final prefs = await SharedPreferences.getInstance();
@@ -164,7 +165,7 @@ void main() {
                 find.byType(NavigationDestination),
               )
               .map((d) => d.label),
-          ['Inicio', 'Inventario', 'Mis rutas'],
+          ['Inicio', 'Inventario', 'Mis rutas', 'Crear rutas'],
         );
       },
     );

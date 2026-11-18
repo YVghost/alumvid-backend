@@ -428,7 +428,8 @@ class _RutaDetalleState extends State<RutaDetalle> {
             onPressed: _cargar,
             icon: const Icon(Icons.refresh),
           ),
-          if (_estado == 'PENDIENTE' || _estado == 'EN_CURSO')
+          if (widget.permisos.planificaRutas &&
+              (_estado == 'PENDIENTE' || _estado == 'EN_CURSO'))
             PopupMenuButton<String>(
               tooltip: 'Más acciones',
               onSelected: (v) => v == 'cancelar' ? _cancelar() : _eliminar(),
@@ -440,7 +441,7 @@ class _RutaDetalleState extends State<RutaDetalle> {
                     title: Text('Cancelar ruta'),
                   ),
                 ),
-                if (_pendiente)
+                if (widget.permisos.planificaRutas && _pendiente)
                   PopupMenuItem(
                     value: 'eliminar',
                     child: ListTile(
@@ -492,7 +493,7 @@ class _RutaDetalleState extends State<RutaDetalle> {
   }
 
   Widget? _barra(List<Map<String, dynamic>> paradas) {
-    if (_pendiente) {
+    if (widget.permisos.planificaRutas && _pendiente) {
       return SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -518,7 +519,8 @@ class _RutaDetalleState extends State<RutaDetalle> {
         ),
       );
     }
-    if (_estado == 'EN_CURSO' &&
+    if (widget.permisos.planificaRutas &&
+        _estado == 'EN_CURSO' &&
         paradas.isNotEmpty &&
         paradas.every(
           (p) => {'ENTREGADO', 'CANCELADA'}.contains(p['estado']),
@@ -612,7 +614,7 @@ class _RutaDetalleState extends State<RutaDetalle> {
                     onPressed: () => llamar(aTexto(r['choferTelefono'])),
                     icon: const Icon(Icons.call),
                   ),
-                if (_pendiente) ...[
+                if (widget.permisos.planificaRutas && _pendiente) ...[
                   const SizedBox(width: 6),
                   TextButton.icon(
                     onPressed: _ocupado ? null : _cambiarChofer,
@@ -727,7 +729,10 @@ class _RutaDetalleState extends State<RutaDetalle> {
         .toList();
     final color = colorEstado(estado);
     final editable =
-        _pendiente && estado != 'CANCELADA' && p['pedidoComercialId'] != null;
+        widget.permisos.planificaRutas &&
+        _pendiente &&
+        estado != 'CANCELADA' &&
+        p['pedidoComercialId'] != null;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
@@ -844,7 +849,7 @@ class _RutaDetalleState extends State<RutaDetalle> {
                     icon: const Icon(Icons.remove_circle_outline, size: 18),
                     label: const Text('Quitar parada'),
                   ),
-                if (estado == 'ENTREGADO')
+                if (widget.permisos.esAdmin && estado == 'ENTREGADO')
                   TextButton.icon(
                     onPressed: () => _verEvidencia(p),
                     style: TextButton.styleFrom(

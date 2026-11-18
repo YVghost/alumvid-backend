@@ -22,6 +22,10 @@ class CommercialShipments {
     private final JdbcTemplate db; private final PedidosService orders; private final OrderFulfillment fulfillment; private final ObjectMapper json;
     CommercialShipments(JdbcTemplate db,PedidosService orders,OrderFulfillment fulfillment,ObjectMapper json){this.db=db;this.orders=orders;this.fulfillment=fulfillment;this.json=json;}
     private void permission(AuthClient.Identity actor){if(!actor.has("ADMINISTRADOR")&&!actor.has("BODEGUERO"))throw new PedidosError(403,"Solo administración y bodega despachan o reciben material");}
+    private void planningPermission(AuthClient.Identity actor,UUID driverId) {
+        if(actor.has("ADMINISTRADOR")||actor.has("BODEGUERO"))return;
+        if(!actor.has("CHOFER")||!actor.id().equals(driverId))throw new PedidosError(403,"Un chofer solo puede crear despachos para sí mismo");
+    }
     List<Map<String,Object>> drivers(){return db.queryForList("SELECT id,full_name FROM usuarios.app_user WHERE active AND NOT must_change_password AND 'CHOFER'=ANY(string_to_array(roles,',')) ORDER BY full_name");}
     List<Map<String,Object>> list(UUID order){return db.queryForList("SELECT * FROM pedidos.commercial_shipment WHERE order_id=? ORDER BY created_at,id",order);}
     private Map<String,Object> get(UUID id){return db.queryForMap("SELECT * FROM pedidos.commercial_shipment WHERE id=?",id);}
@@ -47,7 +51,7 @@ class CommercialShipments {
     }
     @Transactional
     public Map<String,Object> create(UUID order,Create request,AuthClient.Identity actor){
-        permission(actor);
+        planningPermission(actor,request.driverId());
         String fingerprint;
         try{fingerprint=order+":"+actor.id()+":"+json.writeValueAsString(request);}catch(Exception e){throw new IllegalStateException(e);}
         db.queryForObject("SELECT pg_advisory_xact_lock(hashtextextended(?::text,0)) IS NULL",Boolean.class,request.requestId().toString());
@@ -73,7 +77,7 @@ class CommercialShipments {
         }
         UUID shipment=UUID.randomUUID();
         UUID actionId=UUID.nameUUIDFromBytes(("shipment:"+request.requestId()).getBytes(StandardCharsets.UTF_8));
-        orders.action(order,"dispatch",new PedidosApi.Action(actionId,request.reason(),lines,request.receiverName()),actor);
+        orders.dispatchForShipment(order,new PedidosApi.Action(actionId,request.reason(),lines,request.receiverName()),actor,request.driverId());
         db.update("INSERT INTO pedidos.commercial_shipment(id,order_id,request_id,fingerprint,driver_id,logistics_order_id,dispatch_id,route_id,receiver_name,reason,created_by,created_by_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",shipment,order,request.requestId(),fingerprint,request.driverId(),request.logisticsOrderId(),request.dispatchId(),request.routeId(),PedidosService.text(request.receiverName()),request.reason(),actor.id(),actor.fullName());
         for(var item:items.entrySet())db.update("INSERT INTO pedidos.shipment_item(shipment_id,fulfillment_id,quantity) VALUES (?,?,?)",shipment,item.getKey(),item.getValue());
         return detail(shipment);
@@ -81,10 +85,15 @@ class CommercialShipments {
     /** Anula un despacho cuya ruta no ha salido: el material vuelve a quedar preparado en bodega. */
     @Transactional
     public Map<String,Object> release(UUID shipment,PedidosApi.Action action,AuthClient.Identity actor){
-        permission(actor);
         var ref=db.queryForList("SELECT order_id FROM pedidos.commercial_shipment WHERE id=?",shipment);if(ref.isEmpty())throw new PedidosError(404,"Despacho comercial no encontrado");
         UUID order=(UUID)ref.getFirst().get("order_id");var sale=db.queryForMap("SELECT * FROM pedidos.sale_order WHERE id=? FOR UPDATE",order);
         var s=db.queryForMap("SELECT * FROM pedidos.commercial_shipment WHERE id=? FOR UPDATE",shipment);
+        planningPermission(actor,(UUID)s.get("driver_id"));
+        if(!actor.has("ADMINISTRADOR")&&!actor.has("BODEGUERO") && Boolean.TRUE.equals(db.queryForObject("SELECT to_regclass('logistica.despachos') IS NOT NULL",Boolean.class))) {
+            var stops=db.queryForList("SELECT estado FROM logistica.despachos WHERE id=?",s.get("dispatch_id"));
+            if(!stops.isEmpty()&&!"PENDIENTE".equals(stops.getFirst().get("estado")))throw new PedidosError(409,"El material ya salió a reparto; debe regresar físicamente a bodega");
+        }
+
         if("DEVUELTO_BODEGA".equals(s.get("state")))return get(shipment);
         if(!"EN_REPARTO".equals(s.get("state")))throw new PedidosError(409,"Solo se anula un despacho que aún no fue entregado ni devuelto");
         var rows=db.queryForList("SELECT fulfillment_id,quantity FROM pedidos.shipment_item WHERE shipment_id=? ORDER BY fulfillment_id",shipment);
@@ -124,6 +133,12 @@ class CommercialShipments {
         var ref=db.queryForList("SELECT order_id FROM pedidos.commercial_shipment WHERE id=?",shipment);if(ref.isEmpty())throw new PedidosError(404,"Despacho comercial no encontrado");
         UUID order=(UUID)ref.getFirst().get("order_id");var sale=db.queryForMap("SELECT * FROM pedidos.sale_order WHERE id=? FOR UPDATE",order);
         var s=db.queryForMap("SELECT * FROM pedidos.commercial_shipment WHERE id=? FOR UPDATE",shipment);
+        planningPermission(actor,(UUID)s.get("driver_id"));
+        if(!actor.has("ADMINISTRADOR")&&!actor.has("BODEGUERO") && Boolean.TRUE.equals(db.queryForObject("SELECT to_regclass('logistica.despachos') IS NOT NULL",Boolean.class))) {
+            var stops=db.queryForList("SELECT estado FROM logistica.despachos WHERE id=?",s.get("dispatch_id"));
+            if(!stops.isEmpty()&&!"PENDIENTE".equals(stops.getFirst().get("estado")))throw new PedidosError(409,"El material ya salió a reparto; debe regresar físicamente a bodega");
+        }
+
         if("DEVUELTO_BODEGA".equals(s.get("state")))return s;
         if(!"RETORNO_PENDIENTE".equals(s.get("state")))throw new PedidosError(409,"Primero cancela el reparto para registrar su retorno físico");
         var rows=db.queryForList("SELECT f.id,f.line_id,f.product_id,i.quantity FROM pedidos.shipment_item i JOIN pedidos.fulfillment_item f ON f.id=i.fulfillment_id WHERE shipment_id=? ORDER BY f.id",shipment);

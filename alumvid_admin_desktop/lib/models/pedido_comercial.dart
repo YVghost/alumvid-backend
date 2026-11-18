@@ -30,7 +30,11 @@ class PedidoComercial {
 
   bool get isEntregaDomicilio => deliveryMode == 'ENTREGA';
   bool get isListoParaDespacho =>
-      state == 'LISTO' || state == 'RESERVADO' || state == 'PARCIAL';
+      state == 'LISTO' ||
+      state == 'POR_PREPARAR' ||
+      state == 'EN_PREPARACION' ||
+      state == 'RESERVADO' ||
+      state == 'PARCIAL';
 
   factory PedidoComercial.fromJson(Map<String, dynamic> json) {
     return PedidoComercial(

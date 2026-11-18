@@ -60,6 +60,10 @@ String limpiarError(Object e) => e
 
 String humanizar(String s) {
   if (s.isEmpty) return s;
+  if (s == 'RESERVADO' || s == 'POR_PREPARAR') return 'Por preparar';
+  if (s == 'EN_PREPARACION') return 'En preparación';
+  if (s == 'START-PREPARATION') return 'Inicio de preparación';
+  if (s == 'PREPARE') return 'Material listo';
   final t = s.replaceAll('_', ' ').toLowerCase();
   return t[0].toUpperCase() + t.substring(1);
 }
@@ -76,12 +80,14 @@ Color colorEstado(String estado) {
     case 'DISPONIBLE':
     case 'ACTIVO':
       return AppColors.success;
+    case 'EN_PREPARACION':
     case 'EN_CURSO':
     case 'EN_REPARTO':
     case 'EN_RUTA':
     case 'PREPARADO':
       return AppColors.warning;
     case 'PENDIENTE':
+    case 'POR_PREPARAR':
     case 'RESERVADO':
     case 'BORRADOR':
       return AppColors.info;

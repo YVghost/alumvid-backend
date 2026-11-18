@@ -42,5 +42,5 @@ class PedidosApi {
     @PostMapping("/orders") Object create(@Valid @RequestBody Create r,@AuthenticationPrincipal AuthClient.Identity actor) {return service.create(r,actor);}
     @GetMapping("/orders") Object list(@RequestParam(defaultValue="") String state,@RequestParam(defaultValue="") String q,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {return service.list(state,q,page,size);}
     @GetMapping("/orders/{id}") Object get(@PathVariable UUID id) {return service.get(id);}
-    @PostMapping("/orders/{id}/{action:confirm|retry|prepare|delay|resume|cancel|dispatch|deliver|receive-return}") Object action(@PathVariable UUID id,@PathVariable String action,@Valid @RequestBody Action r,@AuthenticationPrincipal AuthClient.Identity actor) {return service.action(id,action,r,actor);}
+    @PostMapping("/orders/{id}/{action:confirm|retry|start-preparation|prepare|delay|resume|cancel|dispatch|deliver|receive-return}") Object action(@PathVariable UUID id,@PathVariable String action,@Valid @RequestBody Action r,@AuthenticationPrincipal AuthClient.Identity actor) {return service.action(id,action,r,actor);}
 }

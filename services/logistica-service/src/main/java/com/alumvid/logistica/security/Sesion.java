@@ -25,6 +25,12 @@ public final class Sesion {
         return token;
     }
 
+    public static boolean planificaBodega() {return actor().admin()||actor().has("BODEGUERO");}
+    public static void exigirPlanificacion(UUID choferId) {
+        if(planificaBodega())return;
+        if(!actor().has("CHOFER")||!actor().id().equals(choferId))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Un chofer solo puede crear rutas para sí mismo");
+    }
+    public static void exigirConsulta(UUID choferId) {if(!planificaBodega())exigirPropietario(choferId);}
     /** Un chofer solo opera sus propias rutas; administración opera todas. */
     public static void exigirPropietario(UUID choferId) {
         var actor = actor();

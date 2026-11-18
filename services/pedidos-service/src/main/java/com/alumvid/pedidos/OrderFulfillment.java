@@ -159,7 +159,7 @@ class OrderFulfillment {
         var totals=db.queryForMap("SELECT SUM(quantity) AS total,SUM(prepared_quantity) AS prepared,SUM(delivered_quantity) AS delivered FROM pedidos.order_line WHERE order_id=?",order);
         BigDecimal total=decimal(totals.get("total")),prepared=decimal(totals.get("prepared")),delivered=decimal(totals.get("delivered"));
         BigDecimal transit=db.queryForObject("SELECT COALESCE(SUM(dispatched_quantity),0) FROM pedidos.fulfillment_item WHERE order_id=?",BigDecimal.class,order);
-        String state=delivered.compareTo(total)==0?"ENTREGADO":transit.signum()>0?"EN_REPARTO":delivered.signum()>0?"PARCIAL":prepared.compareTo(total)==0?"LISTO":prepared.signum()>0?"PARCIAL":"RESERVADO";
+        String state=delivered.compareTo(total)==0?"ENTREGADO":transit.signum()>0?"EN_REPARTO":delivered.signum()>0?"PARCIAL":prepared.compareTo(total)==0?"LISTO":prepared.signum()>0?"PARCIAL":"POR_PREPARAR";
         db.update("UPDATE pedidos.order_line SET state=CASE WHEN delivered_quantity=quantity THEN 'ENTREGADO' WHEN prepared_quantity=quantity THEN 'PREPARADO' WHEN prepared_quantity>0 OR delivered_quantity>0 THEN 'PARCIAL' ELSE state END WHERE order_id=?",order);
         return state;
     }

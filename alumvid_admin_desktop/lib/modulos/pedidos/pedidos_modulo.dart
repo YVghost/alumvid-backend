@@ -11,7 +11,8 @@ import 'pedido_form.dart';
 
 const estadosPedido = <String, String>{
   '': 'Todos',
-  'RESERVADO': 'Reservados',
+  'POR_PREPARAR': 'Por preparar',
+  'EN_PREPARACION': 'En preparación',
   'PENDIENTE_MATERIAL': 'Falta material',
   'PARCIAL': 'Parciales',
   'LISTO': 'Listos',

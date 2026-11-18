@@ -107,10 +107,10 @@ class _PedidoDetalleState extends State<PedidoDetalle> {
       if (lineas == null) return;
     } else if (!await confirmar(
       context,
-      titulo: 'Preparar pedido completo',
+      titulo: 'Marcar pedido como listo',
       mensaje:
           'Se separa el material reservado (y se cortan las medidas) y se descuenta del inventario automáticamente.',
-      accion: 'Preparar',
+      accion: 'Marcar listo',
     )) {
       return;
     }
@@ -118,7 +118,7 @@ class _PedidoDetalleState extends State<PedidoDetalle> {
       () => Api.accionPedido(
         widget.pedidoId,
         'prepare',
-        motivo: 'Preparado en bodega',
+        motivo: 'Pedido listo en bodega',
         lineas: lineas,
       ),
       'Material preparado',
@@ -420,10 +420,15 @@ class _PedidoDetalleState extends State<PedidoDetalle> {
         AppColors.danger,
         'Falta material. Cuando ingrese stock, vende puede "Reintentar reserva".',
       ),
-      'RESERVADO' => (
+      'POR_PREPARAR' || 'RESERVADO' => (
         Icons.handyman_outlined,
         AppColors.info,
-        'Material reservado. Bodega debe prepararlo.',
+        'Material reservado. Bodega puede iniciar la preparación.',
+      ),
+      'EN_PREPARACION' => (
+        Icons.handyman_outlined,
+        AppColors.warning,
+        'Bodega está preparando el pedido. Al terminar, márcalo como listo.',
       ),
       'PARCIAL' when _porPreparar > 0 => (
         Icons.handyman_outlined,
@@ -636,14 +641,32 @@ class _PedidoDetalleState extends State<PedidoDetalle> {
     final principales = <Widget>[];
     final menu = <PopupMenuEntry<VoidCallback>>[];
 
+    if (p.bodega && {'POR_PREPARAR', 'RESERVADO'}.contains(estado)) {
+      principales.add(
+        FilledButton.icon(
+          onPressed: _ocupado
+              ? null
+              : () => _ejecutar(
+                  () => Api.accionPedido(
+                    widget.pedidoId,
+                    'start-preparation',
+                    motivo: 'Bodega inicia la preparación',
+                  ),
+                  'Pedido en preparación',
+                ),
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text('Iniciar preparación'),
+        ),
+      );
+    }
     if (p.bodega &&
-        {'RESERVADO', 'PARCIAL', 'LISTO', 'EN_REPARTO'}.contains(estado) &&
+        {'EN_PREPARACION', 'PARCIAL', 'LISTO', 'EN_REPARTO'}.contains(estado) &&
         _porPreparar > 0) {
       principales.add(
         FilledButton.icon(
           onPressed: _ocupado ? null : () => _preparar(),
           icon: const Icon(Icons.handyman),
-          label: const Text('Preparar'),
+          label: const Text('Marcar listo'),
         ),
       );
       menu.add(
@@ -705,6 +728,8 @@ class _PedidoDetalleState extends State<PedidoDetalle> {
         {
           'PENDIENTE_MATERIAL',
           'RESERVADO',
+          'POR_PREPARAR',
+          'EN_PREPARACION',
           'PARCIAL',
           'LISTO',
           'EN_REPARTO',
@@ -741,6 +766,8 @@ class _PedidoDetalleState extends State<PedidoDetalle> {
           'BORRADOR',
           'PENDIENTE_MATERIAL',
           'RESERVADO',
+          'POR_PREPARAR',
+          'EN_PREPARACION',
           'PARCIAL',
           'RETRASADO',
           'LISTO',

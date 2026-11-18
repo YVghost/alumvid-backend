@@ -42,12 +42,22 @@ class _RutasModuloState extends State<RutasModulo> {
       if (!mounted) return;
       setState(() {
         _bandeja = r[0];
-        _rutas = r[1]
-          ..sort(
-            (a, b) => aTexto(
-              b['fechaCreacion'],
-            ).compareTo(aTexto(a['fechaCreacion'])),
-          );
+        final propias =
+            widget.permisos.tiene('CHOFER') && !widget.permisos.bodega;
+        _rutas =
+            (propias
+                  ? r[1]
+                        .where(
+                          (route) =>
+                              route['choferId'] == widget.permisos.usuario.id,
+                        )
+                        .toList()
+                  : r[1])
+              ..sort(
+                (a, b) => aTexto(
+                  b['fechaCreacion'],
+                ).compareTo(aTexto(a['fechaCreacion'])),
+              );
         _sel.removeWhere(
           (id) => !_bandeja.any((p) => '${p['id']}' == id && listoParaRuta(p)),
         );
@@ -90,7 +100,7 @@ class _RutasModuloState extends State<RutasModulo> {
   }) async {
     final ruta = await abrirPanel<Map<String, dynamic>>(
       context,
-      (_) => CrearRuta(pedidos: pedidos),
+      (_) => CrearRuta(pedidos: pedidos, permisos: widget.permisos),
     );
     if (ruta == null) return;
     _sel.clear();
@@ -179,7 +189,7 @@ class _RutasModuloState extends State<RutasModulo> {
             ],
           ),
         ),
-        floatingActionButton: _sel.isEmpty
+        floatingActionButton: _sel.isEmpty && widget.permisos.creaRutas
             ? FloatingActionButton.extended(
                 heroTag: 'nueva-ruta',
                 onPressed: () => _crearRuta(),
@@ -194,13 +204,14 @@ class _RutasModuloState extends State<RutasModulo> {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                   child: Row(
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _agregarARuta,
-                          icon: const Icon(Icons.playlist_add),
-                          label: const Text('Agregar a ruta'),
+                      if (widget.permisos.planificaRutas)
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _agregarARuta,
+                            icon: const Icon(Icons.playlist_add),
+                            label: const Text('Agregar a ruta'),
+                          ),
                         ),
-                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: FilledButton.icon(

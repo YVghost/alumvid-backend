@@ -70,6 +70,9 @@ class _InicioScreenState extends State<InicioScreen> {
       if (s.puede(Modulo.rutas))
         tarea('Rutas', () async {
           _rutas = await adm.ApiService.obtenerRutas();
+          if (s.tiene('CHOFER') && !s.permisos.bodega) {
+            _rutas = _rutas.where((r) => r.choferId == s.usuario.id).toList();
+          }
         }),
       if (s.puede(Modulo.misRutas))
         tarea('Mis rutas', () async {
@@ -241,7 +244,7 @@ class _InicioScreenState extends State<InicioScreen> {
           KpiCard(
             titulo: 'Por preparar',
             valor:
-                '${_pedidosEn({'RESERVADO', 'PARCIAL', 'PENDIENTE_MATERIAL'})}',
+                '${_pedidosEn({'POR_PREPARAR', 'EN_PREPARACION', 'RESERVADO', 'PARCIAL', 'PENDIENTE_MATERIAL'})}',
             icono: Icons.handyman,
             color: AppColors.violet,
             onTap: () => widget.onIrA(Modulo.pedidos),
