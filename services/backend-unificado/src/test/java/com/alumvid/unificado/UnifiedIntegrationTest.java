@@ -101,7 +101,7 @@ class UnifiedIntegrationTest {
         call("POST","/api/pedidos/availability",token,Map.of("lines",lines),200);
         var created=call("POST","/api/pedidos/orders",token,Map.of("requestId",UUID.randomUUID(),"clientId",client,"externallyConfirmed",true,"deliveryMode","RETIRO","lines",lines),200);
         var order=created.path("order").path("id").asText();assertFalse(order.isBlank());
-        for(var action:List.of("confirm","prepare","cancel"))call("POST","/api/pedidos/orders/"+order+"/"+action,token,Map.of("requestId",UUID.randomUUID(),"reason","Prueba "+action),200);
+        for(var action:List.of("confirm","start-preparation","prepare","cancel"))call("POST","/api/pedidos/orders/"+order+"/"+action,token,Map.of("requestId",UUID.randomUUID(),"reason","Prueba "+action),200);
         assertEquals("CANCELADO",call("GET","/api/pedidos/orders/"+order,token,null,200).path("order").path("state").asText());
         assertEquals(0,new java.math.BigDecimal("4").compareTo(new java.math.BigDecimal(call("GET","/api/products/"+id,token,null,200).path("stock").asText())));
     }
@@ -120,7 +120,7 @@ class UnifiedIntegrationTest {
         request.put("deliveryMode","ENTREGA");request.put("deliveryAddress","Quito prueba");request.put("deliveryLatitude",-0.2);request.put("deliveryLongitude",-78.5);
         request.put("lines",List.of(Map.of("productId",product,"quantity",2,"unitPrice",5)));
         var order=call("POST","/api/pedidos/orders",token,request,200).path("order").path("id").asText();
-        for(var action:List.of("confirm","prepare"))call("POST","/api/pedidos/orders/"+order+"/"+action,token,Map.of("requestId",UUID.randomUUID(),"reason","Prueba "+action),200);
+        for(var action:List.of("confirm","start-preparation","prepare"))call("POST","/api/pedidos/orders/"+order+"/"+action,token,Map.of("requestId",UUID.randomUUID(),"reason","Prueba "+action),200);
         var route=call("POST","/api/v1/logistica/rutas",token,Map.of("codigoRuta","TEST-"+UUID.randomUUID(),"choferId",driver.id(),"pedidos",List.of(Map.of("pedidoId",order))),201);
         assertEquals(1,route.path("paradas").size());
         var dispatch=route.path("paradas").get(0).path("id").asText();

@@ -11,7 +11,8 @@ import 'pedido_form.dart';
 
 const estadosPedido = <String, String>{
   '': 'Todos',
-  'RESERVADO': 'Reservados',
+  'POR_PREPARAR': 'Por preparar',
+  'EN_PREPARACION': 'En preparación',
   'PENDIENTE_MATERIAL': 'Falta material',
   'PARCIAL': 'Parciales',
   'LISTO': 'Listos',
@@ -30,7 +31,14 @@ class PedidosModulo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!permisos.vende) return Scaffold(appBar: AppBar(title: const Text('Pedidos')), body: ListaPedidos(permisos: permisos));
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
+    if (!permisos.vende) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Pedidos')),
+        body: ListaPedidos(permisos: permisos),
+      );
+    }
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -39,10 +47,18 @@ class PedidosModulo extends StatelessWidget {
           bottom: const TabBar(
             tabAlignment: TabAlignment.start,
             isScrollable: true,
-            tabs: [Tab(text: 'Pedidos'), Tab(text: 'Clientes')],
+            tabs: [
+              Tab(text: 'Pedidos'),
+              Tab(text: 'Clientes'),
+            ],
           ),
         ),
-        body: TabBarView(children: [ListaPedidos(permisos: permisos), ClientesLista(permisos: permisos)]),
+        body: TabBarView(
+          children: [
+            ListaPedidos(permisos: permisos),
+            ClientesLista(permisos: permisos),
+          ],
+        ),
       ),
     );
   }
@@ -56,7 +72,8 @@ class ListaPedidos extends StatefulWidget {
   State<ListaPedidos> createState() => _ListaPedidosState();
 }
 
-class _ListaPedidosState extends State<ListaPedidos> with AutomaticKeepAliveClientMixin {
+class _ListaPedidosState extends State<ListaPedidos>
+    with AutomaticKeepAliveClientMixin {
   String _estado = '';
   String _q = '';
   bool _cargando = true;
@@ -88,18 +105,27 @@ class _ListaPedidosState extends State<ListaPedidos> with AutomaticKeepAliveClie
   }
 
   Future<void> _abrir(String id) async {
-    await abrirPanel(context, (_) => PedidoDetalle(pedidoId: id, permisos: widget.permisos));
+    await abrirPanel(
+      context,
+      (_) => PedidoDetalle(pedidoId: id, permisos: widget.permisos),
+    );
     _cargar();
   }
 
   Future<void> _nuevo() async {
-    final id = await abrirPanel<String>(context, (_) => const PedidoForm(), ancho: 720);
+    final id = await abrirPanel<String>(
+      context,
+      (_) => const PedidoForm(),
+      ancho: 720,
+    );
     await _cargar();
     if (id != null && mounted) _abrir(id);
   }
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     super.build(context);
     return Scaffold(
       floatingActionButton: widget.permisos.vende
@@ -141,29 +167,45 @@ class _ListaPedidosState extends State<ListaPedidos> with AutomaticKeepAliveClie
 
   Widget _cuerpo() {
     if (_cargando) return const CargandoLista();
-    if (_error != null) return VistaError(mensaje: _error!, onReintentar: _cargar);
+    if (_error != null) {
+      return VistaError(mensaje: _error!, onReintentar: _cargar);
+    }
     return RefreshIndicator(
       onRefresh: _cargar,
       child: _items.isEmpty
-          ? const VistaVacia(icono: Icons.receipt_long, titulo: 'Sin pedidos', mensaje: 'No hay pedidos con este filtro.')
+          ? const VistaVacia(
+              icono: Icons.receipt_long,
+              titulo: 'Sin pedidos',
+              mensaje: 'No hay pedidos con este filtro.',
+            )
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
               itemCount: _items.length,
               separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (_, i) => PedidoCard(pedido: _items[i], onTap: () => _abrir('${_items[i]['id']}')),
+              itemBuilder: (_, i) => PedidoCard(
+                pedido: _items[i],
+                onTap: () => _abrir('${_items[i]['id']}'),
+              ),
             ),
     );
   }
 }
 
 class PedidoCard extends StatelessWidget {
-  const PedidoCard({super.key, required this.pedido, required this.onTap, this.trailing});
+  const PedidoCard({
+    super.key,
+    required this.pedido,
+    required this.onTap,
+    this.trailing,
+  });
   final Map<String, dynamic> pedido;
   final VoidCallback onTap;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final p = pedido;
     final estado = aTexto(p['state']);
     final entrega = p['delivery_mode'] == 'ENTREGA';
@@ -178,7 +220,10 @@ class PedidoCard extends StatelessWidget {
               Container(
                 width: 4,
                 height: 54,
-                decoration: BoxDecoration(color: colorEstado(estado), borderRadius: BorderRadius.circular(4)),
+                decoration: BoxDecoration(
+                  color: colorEstado(estado),
+                  borderRadius: BorderRadius.circular(4),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -187,23 +232,44 @@ class PedidoCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text('#${p['number']}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                        Text(
+                          '#${p['number']}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
                         const SizedBox(width: 8),
                         Tooltip(
-                          message: entrega ? 'Entrega a domicilio' : 'Retiro en local',
-                          child: Icon(entrega ? Icons.local_shipping_outlined : Icons.storefront_outlined,
-                              size: 16, color: AppColors.textMuted),
+                          message: entrega
+                              ? 'Entrega a domicilio'
+                              : 'Retiro en local',
+                          child: Icon(
+                            entrega
+                                ? Icons.local_shipping_outlined
+                                : Icons.storefront_outlined,
+                            size: 16,
+                            color: AppColors.textMuted,
+                          ),
                         ),
                         const Spacer(),
                         EstadoChip(estado),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Text(aTexto(p['client_name'], 'Cliente'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15)),
+                    Text(
+                      aTexto(p['client_name'], 'Cliente'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 15),
+                    ),
                     const SizedBox(height: 2),
                     Text(
                       '${fmtDinero(aNum(p['total']))} · ${fmtFecha(aFecha(p['created_at']))}',
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),

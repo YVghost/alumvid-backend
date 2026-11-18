@@ -1,4 +1,6 @@
+import 'package:alumvid_admin_desktop/shared/tema.dart';
 import 'package:flutter/material.dart';
+
 import '../widgets/ui.dart';
 import '../services/api_service.dart';
 import '../services/location_service.dart';
@@ -79,15 +81,25 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
         lonActual = pos.longitude;
       } catch (_) {}
 
-      final res = await ApiService.optimizarRutaChofer(rutaId, latitud: latActual, longitud: lonActual);
+      final res = await ApiService.optimizarRutaChofer(
+        rutaId,
+        latitud: latActual,
+        longitud: lonActual,
+      );
       if (!mounted) return;
       setState(() {
         _rutaActual = res;
       });
-      AppToast.success(context, 'Paradas reordenadas con éxito por menor tiempo de viaje (Google Routes).');
+      AppToast.success(
+        context,
+        'Paradas reordenadas con éxito por menor tiempo de viaje (Google Routes).',
+      );
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, 'Error al optimizar: ${e.toString().replaceAll('Exception: ', '')}');
+      AppToast.error(
+        context,
+        'Error al optimizar: ${e.toString().replaceAll('Exception: ', '')}',
+      );
     } finally {
       if (mounted) setState(() => _optimizando = false);
     }
@@ -105,7 +117,7 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
       case 'CANCELADA':
         return const Color(0xFFFB7185);
       default:
-        return const Color(0xFF94A3B8);
+        return AppColors.textMuted;
     }
   }
 
@@ -129,13 +141,19 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
     }
   }
 
-  Future<void> _iniciarDestinoSeleccionado(Map<String, dynamic> despacho) async {
+  Future<void> _iniciarDestinoSeleccionado(
+    Map<String, dynamic> despacho,
+  ) async {
     final despachoId = despacho['id']?.toString() ?? '';
     final estadoDespacho = despacho['estado'] ?? 'PENDIENTE';
 
     // Regla de Negocio: Verificar si YA hay una parada EN_CURSO activa
-    final List<dynamic> paradas = (_rutaActual['paradas'] as List<dynamic>?) ?? [];
-    final tieneEnCurso = paradas.any((p) => (p['estado'] ?? '') == 'EN_CURSO' && p['id'].toString() != despachoId);
+    final List<dynamic> paradas =
+        (_rutaActual['paradas'] as List<dynamic>?) ?? [];
+    final tieneEnCurso = paradas.any(
+      (p) =>
+          (p['estado'] ?? '') == 'EN_CURSO' && p['id'].toString() != despachoId,
+    );
     if (tieneEnCurso && estadoDespacho != 'EN_CURSO') {
       _mostrarToastDiscreto(
         'Ya tienes una entrega en curso. Debes finalizar o reportar la parada actual antes de iniciar otra.',
@@ -180,45 +198,54 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final String codigoRuta = _rutaActual['codigoRuta'] ?? 'Ruta';
     final String estadoRuta = _rutaActual['estado'] ?? 'PENDIENTE';
-    final List<dynamic> paradas = (_rutaActual['paradas'] as List<dynamic>?) ?? [];
+    final List<dynamic> paradas =
+        (_rutaActual['paradas'] as List<dynamic>?) ?? [];
 
     // Contabilizar paradas entregadas
-    final int entregadas = paradas.where((p) => p['estado'] == 'ENTREGADO').length;
+    final int entregadas = paradas
+        .where((p) => p['estado'] == 'ENTREGADO')
+        .length;
     final int totalParadas = paradas.length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E17),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF111827),
+        backgroundColor: AppColors.surface,
         elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               codigoRuta,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.text,
+              ),
             ),
             Text(
               '$totalParadas Destinos de Entrega Programados',
-              style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFF94A3B8)),
+            icon: Icon(Icons.refresh, color: AppColors.textMuted),
             onPressed: _recargarDetalleRuta,
             tooltip: 'Actualizar paradas',
           ),
         ],
       ),
       body: _cargando && paradas.isEmpty
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
+          ? Center(child: CircularProgressIndicator(color: AppColors.primary))
           : RefreshIndicator(
               onRefresh: _recargarDetalleRuta,
-              color: const Color(0xFF2563EB),
+              color: AppColors.primary,
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
@@ -226,8 +253,8 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF111827),
-                      border: Border.all(color: const Color(0xFF1E293B)),
+                      color: AppColors.surface,
+                      border: Border.all(color: AppColors.card),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -238,17 +265,24 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                           children: [
                             Text(
                               codigoRuta,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
-                                color: Colors.white,
+                                color: AppColors.text,
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
-                                color: _obtenerColorEstado(estadoRuta).withValues(alpha: 0.15),
-                                border: Border.all(color: _obtenerColorEstado(estadoRuta).withValues(alpha: 0.4)),
+                                color: _obtenerColorEstado(estadoRuta)
+                                    .withValues(alpha: 0.15),
+                                border: Border.all(
+                                  color: _obtenerColorEstado(estadoRuta)
+                                      .withValues(alpha: 0.4),
+                                ),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -265,25 +299,38 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                         const SizedBox(height: 8),
                         Text(
                           'Progreso: $entregadas de $totalParadas entregas documentadas',
-                          style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textMuted,
+                          ),
                         ),
                         const SizedBox(height: 10),
                         // Barra de progreso
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
-                            value: totalParadas > 0 ? (entregadas / totalParadas) : 0.0,
+                            value: totalParadas > 0
+                                ? (entregadas / totalParadas)
+                                : 0.0,
                             minHeight: 6,
-                            backgroundColor: const Color(0xFF1E293B),
-                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF34D399)),
+                            backgroundColor: AppColors.card,
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Color(0xFF34D399),
+                            ),
                           ),
                         ),
                         if (_rutaActual['comentarios'] != null &&
-                            _rutaActual['comentarios'].toString().isNotEmpty) ...[
+                            _rutaActual['comentarios']
+                                .toString()
+                                .isNotEmpty) ...[
                           const SizedBox(height: 10),
                           Text(
                             'Instrucciones: ${_rutaActual['comentarios']}',
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textDim,
+                              fontStyle: FontStyle.italic,
+                            ),
                           ),
                         ],
                       ],
@@ -301,9 +348,9 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'Seleccione con cual destino iniciara su recorrido:',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                   ),
                   const SizedBox(height: 12),
 
@@ -316,7 +363,13 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                         border: Border.all(color: const Color(0xFFE11D48)),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(_error!, style: const TextStyle(color: Color(0xFFFB7185), fontSize: 12)),
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(
+                          color: Color(0xFFFB7185),
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
 
                   // Botón Chofer: Optimizar Paradas desde GPS (compacto a la derecha)
@@ -326,14 +379,32 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF60A5FA),
-                          side: const BorderSide(color: Color(0xFF2563EB)),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          side: BorderSide(color: AppColors.primary),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                         icon: _optimizando
-                            ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF60A5FA)))
+                            ? const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFF60A5FA),
+                                ),
+                              )
                             : const Icon(Icons.auto_mode_rounded, size: 14),
-                        label: const Text('optimizar ruta', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                        label: const Text(
+                          'optimizar ruta',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
                         onPressed: _optimizando ? null : _optimizarRutaDesdeGps,
                       ),
                     ),
@@ -345,9 +416,12 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                     Container(
                       padding: const EdgeInsets.all(24),
                       alignment: Alignment.center,
-                      child: const Text(
+                      child: Text(
                         'Esta ruta no contiene destinos asignados aun.',
-                        style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                        style: TextStyle(
+                          color: AppColors.textDim,
+                          fontSize: 13,
+                        ),
                       ),
                     )
                   else
@@ -356,7 +430,8 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                       final Map<String, dynamic> pedido =
                           (d['pedido'] as Map<String, dynamic>?) ?? {};
                       final String cliente = pedido['cliente'] ?? 'Cliente';
-                      final String direccion = pedido['direccionTexto'] ?? 'Quito';
+                      final String direccion =
+                          pedido['direccionTexto'] ?? 'Quito';
                       final num? orden = d['ordenParada'] as num?;
                       final bool esEntregado = estado == 'ENTREGADO';
                       final bool esEnCurso = estado == 'EN_CURSO';
@@ -364,13 +439,13 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF111827),
+                          color: AppColors.surface,
                           border: Border.all(
                             color: esEnCurso
-                                ? const Color(0xFF2563EB)
+                                ? AppColors.primary
                                 : esEntregado
-                                    ? const Color(0xFF059669).withValues(alpha: 0.4)
-                                    : const Color(0xFF1E293B),
+                                ? const Color(0xFF059669).withValues(alpha: 0.4)
+                                : AppColors.card,
                             width: esEnCurso ? 1.8 : 1.0,
                           ),
                           borderRadius: BorderRadius.circular(10),
@@ -381,20 +456,26 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF1E293B),
-                                          borderRadius: BorderRadius.circular(4),
+                                          color: AppColors.card,
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                         ),
                                         child: Text(
                                           'Parada #${orden ?? 1}',
-                                          style: const TextStyle(
-                                            color: Color(0xFF38BDF8),
+                                          style: TextStyle(
+                                            color: AppColors.primaryLight,
                                             fontWeight: FontWeight.w700,
                                             fontSize: 11,
                                           ),
@@ -403,15 +484,25 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                                       const SizedBox(width: 8),
                                       Text(
                                         '#${d['id'].toString().substring(0, 6)}',
-                                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                                        style: TextStyle(
+                                          color: AppColors.textDim,
+                                          fontSize: 11,
+                                        ),
                                       ),
                                     ],
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: _obtenerColorEstado(estado).withValues(alpha: 0.15),
-                                      border: Border.all(color: _obtenerColorEstado(estado).withValues(alpha: 0.4)),
+                                      color: _obtenerColorEstado(estado)
+                                          .withValues(alpha: 0.15),
+                                      border: Border.all(
+                                        color: _obtenerColorEstado(estado)
+                                            .withValues(alpha: 0.4),
+                                      ),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
@@ -428,59 +519,88 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                               const SizedBox(height: 10),
                               Text(
                                 cliente,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
-                                  color: Colors.white,
+                                  color: AppColors.text,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.place, color: Color(0xFF94A3B8), size: 15),
+                                  Icon(
+                                    Icons.place,
+                                    color: AppColors.textMuted,
+                                    size: 15,
+                                  ),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
                                       direccion,
-                                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                                      style: TextStyle(
+                                        color: AppColors.textMuted,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                               // Carga del pedido: lo que el chofer debe entregar en esta parada.
-                              if ((d['carga'] as List?)?.isNotEmpty == true) ...[
+                              if ((d['carga'] as List?)?.isNotEmpty ==
+                                  true) ...[
                                 const SizedBox(height: 10),
                                 Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF0F172A),
+                                    color: AppColors.surface,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFF334155)),
+                                    border: Border.all(color: AppColors.border),
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        d['numeroPedido'] != null ? 'Entregar · pedido #${d['numeroPedido']}' : 'Entregar',
-                                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w700),
+                                        d['numeroPedido'] != null
+                                            ? 'Entregar · pedido #${d['numeroPedido']}'
+                                            : 'Entregar',
+                                        style: TextStyle(
+                                          color: AppColors.textMuted,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
                                       const SizedBox(height: 4),
                                       for (final c in (d['carga'] as List))
                                         Padding(
-                                          padding: const EdgeInsets.only(top: 2),
+                                          padding: const EdgeInsets.only(
+                                            top: 2,
+                                          ),
                                           child: Row(
                                             children: [
-                                              const Icon(Icons.inventory_2_outlined, size: 14, color: Color(0xFF60A5FA)),
+                                              const Icon(
+                                                Icons.inventory_2_outlined,
+                                                size: 14,
+                                                color: Color(0xFF60A5FA),
+                                              ),
                                               const SizedBox(width: 6),
                                               Expanded(
                                                 child: Text(
                                                   '${c['product_name']} ${medidas(c['length_m'], c['width_cm'], c['height_cm'])}',
-                                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                                  style: TextStyle(
+                                                    color: AppColors.text,
+                                                    fontSize: 13,
+                                                  ),
                                                 ),
                                               ),
-                                              Text('× ${fmtNum(aNum(c['quantity']))}',
-                                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                                              Text(
+                                                '× ${fmtNum(aNum(c['quantity']))}',
+                                                style: TextStyle(
+                                                  color: AppColors.text,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
                                             ],
                                           ),
                                         ),
@@ -493,19 +613,31 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                               // Boton de accion segun estado
                               if (esEntregado)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF059669).withValues(alpha: 0.1),
+                                    color: const Color(0xFF059669)
+                                        .withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: const Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.check_circle, color: Color(0xFF34D399), size: 16),
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: Color(0xFF34D399),
+                                        size: 16,
+                                      ),
                                       SizedBox(width: 6),
                                       Text(
                                         'Entrega Finalizada y Documentada con e-PoD',
-                                        style: TextStyle(color: Color(0xFF34D399), fontSize: 12, fontWeight: FontWeight.w600),
+                                        style: TextStyle(
+                                          color: Color(0xFF34D399),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -515,20 +647,34 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                                   children: [
                                     Container(
                                       width: double.infinity,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                                        color: const Color(0xFFEF4444)
+                                            .withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                                        border: Border.all(
+                                          color: const Color(0xFFEF4444)
+                                              .withValues(alpha: 0.3),
+                                        ),
                                       ),
                                       child: Row(
                                         children: [
-                                          const Icon(Icons.report_problem_outlined, color: Color(0xFFEF4444), size: 16),
+                                          const Icon(
+                                            Icons.report_problem_outlined,
+                                            color: Color(0xFFEF4444),
+                                            size: 16,
+                                          ),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
                                               'Parada Fallida: ${d['comentarios'] ?? "No concretada"}',
-                                              style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 11),
+                                              style: const TextStyle(
+                                                color: Color(0xFFFCA5A5),
+                                                fontSize: 11,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -539,13 +685,31 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                                       width: double.infinity,
                                       child: OutlinedButton.icon(
                                         style: OutlinedButton.styleFrom(
-                                          foregroundColor: const Color(0xFF38BDF8),
-                                          side: const BorderSide(color: Color(0xFF0284C7)),
-                                          padding: const EdgeInsets.symmetric(vertical: 9),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          foregroundColor:
+                                              AppColors.primaryLight,
+                                          side: const BorderSide(
+                                            color: Color(0xFF0284C7),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 9,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
                                         ),
-                                        icon: const Icon(Icons.replay_rounded, size: 16),
-                                        label: const Text('Reintentar Entrega', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                        icon: const Icon(
+                                          Icons.replay_rounded,
+                                          size: 16,
+                                        ),
+                                        label: const Text(
+                                          'Reintentar Entrega',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
                                         onPressed: () => _reintentarParada(d),
                                       ),
                                     ),
@@ -558,22 +722,32 @@ class _DetalleRutaScreenState extends State<DetalleRutaScreen> {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: esEnCurso
                                           ? const Color(0xFF0284C7)
-                                          : const Color(0xFF2563EB),
+                                          : AppColors.primary,
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 10),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
                                     ),
                                     icon: Icon(
-                                      esEnCurso ? Icons.navigation : Icons.play_arrow,
+                                      esEnCurso
+                                          ? Icons.navigation
+                                          : Icons.play_arrow,
                                       size: 18,
                                     ),
                                     label: Text(
                                       esEnCurso
                                           ? 'Continuar Navegacion Urbana a este Destino'
                                           : 'Iniciar Entrega a este Destino',
-                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                      ),
                                     ),
-                                    onPressed: () => _iniciarDestinoSeleccionado(d),
+                                    onPressed: () =>
+                                        _iniciarDestinoSeleccionado(d),
                                   ),
                                 ),
                             ],

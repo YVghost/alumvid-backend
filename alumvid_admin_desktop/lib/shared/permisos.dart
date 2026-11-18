@@ -24,6 +24,7 @@ class Permisos {
   bool get editaCatalogo => esAdmin;
 
   /// Planificar rutas, monitoreo y usuarios.
+  bool get creaRutas => esAdmin || tiene('BODEGUERO') || tiene('CHOFER');
   bool get planificaRutas => esAdmin;
   bool get gestionaUsuarios => esAdmin;
 

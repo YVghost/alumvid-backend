@@ -1,9 +1,13 @@
+import 'package:alumvid_admin_desktop/shared/tema.dart';
+
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+
 import '../services/api_service.dart';
 import '../services/location_service.dart';
 import '../utils/app_toast.dart';
@@ -25,7 +29,8 @@ class NavegacionDestinoScreen extends StatefulWidget {
   });
 
   @override
-  State<NavegacionDestinoScreen> createState() => _NavegacionDestinoScreenState();
+  State<NavegacionDestinoScreen> createState() =>
+      _NavegacionDestinoScreenState();
 }
 
 class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
@@ -47,14 +52,23 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
   Timer? _telemetriaTimer;
 
   List<Map<String, dynamic>> _obtenerParadasPendientes() {
-    final List<dynamic> paradasRaw = widget.ruta['paradas'] as List<dynamic>? ?? [];
+    final List<dynamic> paradasRaw =
+        widget.ruta['paradas'] as List<dynamic>? ?? [];
     final List<Map<String, dynamic>> paradas = paradasRaw
         .map((p) => p as Map<String, dynamic>)
-        .where((p) => p['estado'] != 'ENTREGADO' && p['estado'] != 'CANCELADA' && p['pedido'] != null)
+        .where(
+          (p) =>
+              p['estado'] != 'ENTREGADO' &&
+              p['estado'] != 'CANCELADA' &&
+              p['pedido'] != null,
+        )
         .toList();
 
-    paradas.sort((a, b) => ((a['ordenParada'] as num?)?.toInt() ?? 0)
-        .compareTo((b['ordenParada'] as num?)?.toInt() ?? 0));
+    paradas.sort(
+      (a, b) => ((a['ordenParada'] as num?)?.toInt() ?? 0).compareTo(
+        (b['ordenParada'] as num?)?.toInt() ?? 0,
+      ),
+    );
     return paradas;
   }
 
@@ -91,7 +105,8 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
     const r = 6371.0;
     final dLat = (p2.latitude - p1.latitude) * (pi / 180.0);
     final dLon = (p2.longitude - p1.longitude) * (pi / 180.0);
-    final a = sin(dLat / 2) * sin(dLat / 2) +
+    final a =
+        sin(dLat / 2) * sin(dLat / 2) +
         cos(p1.latitude * (pi / 180.0)) *
             cos(p2.latitude * (pi / 180.0)) *
             sin(dLon / 2) *
@@ -138,37 +153,45 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
     _mapController.move(posInicial, 15.0);
 
     // 3. Suscripcion a cambios en la posicion GPS del dispositivo (si está en Quito)
-    _positionStreamSub = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 5,
-      ),
-    ).listen((pos) {
-      if (!mounted) return;
-      if (!_esCoordenadaQuito(pos.latitude, pos.longitude)) return;
-      final nuevaPos = LatLng(pos.latitude, pos.longitude);
-      setState(() {
-        _posicionChofer = nuevaPos;
-        _rumboActual = pos.heading;
-        _velocidadKmh = (pos.speed * 3.6).clamp(0.0, 120.0);
-      });
-      _mapController.move(nuevaPos, _mapController.camera.zoom);
-    }, onError: (_) {});
+    _positionStreamSub =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 5,
+          ),
+        ).listen((pos) {
+          if (!mounted) return;
+          if (!_esCoordenadaQuito(pos.latitude, pos.longitude)) return;
+          final nuevaPos = LatLng(pos.latitude, pos.longitude);
+          setState(() {
+            _posicionChofer = nuevaPos;
+            _rumboActual = pos.heading;
+            _velocidadKmh = (pos.speed * 3.6).clamp(0.0, 120.0);
+          });
+          _mapController.move(nuevaPos, _mapController.camera.zoom);
+        }, onError: (_) {});
 
     // 4. Transmision periodica de telemetria al backend y avance vehicular continuo por calles reales
     _indicePunto = 0;
     _telemetriaTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (!mounted) return;
 
-      if (_puntosTramoActivo.isNotEmpty && _indicePunto < _puntosTramoActivo.length - 1) {
-        _indicePunto = (_indicePunto + 1).clamp(0, _puntosTramoActivo.length - 1);
+      if (_puntosTramoActivo.isNotEmpty &&
+          _indicePunto < _puntosTramoActivo.length - 1) {
+        _indicePunto = (_indicePunto + 1).clamp(
+          0,
+          _puntosTramoActivo.length - 1,
+        );
         final nuevoPunto = _puntosTramoActivo[_indicePunto];
         final siguiente = _indicePunto < _puntosTramoActivo.length - 1
             ? _puntosTramoActivo[_indicePunto + 1]
             : nuevoPunto;
 
         final nuevoRumbo = _calcularRumbo(nuevoPunto, siguiente);
-        final distRestante = _calcularDistanciaKm(nuevoPunto, LatLng(destLat, destLng));
+        final distRestante = _calcularDistanciaKm(
+          nuevoPunto,
+          LatLng(destLat, destLng),
+        );
 
         setState(() {
           _posicionChofer = nuevoPunto;
@@ -196,8 +219,10 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
   Future<void> _trazarRutaVial(LatLng origen) async {
     final Map<String, dynamic> pedidoActivo =
         widget.despacho['pedido'] as Map<String, dynamic>? ?? {};
-    final destLatActivo = (pedidoActivo['latitudDestino'] as num?)?.toDouble() ?? -0.102234;
-    final destLngActivo = (pedidoActivo['longitudDestino'] as num?)?.toDouble() ?? -78.451495;
+    final destLatActivo =
+        (pedidoActivo['latitudDestino'] as num?)?.toDouble() ?? -0.102234;
+    final destLngActivo =
+        (pedidoActivo['longitudDestino'] as num?)?.toDouble() ?? -78.451495;
 
     final paradas = _obtenerParadasPendientes();
 
@@ -213,7 +238,11 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
         destLngActivo,
       );
       final List<dynamic> coords = res['coordinates'] as List<dynamic>? ?? [];
-      listaActivo = coords.map((c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble())).toList();
+      listaActivo = coords
+          .map(
+            (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
+          )
+          .toList();
       distActivoKm = (res['distanciaKm'] as num?)?.toDouble() ?? 2.2;
       durActivoMin = (res['duracionMin'] as num?)?.toInt() ?? 4;
     } catch (_) {}
@@ -239,8 +268,13 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
           latSig,
           lonSig,
         );
-        final List<dynamic> coordsSig = resSig['coordinates'] as List<dynamic>? ?? [];
-        listaSiguiente = coordsSig.map((c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble())).toList();
+        final List<dynamic> coordsSig =
+            resSig['coordinates'] as List<dynamic>? ?? [];
+        listaSiguiente = coordsSig
+            .map(
+              (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
+            )
+            .toList();
       } catch (_) {}
     }
 
@@ -257,15 +291,21 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
 
   Future<void> _transmitirTelemetriaAlServidor() async {
     if (_posicionChofer == null) return;
-    String choferId = widget.choferData['id']?.toString() ??
-        (widget.choferData['user'] != null ? widget.choferData['user']['id']?.toString() : '') ??
+    String choferId =
+        widget.choferData['id']?.toString() ??
+        (widget.choferData['user'] != null
+            ? widget.choferData['user']['id']?.toString()
+            : '') ??
         '';
     if (choferId.isEmpty) {
       choferId = await ApiService.getDriverId() ?? '';
     }
-    String choferNombre = widget.choferData['nombre']?.toString() ??
+    String choferNombre =
+        widget.choferData['nombre']?.toString() ??
         widget.choferData['fullName']?.toString() ??
-        (widget.choferData['user'] != null ? widget.choferData['user']['fullName']?.toString() : '') ??
+        (widget.choferData['user'] != null
+            ? widget.choferData['user']['fullName']?.toString()
+            : '') ??
         '';
     if (choferNombre.isEmpty) {
       choferNombre = await ApiService.getDriverName() ?? 'Chofer';
@@ -286,13 +326,13 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
   void _abrirPantallaEpod() async {
     final resultado = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(
-        builder: (_) => EpodScreen(despacho: _despachoActual),
-      ),
+      MaterialPageRoute(builder: (_) => EpodScreen(despacho: _despachoActual)),
     );
 
     if (resultado == true && mounted) {
-      _mostrarToastDiscreto('Entrega documentada registrada con éxito en el sistema.');
+      _mostrarToastDiscreto(
+        'Entrega documentada registrada con éxito en el sistema.',
+      );
       Navigator.pop(context, true);
     }
   }
@@ -325,18 +365,26 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
         builder: (ctx, setDialogState) {
           final esOtro = motivoSeleccionado == 'Otro motivo...';
           return AlertDialog(
-            backgroundColor: const Color(0xFF111827),
+            backgroundColor: AppColors.surface,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFF1E293B)),
+              side: BorderSide(color: AppColors.card),
             ),
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.report_problem_rounded, color: Color(0xFFEF4444), size: 22),
+                Icon(
+                  Icons.report_problem_rounded,
+                  color: Color(0xFFEF4444),
+                  size: 22,
+                ),
                 SizedBox(width: 8),
                 Text(
                   'Reportar Parada Fallida',
-                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -345,29 +393,36 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Seleccione la causa por la cual no se pudo concretar la entrega:',
-                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                   ),
                   const SizedBox(height: 12),
-                  ...motivos.map((m) => RadioListTile<String>(
-                        value: m,
-                        // ignore: deprecated_member_use
-                        groupValue: motivoSeleccionado,
-                        activeColor: const Color(0xFFEF4444),
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        title: Text(m, style: const TextStyle(color: Colors.white, fontSize: 12)),
-                        // ignore: deprecated_member_use
-                        onChanged: (val) {
-                          if (val != null) setDialogState(() => motivoSeleccionado = val);
-                        },
-                      )),
+                  ...motivos.map(
+                    (m) => RadioListTile<String>(
+                      value: m,
+                      // ignore: deprecated_member_use
+                      groupValue: motivoSeleccionado,
+                      activeColor: const Color(0xFFEF4444),
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: Text(
+                        m,
+                        style: TextStyle(color: AppColors.text, fontSize: 12),
+                      ),
+                      // ignore: deprecated_member_use
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() => motivoSeleccionado = val);
+                        }
+                      },
+                    ),
+                  ),
                   if (esOtro) ...[
                     const SizedBox(height: 8),
                     TextField(
                       controller: detalleCtrl,
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      style: TextStyle(color: AppColors.text, fontSize: 12),
                       decoration: const InputDecoration(
                         hintText: 'Especifique el motivo...',
                         isDense: true,
@@ -381,7 +436,10 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancelar', style: TextStyle(color: Color(0xFF94A3B8))),
+                child: Text(
+                  'Cancelar',
+                  style: TextStyle(color: AppColors.textMuted),
+                ),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -389,7 +447,10 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Confirmar Fallida', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'Confirmar Fallida',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           );
@@ -398,29 +459,41 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
     );
 
     if (confirmado == true) {
-      final motivoFinal = motivoSeleccionado == 'Otro motivo...' && detalleCtrl.text.trim().isNotEmpty
+      final motivoFinal =
+          motivoSeleccionado == 'Otro motivo...' &&
+              detalleCtrl.text.trim().isNotEmpty
           ? detalleCtrl.text.trim()
           : motivoSeleccionado;
 
       try {
-        await ApiService.cancelarRuta(widget.despacho['id'].toString(), motivoFinal);
+        await ApiService.cancelarRuta(
+          widget.despacho['id'].toString(),
+          motivoFinal,
+        );
         if (!mounted) return;
         Navigator.pop(context, true); // Retornar a la lista de paradas
       } catch (e) {
         if (!mounted) return;
-        _mostrarToastDiscreto('Error al reportar parada fallida: $e', isError: true);
+        _mostrarToastDiscreto(
+          'Error al reportar parada fallida: $e',
+          isError: true,
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final Map<String, dynamic> pedido =
         _despachoActual['pedido'] as Map<String, dynamic>? ?? {};
     final String cliente = pedido['cliente'] ?? 'Cliente';
     final String direccion = pedido['direccionTexto'] ?? 'Quito';
-    final double destLat = (pedido['latitudDestino'] as num?)?.toDouble() ?? -0.102234;
-    final double destLng = (pedido['longitudDestino'] as num?)?.toDouble() ?? -78.451495;
+    final double destLat =
+        (pedido['latitudDestino'] as num?)?.toDouble() ?? -0.102234;
+    final double destLng =
+        (pedido['longitudDestino'] as num?)?.toDouble() ?? -78.451495;
     final LatLng destPoint = LatLng(destLat, destLng);
 
     final String codigoRuta = widget.ruta['codigoRuta'] ?? 'Ruta';
@@ -429,26 +502,30 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
     final paradasPendientes = _obtenerParadasPendientes();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E17),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF111827),
+        backgroundColor: AppColors.surface,
         elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               '$codigoRuta • Parada #${ordenParada ?? 1}',
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.text,
+              ),
             ),
-            const Text(
+            Text(
               'Navegacion Urbana y Telemetria en Vivo',
-              style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.my_location, color: Color(0xFF38BDF8)),
+            icon: Icon(Icons.my_location, color: AppColors.primaryLight),
             onPressed: () {
               if (_posicionChofer != null) {
                 _mapController.move(_posicionChofer!, 15.0);
@@ -471,7 +548,8 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                urlTemplate:
+                    'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
                 userAgentPackageName: 'com.alumvid.mobile',
                 subdomains: const ['mt0', 'mt1', 'mt2', 'mt3'],
                 maxZoom: 20,
@@ -485,17 +563,24 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                     Polyline(
                       points: _puntosTramoSiguiente,
                       strokeWidth: 4.8,
-                      color: const Color(0xFF38BDF8),
+                      color: AppColors.primaryLight,
                     ),
 
                   // 2. Tramo hacia la parada activa (desde el chofer)
                   if (_puntosTramoActivo.isNotEmpty)
                     Polyline(
                       points: _puntosTramoActivo.length > _indicePunto
-                          ? [_posicionChofer ?? _puntosTramoActivo[_indicePunto], ..._puntosTramoActivo.sublist(_indicePunto)]
-                          : [_posicionChofer ?? _puntosTramoActivo.last, destPoint],
+                          ? [
+                              _posicionChofer ??
+                                  _puntosTramoActivo[_indicePunto],
+                              ..._puntosTramoActivo.sublist(_indicePunto),
+                            ]
+                          : [
+                              _posicionChofer ?? _puntosTramoActivo.last,
+                              destPoint,
+                            ],
                       strokeWidth: 5.5,
-                      color: const Color(0xFF2563EB),
+                      color: AppColors.primary,
                     ),
                 ],
               ),
@@ -506,8 +591,10 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                   // Marcadores de todas las paradas pendientes de la hoja de ruta
                   ...paradasPendientes.map((parada) {
                     final ped = parada['pedido'] as Map<String, dynamic>? ?? {};
-                    final lat = (ped['latitudDestino'] as num?)?.toDouble() ?? 0.0;
-                    final lon = (ped['longitudDestino'] as num?)?.toDouble() ?? 0.0;
+                    final lat =
+                        (ped['latitudDestino'] as num?)?.toDouble() ?? 0.0;
+                    final lon =
+                        (ped['longitudDestino'] as num?)?.toDouble() ?? 0.0;
                     final orden = parada['ordenParada'] ?? 1;
                     final clienteNom = ped['cliente'] ?? 'Destino';
                     final esActiva = parada['id'] == _despachoActual['id'];
@@ -520,18 +607,27 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: esActiva ? const Color(0xFFE11D48) : const Color(0xFF0284C7),
+                              color: esActiva
+                                  ? const Color(0xFFE11D48)
+                                  : const Color(0xFF0284C7),
                               borderRadius: BorderRadius.circular(6),
                               boxShadow: const [
-                                BoxShadow(color: Colors.black45, blurRadius: 4, offset: Offset(0, 2)),
+                                BoxShadow(
+                                  color: Colors.black45,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
                               ],
                             ),
                             child: Text(
                               '#$orden $clienteNom',
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: AppColors.text,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 10,
                               ),
@@ -541,7 +637,9 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                           ),
                           Icon(
                             Icons.location_on,
-                            color: esActiva ? const Color(0xFFE11D48) : const Color(0xFF0284C7),
+                            color: esActiva
+                                ? const Color(0xFFE11D48)
+                                : const Color(0xFF0284C7),
                             size: 26,
                           ),
                         ],
@@ -559,14 +657,22 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                         decoration: BoxDecoration(
                           color: const Color(0xFF0284C7),
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2.5),
+                          border: Border.all(color: AppColors.text, width: 2.5),
                           boxShadow: const [
-                            BoxShadow(color: Color(0x66000000), blurRadius: 8, offset: Offset(0, 4)),
+                            BoxShadow(
+                              color: Color(0x66000000),
+                              blurRadius: 8,
+                              offset: Offset(0, 4),
+                            ),
                           ],
                         ),
                         child: Transform.rotate(
                           angle: _rumboActual * (pi / 180.0),
-                          child: const Icon(Icons.navigation, color: Colors.white, size: 26),
+                          child: Icon(
+                            Icons.navigation,
+                            color: AppColors.text,
+                            size: 26,
+                          ),
                         ),
                       ),
                     ),
@@ -583,11 +689,15 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFF111827).withValues(alpha: 0.95),
+                color: AppColors.surface.withValues(alpha: 0.95),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF1E293B)),
+                border: Border.all(color: AppColors.card),
                 boxShadow: const [
-                  BoxShadow(color: Colors.black54, blurRadius: 12, offset: Offset(0, 4)),
+                  BoxShadow(
+                    color: Colors.black54,
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                  ),
                 ],
               ),
               child: Column(
@@ -598,10 +708,14 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                          color: AppColors.primary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.local_shipping, color: Color(0xFF60A5FA), size: 22),
+                        child: const Icon(
+                          Icons.local_shipping,
+                          color: Color(0xFF60A5FA),
+                          size: 22,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -610,8 +724,8 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                           children: [
                             Text(
                               cliente,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: AppColors.text,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 15,
                               ),
@@ -620,8 +734,8 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                             ),
                             Text(
                               direccion,
-                              style: const TextStyle(
-                                color: Color(0xFF94A3B8),
+                              style: TextStyle(
+                                color: AppColors.textMuted,
                                 fontSize: 12,
                               ),
                               maxLines: 1,
@@ -632,20 +746,24 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                       ),
                     ],
                   ),
-                  const Divider(color: Color(0xFF1E293B), height: 16),
+                  Divider(color: AppColors.card, height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.route, color: Color(0xFF34D399), size: 16),
+                          const Icon(
+                            Icons.route,
+                            color: Color(0xFF34D399),
+                            size: 16,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             _cargandoRuta
                                 ? 'Calculando red vial...'
                                 : _distanciaRestanteKm <= 0.05
-                                    ? '¡Has llegado al destino!'
-                                    : '${_distanciaRestanteKm.toStringAsFixed(1)} km restantes',
+                                ? '¡Has llegado al destino!'
+                                : '${_distanciaRestanteKm.toStringAsFixed(1)} km restantes',
                             style: const TextStyle(
                               color: Color(0xFF34D399),
                               fontWeight: FontWeight.w600,
@@ -657,8 +775,8 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                       if (_duracionEstimadaMin > 0)
                         Text(
                           '~$_duracionEstimadaMin min aprox.',
-                          style: const TextStyle(
-                            color: Color(0xFF94A3B8),
+                          style: TextStyle(
+                            color: AppColors.textMuted,
                             fontSize: 12,
                             fontFamily: 'monospace',
                           ),
@@ -669,13 +787,17 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(Icons.near_me, color: Color(0xFF38BDF8), size: 14),
+                        Icon(
+                          Icons.near_me,
+                          color: AppColors.primaryLight,
+                          size: 14,
+                        ),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             'Próxima parada: #${_proximaParada!['ordenParada']} ${(_proximaParada!['pedido'] as Map)['cliente'] ?? ''}',
-                            style: const TextStyle(
-                              color: Color(0xFF38BDF8),
+                            style: TextStyle(
+                              color: AppColors.primaryLight,
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                             ),
@@ -702,20 +824,32 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                 // Indicador de telemetria satelital activa
                 Container(
                   margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A).withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
                   ),
-                  child: const Row(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.primaryLight.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.sensors, color: Color(0xFF38BDF8), size: 15),
+                      Icon(
+                        Icons.sensors,
+                        color: AppColors.primaryLight,
+                        size: 15,
+                      ),
                       SizedBox(width: 6),
                       Text(
                         'Transmision satelital activa hacia el Centro de Control',
-                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
@@ -727,15 +861,20 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                   height: 50,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       elevation: 4,
                     ),
                     icon: const Icon(Icons.assignment_turned_in, size: 20),
                     label: const Text(
                       'Completar Entrega Documentada (e-PoD)',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
                     ),
                     onPressed: _abrirPantallaEpod,
                   ),
@@ -750,12 +889,21 @@ class _NavegacionDestinoScreenState extends State<NavegacionDestinoScreen> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFEF4444),
                       side: const BorderSide(color: Color(0xFFEF4444)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
-                    icon: const Icon(Icons.cancel_outlined, size: 16, color: Color(0xFFEF4444)),
+                    icon: const Icon(
+                      Icons.cancel_outlined,
+                      size: 16,
+                      color: Color(0xFFEF4444),
+                    ),
                     label: const Text(
                       'Reportar Parada Fallida',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     onPressed: _reportarParadaFallida,
                   ),

@@ -44,12 +44,15 @@ class MovimientoInventario {
       type: json['type']?.toString() ?? 'INGRESO',
       quantity: double.tryParse(json['quantity']?.toString() ?? '') ?? 0.0,
       delta: double.tryParse(json['delta']?.toString() ?? '') ?? 0.0,
-      stockBefore: double.tryParse(json['stockBefore']?.toString() ?? '') ?? 0.0,
+      stockBefore:
+          double.tryParse(json['stockBefore']?.toString() ?? '') ?? 0.0,
       stockAfter: double.tryParse(json['stockAfter']?.toString() ?? '') ?? 0.0,
       reason: json['reason']?.toString() ?? '',
       reference: json['reference']?.toString() ?? '',
       actorName: json['actorName']?.toString() ?? 'Sistema',
-      occurredAt: json['occurredAt'] != null ? DateTime.tryParse(json['occurredAt'].toString()) : null,
+      occurredAt: json['occurredAt'] != null
+          ? DateTime.tryParse(json['occurredAt'].toString())
+          : null,
     );
   }
 }

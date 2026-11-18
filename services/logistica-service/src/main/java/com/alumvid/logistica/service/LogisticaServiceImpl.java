@@ -235,6 +235,7 @@ public class LogisticaServiceImpl implements LogisticaService {
     @Override
     @Transactional
     public RutaResponse crearRuta(CrearRutaSimpleRequest request) {
+        Sesion.exigirPlanificacion(request.getChoferId());
         Chofer chofer = choferDisponible(request.getChoferId(), null);
         String base = request.getCodigoRuta() != null && !request.getCodigoRuta().isBlank()
                 ? request.getCodigoRuta().trim()

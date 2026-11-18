@@ -59,10 +59,13 @@ public class LogisticaSecurity {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(API + "/health", "/ws-logistica/**", "/ws-telemetria/**", "/actuator/health").permitAll()
                         // Operación del chofer en ruta (la propiedad se valida en el controlador).
-                        .requestMatchers(HttpMethod.GET, API + "/choferes/*/rutas", API + "/choferes/*/despachos-hoy", API + "/rutas/*").hasAnyRole("ADMINISTRADOR", "CHOFER")
+                        .requestMatchers(HttpMethod.GET, API + "/choferes/*/rutas", API + "/choferes/*/despachos-hoy", API + "/rutas/*").hasAnyRole("ADMINISTRADOR", "BODEGUERO", "CHOFER")
                         .requestMatchers(HttpMethod.POST, API + "/despachos/*/aceptar-inicio", API + "/despachos/*/cancelar",
                                 API + "/despachos/*/reintentar", API + "/despachos/*/cerrar-entrega",
                                 API + "/rutas/*/optimizar-chofer", API + "/telemetria").hasAnyRole("ADMINISTRADOR", "CHOFER")
+                        // Creation and the minimum read access needed by the route planner.
+                        .requestMatchers(HttpMethod.GET,API+"/rutas",API+"/rutas/*",API+"/choferes").hasAnyRole("ADMINISTRADOR","BODEGUERO","CHOFER")
+                        .requestMatchers(HttpMethod.POST,API+"/rutas").hasAnyRole("ADMINISTRADOR","BODEGUERO","CHOFER")
                         // Planificación y supervisión.
                         .requestMatchers(API + "/**").hasRole("ADMINISTRADOR")
                         .anyRequest().denyAll())

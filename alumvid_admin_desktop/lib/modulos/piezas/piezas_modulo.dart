@@ -70,12 +70,17 @@ class _PiezasModuloState extends State<PiezasModulo> {
   }
 
   Future<void> _abrir(Map<String, dynamic> p) async {
-    final cambio = await abrirPanel<bool>(context, (_) => FichaPieza(piezaId: '${p['id']}', permisos: widget.permisos));
+    final cambio = await abrirPanel<bool>(
+      context,
+      (_) => FichaPieza(piezaId: '${p['id']}', permisos: widget.permisos),
+    );
     if (cambio == true) _cargar();
   }
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Scaffold(
       appBar: AppBar(title: const Text('Piezas y retazos')),
       body: AnchoLegible(
@@ -92,7 +97,11 @@ class _PiezasModuloState extends State<PiezasModulo> {
               ),
             ),
             FiltrosChips<String>(
-              opciones: const {'': 'Todos', 'ALUMINIO': 'Perfiles de aluminio', 'VIDRIO': 'Vidrios'},
+              opciones: const {
+                '': 'Todos',
+                'ALUMINIO': 'Perfiles de aluminio',
+                'VIDRIO': 'Vidrios',
+              },
               seleccion: _tipo,
               onSeleccion: (v) {
                 setState(() {
@@ -108,10 +117,14 @@ class _PiezasModuloState extends State<PiezasModulo> {
                 child: TextField(
                   controller: _minimo,
                   onChanged: _medidaCambio,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.straighten),
-                    labelText: _tipo == 'ALUMINIO' ? 'Largo mínimo que necesito (m)' : 'Ancho mínimo que necesito (cm)',
+                    labelText: _tipo == 'ALUMINIO'
+                        ? 'Largo mínimo que necesito (m)'
+                        : 'Ancho mínimo que necesito (cm)',
                   ),
                 ),
               ),
@@ -119,15 +132,29 @@ class _PiezasModuloState extends State<PiezasModulo> {
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
               child: Row(
                 children: [
-                  Expanded(child: Text('${_items.length} piezas', style: const TextStyle(color: AppColors.textMuted))),
+                  Expanded(
+                    child: Text(
+                      '${_items.length} piezas',
+                      style: TextStyle(color: AppColors.textMuted),
+                    ),
+                  ),
                   DropdownButton<String>(
                     value: _estado,
                     isDense: true,
                     underline: const SizedBox.shrink(),
                     items: const [
-                      DropdownMenuItem(value: 'DISPONIBLE', child: Text('Disponibles')),
-                      DropdownMenuItem(value: 'PREPARADO', child: Text('Reservadas')),
-                      DropdownMenuItem(value: 'DESCARTADO', child: Text('Descartadas')),
+                      DropdownMenuItem(
+                        value: 'DISPONIBLE',
+                        child: Text('Disponibles'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'PREPARADO',
+                        child: Text('Reservadas'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'DESCARTADO',
+                        child: Text('Descartadas'),
+                      ),
                       DropdownMenuItem(value: '', child: Text('Todas')),
                     ],
                     onChanged: (v) {
@@ -147,11 +174,17 @@ class _PiezasModuloState extends State<PiezasModulo> {
 
   Widget _cuerpo() {
     if (_cargando) return const CargandoLista();
-    if (_error != null) return VistaError(mensaje: _error!, onReintentar: _cargar);
+    if (_error != null) {
+      return VistaError(mensaje: _error!, onReintentar: _cargar);
+    }
     return RefreshIndicator(
       onRefresh: _cargar,
       child: _items.isEmpty
-          ? const VistaVacia(icono: Icons.content_cut, titulo: 'Sin piezas', mensaje: 'Prueba con una medida menor u otro material.')
+          ? const VistaVacia(
+              icono: Icons.content_cut,
+              titulo: 'Sin piezas',
+              mensaje: 'Prueba con una medida menor u otro material.',
+            )
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
               itemCount: _items.length,
@@ -162,16 +195,34 @@ class _PiezasModuloState extends State<PiezasModulo> {
                 return Card(
                   clipBehavior: Clip.antiAlias,
                   child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    leading: CircleAvatar(
-                      backgroundColor: (completa ? AppColors.success : AppColors.violet).withValues(alpha: 0.16),
-                      child: Icon(completa ? Icons.crop_square : Icons.content_cut, color: completa ? AppColors.success : AppColors.violet),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 6,
                     ),
-                    title: Text(medidas(p['lengthM'], p['widthCm'], p['heightCm']), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                    subtitle: Text('${p['productName']}\n${aTexto(p['location'], 'Sin ubicación')} · ${fmtNum(aNum(p['percentage']))} % de una unidad',
-                        style: const TextStyle(color: AppColors.textMuted)),
+                    leading: CircleAvatar(
+                      backgroundColor:
+                          (completa ? AppColors.success : AppColors.violet)
+                              .withValues(alpha: 0.16),
+                      child: Icon(
+                        completa ? Icons.crop_square : Icons.content_cut,
+                        color: completa ? AppColors.success : AppColors.violet,
+                      ),
+                    ),
+                    title: Text(
+                      medidas(p['lengthM'], p['widthCm'], p['heightCm']),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                    subtitle: Text(
+                      '${p['productName']}\n${aTexto(p['location'], 'Sin ubicación')} · ${fmtNum(aNum(p['percentage']))} % de una unidad',
+                      style: TextStyle(color: AppColors.textMuted),
+                    ),
                     isThreeLine: true,
-                    trailing: _estado == '' ? EstadoChip(aTexto(p['state'])) : const Icon(Icons.chevron_right),
+                    trailing: _estado == ''
+                        ? EstadoChip(aTexto(p['state']))
+                        : const Icon(Icons.chevron_right),
                     onTap: () => _abrir(p),
                   ),
                 );

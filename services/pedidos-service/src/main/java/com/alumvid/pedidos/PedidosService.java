@@ -15,7 +15,7 @@ import static com.alumvid.pedidos.AvailabilityPlanner.*;
 class PedidosService {
     private final JdbcTemplate db;private final AvailabilityPlanner planner;private final ObjectMapper json;private final OrderFulfillment fulfillment;private final java.time.Clock clock;
     PedidosService(JdbcTemplate db,AvailabilityPlanner planner,ObjectMapper json,OrderFulfillment fulfillment,java.time.Clock clock) {this.db=db;this.planner=planner;this.json=json;this.fulfillment=fulfillment;this.clock=clock;}
-    private static final Set<String> STATES=Set.of("BORRADOR","PENDIENTE_MATERIAL","RESERVADO","PARCIAL","LISTO","EN_REPARTO","ENTREGADO","RETRASADO","CANCELADO","VENCIDO");
+    private static final Set<String> STATES=Set.of("BORRADOR","PENDIENTE_MATERIAL","RESERVADO","POR_PREPARAR","EN_PREPARACION","PARCIAL","LISTO","EN_REPARTO","ENTREGADO","RETRASADO","CANCELADO","VENCIDO");
     private void permission(AuthClient.Identity actor,String... roles) {if(Arrays.stream(roles).noneMatch(actor::has))throw new PedidosError(403,"Sin permisos para esta operacion");}
     private void page(int page,int size) {if(page<0||size<1||size>100)throw new PedidosError(400,"Pagina >=0 y tamano entre 1 y 100");}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
@@ -67,7 +67,7 @@ class PedidosService {
     public Map<String,Object> get(UUID id) {return map("order",order(id,false),"lines",lines(id),"allocations",db.queryForList("SELECT a.*,p.location FROM pedidos.allocation a LEFT JOIN retazos.piece p ON p.id=a.piece_id WHERE a.order_id=? ORDER BY a.created_at,a.id",id),"reservations",db.queryForList("SELECT * FROM inventario.stock_reservation WHERE order_id=? ORDER BY created_at,id",id),"fulfillments",db.queryForList("SELECT f.*,p.length_m,p.width_cm,p.height_cm,p.location AS current_location FROM pedidos.fulfillment_item f LEFT JOIN retazos.piece p ON p.id=f.piece_id WHERE f.order_id=? ORDER BY f.created_at,f.id",id),"shipments",db.queryForList("SELECT id,state,driver_id,route_id,dispatch_id,receiver_name,reason,created_by_name,created_at,delivered_at,returned_at FROM pedidos.commercial_shipment WHERE order_id=? ORDER BY created_at,id",id),"events",events(id));}
     private List<Map<String,Object>> events(UUID id) {var rows=db.queryForList("SELECT id,action,reason,actor_name,detail,created_at FROM pedidos.order_event WHERE order_id=? ORDER BY created_at,id",id);for(var row:rows)row.put("detail",parse(row.get("detail").toString()));return rows;}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
-    public Map<String,Object> list(String state,String q,int page,int size) {page(page,size);if(!state.isEmpty()&&!STATES.contains(state))throw new PedidosError(400,"Estado invalido");if(q.length()>150)throw new PedidosError(400,"Filtro demasiado largo");String filter=q.trim().toLowerCase(Locale.ROOT);String where=" WHERE (?='' OR state=?) AND POSITION(? IN LOWER(client_name||' '||number::text))>0";return map("items",db.queryForList("SELECT * FROM pedidos.sale_order"+where+" ORDER BY created_at DESC,id LIMIT ? OFFSET ?",state,state,filter,size,(long)page*size),"total",db.queryForObject("SELECT count(*) FROM pedidos.sale_order"+where,Long.class,state,state,filter),"page",page,"size",size);}
+    public Map<String,Object> list(String state,String q,int page,int size) {if("RESERVADO".equals(state))state="POR_PREPARAR";page(page,size);if(!state.isEmpty()&&!STATES.contains(state))throw new PedidosError(400,"Estado invalido");if(q.length()>150)throw new PedidosError(400,"Filtro demasiado largo");String filter=q.trim().toLowerCase(Locale.ROOT);String where=" WHERE (?='' OR state=?) AND POSITION(? IN LOWER(client_name||' '||number::text))>0";return map("items",db.queryForList("SELECT * FROM pedidos.sale_order"+where+" ORDER BY created_at DESC,id LIMIT ? OFFSET ?",state,state,filter,size,(long)page*size),"total",db.queryForObject("SELECT count(*) FROM pedidos.sale_order"+where,Long.class,state,state,filter),"page",page,"size",size);}
     private void state(UUID id,String value) {db.update("UPDATE pedidos.sale_order SET state=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",value,id);}
     private void release(UUID id,String value) {db.update("UPDATE inventario.stock_reservation SET state=?,updated_at=CURRENT_TIMESTAMP WHERE order_id=? AND state='ACTIVA'",value,id);db.update("UPDATE pedidos.allocation SET state=? WHERE order_id=? AND state='ACTIVA'",value,id);}
     private static final AuthClient.Identity SYSTEM=new AuthClient.Identity(new UUID(0,0),"SYSTEM","Vencimiento automatico",Set.of("ADMINISTRADOR"),false,true,false);
@@ -91,10 +91,19 @@ class PedidosService {
     public Map<String,Object> action(UUID id,String action,PedidosApi.Action r,AuthClient.Identity actor) {
         switch(action) {
             case "confirm","retry","cancel"->permission(actor,"ADMINISTRADOR","VENDEDOR");
-            case "prepare","dispatch","deliver","receive-return"->permission(actor,"ADMINISTRADOR","BODEGUERO");
+            case "start-preparation","prepare","dispatch","deliver","receive-return"->permission(actor,"ADMINISTRADOR","BODEGUERO");
             case "delay","resume"->permission(actor,"ADMINISTRADOR","VENDEDOR","BODEGUERO");
             default->throw new PedidosError(400,"Accion invalida");
         }
+        return executeAction(id,action,r,actor);
+    }
+    /** Internal shipment boundary; HTTP /dispatch keeps its warehouse-only authorization. */
+    @Transactional
+    public Map<String,Object> dispatchForShipment(UUID id,PedidosApi.Action request,AuthClient.Identity actor,UUID driverId) {
+        if(!actor.has("ADMINISTRADOR")&&!actor.has("BODEGUERO")&&(!actor.has("CHOFER")||!actor.id().equals(driverId)))throw new PedidosError(403,"Solo puedes crear despachos para tu propia ruta");
+        return executeAction(id,"dispatch",request,actor);
+    }
+    private Map<String,Object> executeAction(UUID id,String action,PedidosApi.Action r,AuthClient.Identity actor) {
         String key=key(action+":"+id,r,actor);var old=previous(r.requestId(),key);if(old!=null)return old;
         var order=order(id,true);String before=order.get("state").toString();var rows=lines(id);lockProducts(rows);
         if(Set.of("deliver","receive-return").contains(action)&&db.queryForObject("SELECT count(*) FROM pedidos.commercial_shipment WHERE order_id=? AND state IN ('EN_REPARTO','RETORNO_PENDIENTE')",Long.class,id)>0)
@@ -106,9 +115,10 @@ class PedidosService {
                 else if(!Boolean.TRUE.equals(order.get("externally_confirmed"))||terminal(before))throw new PedidosError(409,"Pedido ya cerrado");
             }
             case "retry"->{require(before,"PENDIENTE_MATERIAL");reserve(id,rows,actor,r.reason());}
-            case "prepare"->{require(before,"RESERVADO","PARCIAL","LISTO","EN_REPARTO");fulfillment.prepare(id,r,actor);state(id,fulfillment.refresh(id));}
-            case "cancel"->{require(before,"BORRADOR","PENDIENTE_MATERIAL","RESERVADO","PARCIAL","RETRASADO","LISTO","EN_REPARTO");close(id,"CANCELADO",r,actor);}
-            case "delay"->{require(before,"PENDIENTE_MATERIAL","RESERVADO","PARCIAL","LISTO","EN_REPARTO");db.update("UPDATE pedidos.sale_order SET resume_state=? WHERE id=?",before,id);state(id,"RETRASADO");renew(id);}
+            case "start-preparation"->{require(before,"POR_PREPARAR","RESERVADO");state(id,"EN_PREPARACION");}
+            case "prepare"->{require(before,"EN_PREPARACION","PARCIAL","LISTO","EN_REPARTO");fulfillment.prepare(id,r,actor);state(id,fulfillment.refresh(id));}
+            case "cancel"->{require(before,"BORRADOR","PENDIENTE_MATERIAL","RESERVADO","POR_PREPARAR","EN_PREPARACION","PARCIAL","RETRASADO","LISTO","EN_REPARTO");close(id,"CANCELADO",r,actor);}
+            case "delay"->{require(before,"PENDIENTE_MATERIAL","RESERVADO","POR_PREPARAR","EN_PREPARACION","PARCIAL","LISTO","EN_REPARTO");db.update("UPDATE pedidos.sale_order SET resume_state=? WHERE id=?",before,id);state(id,"RETRASADO");renew(id);}
             case "resume"->{require(before,"RETRASADO");state(id,order.get("resume_state").toString());db.update("UPDATE pedidos.sale_order SET resume_state=NULL WHERE id=?",id);}
             case "dispatch"->{require(before,"PARCIAL","LISTO","EN_REPARTO");if(!"ENTREGA".equals(order.get("delivery_mode")))throw new PedidosError(409,"Pedido para retiro en local");fulfillment.move(id,r,"dispatch",true);state(id,fulfillment.refresh(id));}
             case "deliver"->{require(before,"PARCIAL","LISTO","EN_REPARTO");fulfillment.move(id,r,"deliver","ENTREGA".equals(order.get("delivery_mode")));String next=fulfillment.refresh(id);state(id,next);if(!next.equals("ENTREGADO"))renew(id);}
@@ -136,7 +146,7 @@ class PedidosService {
             }
         }
         for(var line:plan.lines())db.update("UPDATE pedidos.order_line SET state=?,reserved_quantity=? WHERE id=?",line.get("state"),line.get("availableQuantity"),rows.get((Integer)line.get("position")).get("id"));
-        state(id,plan.available()?"RESERVADO":"PENDIENTE_MATERIAL");
+        state(id,plan.available()?"POR_PREPARAR":"PENDIENTE_MATERIAL");
         event(id,"DISPONIBILIDAD",reason,actor,map("available",plan.available(),"lines",plan.lines()));
     }
     private void reserveStock(UUID order,UUID product,UUID piece,BigDecimal quantity) {db.update("INSERT INTO inventario.stock_reservation(id,order_id,product_id,piece_id,quantity) VALUES (?,?,?,?,?)",UUID.randomUUID(),order,product,piece,quantity);}

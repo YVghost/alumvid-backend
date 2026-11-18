@@ -1,5 +1,7 @@
 import 'package:alumvid_admin_desktop/shared/server_config.dart';
+import 'package:alumvid_admin_desktop/shared/tema.dart';
 import 'package:flutter/material.dart';
+
 import '../services/api_service.dart';
 import 'cambiar_password_screen.dart';
 import '../core/sesion.dart';
@@ -196,169 +198,192 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E17),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: Text(
-                      _buscandoServidor
-                          ? 'Buscando servidor en la red...'
-                          : 'Servidor: ${Uri.tryParse(ApiService.baseUrl)?.authority ?? ApiService.baseUrl}',
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12,
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.layers_outlined,
+                        color: colors.primary,
+                        size: 25,
                       ),
-                      overflow: TextOverflow.ellipsis,
+                      const SizedBox(width: 9),
+                      const Expanded(
+                        child: Text(
+                          'AlumVid',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -.8,
+                          ),
+                        ),
+                      ),
+                      const SelectorTema(compacto: true),
+                    ],
+                  ),
+                  const SizedBox(height: 36),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: Apariencia.instancia.esOscuro
+                            ? colors.primary.withValues(alpha: .15)
+                            : AppColors.lavender,
+                        borderRadius: BorderRadius.circular(21),
+                      ),
+                      child: Icon(
+                        Icons.space_dashboard_outlined,
+                        size: 30,
+                        color: colors.primary,
+                      ),
                     ),
                   ),
-                  if (_buscandoServidor)
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                  const SizedBox(height: 22),
+                  const Text(
+                    'Todo listo para\nuna nueva jornada.',
+                    style: TextStyle(
+                      fontSize: 31,
+                      height: 1.15,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -1,
                     ),
-                  TextButton.icon(
-                    onPressed: _cargando || _buscandoServidor
-                        ? null
-                        : _configurarServidor,
-                    icon: const Icon(Icons.settings),
-                    label: const Text('Servidor'),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Tus materiales, pedidos y rutas. Cada herramienta, según tu rol.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.6,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Container(
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: colors.outlineVariant),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'Inicia sesión',
+                          style: TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        if (_errorMensaje != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Text(
+                              _errorMensaje!,
+                              style: TextStyle(
+                                color: colors.error,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        TextField(
+                          controller: _emailController,
+                          autofillHints: const [AutofillHints.username],
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            labelText: 'Identificación o correo',
+                            prefixIcon: Icon(Icons.badge_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _passwordController,
+                          obscureText: !_mostrarPassword,
+                          autofillHints: const [AutofillHints.password],
+                          onSubmitted: (_) => _iniciarSesion(),
+                          decoration: InputDecoration(
+                            labelText: 'Contraseña',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              tooltip: _mostrarPassword
+                                  ? 'Ocultar contraseña'
+                                  : 'Mostrar contraseña',
+                              onPressed: () => setState(
+                                () => _mostrarPassword = !_mostrarPassword,
+                              ),
+                              icon: Icon(
+                                _mostrarPassword
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        ElevatedButton(
+                          onPressed: _cargando ? null : _iniciarSesion,
+                          child: _cargando
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: colors.onPrimary,
+                                  ),
+                                )
+                              : const Text('Iniciar sesión'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.dns_outlined,
+                        size: 15,
+                        color: colors.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          _buscandoServidor
+                              ? 'Buscando servidor…'
+                              : Uri.tryParse(ApiService.baseUrl)?.authority ??
+                                    ApiService.baseUrl,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.onSurfaceVariant,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _buscandoServidor
+                            ? null
+                            : _configurarServidor,
+                        child: const Text('Servidor'),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1D4ED8),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Center(
-                  child: Text(
-                    'GF',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'AlumVid',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const Text(
-                'Operación móvil: pedidos, inventario y rutas',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-              ),
-              const SizedBox(height: 32),
-              if (_errorMensaje != null)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0x33E11D48),
-                    border: Border.all(color: const Color(0x66E11D48)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _errorMensaje!,
-                    style: const TextStyle(
-                      color: Color(0xFFFB7185),
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              TextField(
-                controller: _emailController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Identificación o Correo',
-                  hintText: 'Cédula o usuario@alumvid.com',
-                  labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                  filled: true,
-                  fillColor: const Color(0xFF111827),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF334155)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passwordController,
-                obscureText: !_mostrarPassword,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'Contrasena',
-                  labelStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                  filled: true,
-                  fillColor: const Color(0xFF111827),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF334155)),
-                  ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _mostrarPassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                      color: const Color(0xFF94A3B8),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _mostrarPassword = !_mostrarPassword;
-                      });
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _cargando ? null : _iniciarSesion,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: _cargando
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text(
-                        'Iniciar Sesion',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

@@ -25,7 +25,7 @@ public class LocalPedidosFacade {
     }
     private AuthClient.Identity actor(boolean write) {
         var actor=auth.identity(Sesion.token());
-        if(actor.mustChangePassword() || (write ? !actor.has("ADMINISTRADOR")&&!actor.has("BODEGUERO") : !actor.has("ADMINISTRADOR")&&!actor.has("BODEGUERO")&&!actor.has("VENDEDOR")))
+        if(actor.mustChangePassword() || (write ? !actor.has("ADMINISTRADOR")&&!actor.has("BODEGUERO") : !actor.has("ADMINISTRADOR")&&!actor.has("BODEGUERO")&&!actor.has("VENDEDOR")&&!actor.has("CHOFER")))
             throw new ResponseStatusException(HttpStatusCode.valueOf(403),"Sin permisos para pedidos");
         return actor;
     }
@@ -40,12 +40,12 @@ public class LocalPedidosFacade {
         try {
             var parsed=lines==null||lines.isEmpty()?null:lines.stream().map(line->json.convertValue(line,PedidosApi.BatchLine.class)).toList();
             var request=validate(new CommercialShipments.Create(UUID.nameUUIDFromBytes(("logistica:"+dispatch).getBytes(java.nio.charset.StandardCharsets.UTF_8)),driver,route,dispatch,destination,parsed,reason,null));
-            return shipments.create(order,request,actor(true));
+            return shipments.create(order,request,actor(false));
         } catch(PedidosError e){throw error(e);}
     }
     @Transactional(propagation=Propagation.REQUIRES_NEW)
     public void release(UUID shipment,String reason) {
-        try {shipments.release(shipment,validate(new PedidosApi.Action(UUID.randomUUID(),reason)),actor(true));}catch(PedidosError e){throw error(e);}
+        try {shipments.release(shipment,validate(new PedidosApi.Action(UUID.randomUUID(),reason)),actor(false));}catch(PedidosError e){throw error(e);}
     }
     @Transactional(propagation=Propagation.REQUIRES_NEW)
     public void reassign(UUID route,UUID driver) {

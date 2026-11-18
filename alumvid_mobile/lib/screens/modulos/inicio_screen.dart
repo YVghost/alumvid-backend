@@ -61,18 +61,27 @@ class _InicioScreenState extends State<InicioScreen> {
         }),
       if (s.puede(Modulo.inventario))
         tarea('Inventario', () async {
-          final r = await adm.ApiService.obtenerProductos(lowStock: true, size: 50);
+          final r = await adm.ApiService.obtenerProductos(
+            lowStock: true,
+            size: 50,
+          );
           _stockBajo = (r['items'] as List).cast<Producto>();
         }),
       if (s.puede(Modulo.rutas))
         tarea('Rutas', () async {
           _rutas = await adm.ApiService.obtenerRutas();
+          if (s.tiene('CHOFER') && !s.permisos.bodega) {
+            _rutas = _rutas.where((r) => r.choferId == s.usuario.id).toList();
+          }
         }),
       if (s.puede(Modulo.misRutas))
         tarea('Mis rutas', () async {
           final v = await ApiService.obtenerRutasChofer(s.usuario.id);
           _rutasChofer = v
-              .where((r) => r['estado'] != 'COMPLETADA' && r['estado'] != 'CANCELADA')
+              .where(
+                (r) =>
+                    r['estado'] != 'COMPLETADA' && r['estado'] != 'CANCELADA',
+              )
               .length;
         }),
     ]);
@@ -91,6 +100,10 @@ class _InicioScreenState extends State<InicioScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final nombre = s.usuario.fullName.split(' ').first;
     return Scaffold(
       body: SafeArea(
@@ -131,11 +144,14 @@ class _InicioScreenState extends State<InicioScreen> {
             children: [
               Text(
                 '${_saludo()},',
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 15),
+                style: TextStyle(color: AppColors.textMuted, fontSize: 15),
               ),
               Text(
                 nombre,
-                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               const SizedBox(height: 6),
               Wrap(
@@ -143,7 +159,11 @@ class _InicioScreenState extends State<InicioScreen> {
                 runSpacing: 6,
                 children: [
                   for (final r in s.roles)
-                    EstadoChip(r, color: AppColors.primaryLight, texto: humanizar(r)),
+                    EstadoChip(
+                      r,
+                      color: AppColors.primaryLight,
+                      texto: humanizar(r),
+                    ),
                 ],
               ),
             ],
@@ -172,7 +192,7 @@ class _InicioScreenState extends State<InicioScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded, color: AppColors.danger),
+          Icon(Icons.warning_amber_rounded, color: AppColors.danger),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -188,63 +208,78 @@ class _InicioScreenState extends State<InicioScreen> {
   List<Widget> _kpis() {
     final tarjetas = <Widget>[];
     if (s.puede(Modulo.misRutas)) {
-      tarjetas.add(KpiCard(
-        titulo: 'Mis rutas activas',
-        valor: '$_rutasChofer',
-        icono: Icons.local_shipping,
-        color: AppColors.primaryLight,
-        onTap: () => widget.onIrA(Modulo.misRutas),
-      ));
+      tarjetas.add(
+        KpiCard(
+          titulo: 'Mis rutas activas',
+          valor: '$_rutasChofer',
+          icono: Icons.local_shipping,
+          color: AppColors.primaryLight,
+          onTap: () => widget.onIrA(Modulo.misRutas),
+        ),
+      );
     }
     if (s.puede(Modulo.rutas)) {
-      tarjetas.add(KpiCard(
-        titulo: 'Rutas en curso',
-        valor: '${_rutas.where((r) => r.isEnCurso).length}',
-        icono: Icons.alt_route,
-        color: AppColors.warning,
-        onTap: () => widget.onIrA(Modulo.rutas),
-      ));
-      tarjetas.add(KpiCard(
-        titulo: 'Rutas pendientes',
-        valor: '${_rutas.where((r) => r.isPendiente).length}',
-        icono: Icons.pending_actions,
-        color: AppColors.info,
-        onTap: () => widget.onIrA(Modulo.rutas),
-      ));
+      tarjetas.add(
+        KpiCard(
+          titulo: 'Rutas en curso',
+          valor: '${_rutas.where((r) => r.isEnCurso).length}',
+          icono: Icons.alt_route,
+          color: AppColors.warning,
+          onTap: () => widget.onIrA(Modulo.rutas),
+        ),
+      );
+      tarjetas.add(
+        KpiCard(
+          titulo: 'Rutas pendientes',
+          valor: '${_rutas.where((r) => r.isPendiente).length}',
+          icono: Icons.pending_actions,
+          color: AppColors.info,
+          onTap: () => widget.onIrA(Modulo.rutas),
+        ),
+      );
     }
     if (s.puede(Modulo.pedidos)) {
       if (s.tiene('BODEGUERO') || s.esAdmin) {
-        tarjetas.add(KpiCard(
-          titulo: 'Por preparar',
-          valor: '${_pedidosEn({'RESERVADO', 'PARCIAL', 'PENDIENTE_MATERIAL'})}',
-          icono: Icons.handyman,
-          color: AppColors.violet,
-          onTap: () => widget.onIrA(Modulo.pedidos),
-        ));
+        tarjetas.add(
+          KpiCard(
+            titulo: 'Por preparar',
+            valor:
+                '${_pedidosEn({'POR_PREPARAR', 'EN_PREPARACION', 'RESERVADO', 'PARCIAL', 'PENDIENTE_MATERIAL'})}',
+            icono: Icons.handyman,
+            color: AppColors.violet,
+            onTap: () => widget.onIrA(Modulo.pedidos),
+          ),
+        );
       }
-      tarjetas.add(KpiCard(
-        titulo: 'Listos / en reparto',
-        valor: '${_pedidosEn({'LISTO', 'EN_REPARTO'})}',
-        icono: Icons.inventory,
-        color: AppColors.success,
-        onTap: () => widget.onIrA(Modulo.pedidos),
-      ));
-      tarjetas.add(KpiCard(
-        titulo: 'Retrasados',
-        valor: '${_pedidosEn({'RETRASADO'})}',
-        icono: Icons.schedule,
-        color: AppColors.danger,
-        onTap: () => widget.onIrA(Modulo.pedidos),
-      ));
+      tarjetas.add(
+        KpiCard(
+          titulo: 'Listos / en reparto',
+          valor: '${_pedidosEn({'LISTO', 'EN_REPARTO'})}',
+          icono: Icons.inventory,
+          color: AppColors.success,
+          onTap: () => widget.onIrA(Modulo.pedidos),
+        ),
+      );
+      tarjetas.add(
+        KpiCard(
+          titulo: 'Retrasados',
+          valor: '${_pedidosEn({'RETRASADO'})}',
+          icono: Icons.schedule,
+          color: AppColors.danger,
+          onTap: () => widget.onIrA(Modulo.pedidos),
+        ),
+      );
     }
     if (s.puede(Modulo.inventario)) {
-      tarjetas.add(KpiCard(
-        titulo: 'Stock bajo o agotado',
-        valor: '${_stockBajo.length}',
-        icono: Icons.trending_down,
-        color: AppColors.warning,
-        onTap: () => widget.onIrA(Modulo.inventario),
-      ));
+      tarjetas.add(
+        KpiCard(
+          titulo: 'Stock bajo o agotado',
+          valor: '${_stockBajo.length}',
+          icono: Icons.trending_down,
+          color: AppColors.warning,
+          onTap: () => widget.onIrA(Modulo.inventario),
+        ),
+      );
     }
     if (tarjetas.isEmpty) return [];
     return [
@@ -255,7 +290,8 @@ class _InicioScreenState extends State<InicioScreen> {
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 1.45,
+        mainAxisExtent:
+            156 + (MediaQuery.textScalerOf(context).scale(16) - 16) * 5,
         children: tarjetas,
       ),
     ];
@@ -269,47 +305,67 @@ class _InicioScreenState extends State<InicioScreen> {
         .toList();
     if (urgentes.isNotEmpty) {
       out.add(SeccionTitulo('Pedidos que requieren atención'));
-      out.add(Card(
-        child: Column(
-          children: [
-            for (final p in urgentes)
-              ListTile(
-                leading: const Icon(Icons.priority_high, color: AppColors.danger),
-                title: Text('#${p.number} · ${p.clientName}', maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text(p.isEntregaDomicilio ? 'Entrega a domicilio' : 'Retiro en local'),
-                trailing: EstadoChip(p.state),
-                onTap: () => widget.onIrA(Modulo.pedidos),
-              ),
-          ],
+      out.add(
+        Card(
+          child: Column(
+            children: [
+              for (final p in urgentes)
+                ListTile(
+                  leading: Icon(Icons.priority_high, color: AppColors.danger),
+                  title: Text(
+                    '#${p.number} · ${p.clientName}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    p.isEntregaDomicilio
+                        ? 'Entrega a domicilio'
+                        : 'Retiro en local',
+                  ),
+                  trailing: EstadoChip(p.state),
+                  onTap: () => widget.onIrA(Modulo.pedidos),
+                ),
+            ],
+          ),
         ),
-      ));
+      );
     }
     if (_stockBajo.isNotEmpty) {
       out.add(SeccionTitulo('Stock por reponer'));
-      out.add(Card(
-        child: Column(
-          children: [
-            for (final p in _stockBajo.take(4))
-              ListTile(
-                leading: Icon(
-                  p.isAgotado ? Icons.remove_shopping_cart : Icons.trending_down,
-                  color: p.isAgotado ? AppColors.danger : AppColors.warning,
-                ),
-                title: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text('Mínimo ${fmtNum(p.minStock)} ${humanizar(p.unit).toLowerCase()}'),
-                trailing: Text(
-                  fmtNum(p.stock),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
+      out.add(
+        Card(
+          child: Column(
+            children: [
+              for (final p in _stockBajo.take(4))
+                ListTile(
+                  leading: Icon(
+                    p.isAgotado
+                        ? Icons.remove_shopping_cart
+                        : Icons.trending_down,
                     color: p.isAgotado ? AppColors.danger : AppColors.warning,
                   ),
+                  title: Text(
+                    p.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    'Mínimo ${fmtNum(p.minStock)} ${humanizar(p.unit).toLowerCase()}',
+                  ),
+                  trailing: Text(
+                    fmtNum(p.stock),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: p.isAgotado ? AppColors.danger : AppColors.warning,
+                    ),
+                  ),
+                  onTap: () => widget.onIrA(Modulo.inventario),
                 ),
-                onTap: () => widget.onIrA(Modulo.inventario),
-              ),
-          ],
+            ],
+          ),
         ),
-      ));
+      );
     }
     return out;
   }
@@ -334,7 +390,10 @@ class _InicioScreenState extends State<InicioScreen> {
                 children: [
                   Icon(m.iconoActivo, color: AppColors.primaryLight, size: 28),
                   const SizedBox(height: 8),
-                  Text(m.etiqueta, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    m.etiqueta,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                 ],
               ),
             ),

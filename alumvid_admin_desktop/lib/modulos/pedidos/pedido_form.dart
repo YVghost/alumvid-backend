@@ -15,7 +15,8 @@ class _Linea {
   final Map<String, dynamic> producto;
   final cantidad = TextEditingController(text: '1');
   final precio = TextEditingController();
-  final medida = TextEditingController(); // largo (m) para aluminio, ancho (cm) para vidrio
+  final medida =
+      TextEditingController(); // largo (m) para aluminio, ancho (cm) para vidrio
   Map<String, dynamic>? disponibilidad;
 
   bool get porPiezas => producto['piecesManaged'] == true;
@@ -31,14 +32,18 @@ class _Linea {
   }
 
   Map<String, dynamic> json() {
-    double n(TextEditingController c) => double.tryParse(c.text.replaceAll(',', '.')) ?? 0;
+    double n(TextEditingController c) =>
+        double.tryParse(c.text.replaceAll(',', '.')) ?? 0;
     final m = medida.text.trim().isEmpty ? null : n(medida);
     return {
       'productId': producto['id'],
       'quantity': n(cantidad),
       'unitPrice': n(precio),
       if (porPiezas && tipo == 'ALUMINIO' && m != null) 'lengthM': m,
-      if (porPiezas && tipo == 'VIDRIO' && m != null) ...{'widthCm': m, 'heightCm': altoVidrio},
+      if (porPiezas && tipo == 'VIDRIO' && m != null) ...{
+        'widthCm': m,
+        'heightCm': altoVidrio,
+      },
     };
   }
 }
@@ -85,7 +90,10 @@ class _PedidoFormState extends State<PedidoForm> {
     final c = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const FractionallySizedBox(heightFactor: 0.85, child: SelectorCliente()),
+      builder: (_) => const FractionallySizedBox(
+        heightFactor: 0.85,
+        child: SelectorCliente(),
+      ),
     );
     if (c != null) {
       setState(() {
@@ -100,19 +108,27 @@ class _PedidoFormState extends State<PedidoForm> {
     final p = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const FractionallySizedBox(heightFactor: 0.85, child: _SelectorProducto()),
+      builder: (_) => const FractionallySizedBox(
+        heightFactor: 0.85,
+        child: _SelectorProducto(),
+      ),
     );
     if (p != null) setState(() => _lineas.add(_Linea(p)));
   }
 
   Future<void> _elegirPunto() async {
     final u = await Navigator.of(context).push<UbicacionElegida>(
-      MaterialPageRoute(builder: (_) => ConTemaAlumVid(child: MapaSelectorScreen(inicial: _punto))),
+      MaterialPageRoute(
+        builder: (_) =>
+            ConTemaAlumVid(child: MapaSelectorScreen(inicial: _punto)),
+      ),
     );
     if (u == null) return;
     setState(() {
       _punto = u.punto;
-      if (_direccion.text.trim().isEmpty && (u.direccion ?? '').isNotEmpty) _direccion.text = u.direccion!;
+      if (_direccion.text.trim().isEmpty && (u.direccion ?? '').isNotEmpty) {
+        _direccion.text = u.direccion!;
+      }
     });
   }
 
@@ -121,7 +137,9 @@ class _PedidoFormState extends State<PedidoForm> {
     setState(() => _consultando = true);
     try {
       final r = await Api.disponibilidad(_lineas.map((l) => l.json()).toList());
-      final filas = (r['lines'] as List? ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      final filas = (r['lines'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
       setState(() {
         for (var i = 0; i < _lineas.length && i < filas.length; i++) {
           _lineas[i].disponibilidad = filas[i];
@@ -148,7 +166,10 @@ class _PedidoFormState extends State<PedidoForm> {
     }
     if (!_form.currentState!.validate()) return;
     if (_entrega && _punto == null) {
-      avisoError(context, 'Marca la ubicación de entrega en el mapa: se usa para planificar la ruta');
+      avisoError(
+        context,
+        'Marca la ubicación de entrega en el mapa: se usa para planificar la ruta',
+      );
       return;
     }
     setState(() => _guardando = true);
@@ -184,6 +205,8 @@ class _PedidoFormState extends State<PedidoForm> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Scaffold(
       appBar: AppBar(title: const Text('Nuevo pedido')),
       bottomNavigationBar: SafeArea(
@@ -196,15 +219,31 @@ class _PedidoFormState extends State<PedidoForm> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Total', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                    Text(fmtDinero(_total), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    Text(
+                      'Total',
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      fmtDinero(_total),
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ],
                 ),
               ),
               FilledButton.icon(
                 onPressed: _guardando ? null : _guardar,
                 icon: _guardando
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.check),
                 label: const Text('Confirmar pedido'),
               ),
@@ -223,10 +262,19 @@ class _PedidoFormState extends State<PedidoForm> {
               clipBehavior: Clip.antiAlias,
               child: ListTile(
                 leading: AvatarIniciales(aTexto(_cliente?['name'], '?')),
-                title: Text(_cliente == null ? 'Seleccionar cliente' : aTexto(_cliente!['name'])),
+                title: Text(
+                  _cliente == null
+                      ? 'Seleccionar cliente'
+                      : aTexto(_cliente!['name']),
+                ),
                 subtitle: _cliente == null
                     ? const Text('Busca en el catálogo o regístralo')
-                    : Text([aTexto(_cliente!['identification']), aTexto(_cliente!['phone'])].where((x) => x.isNotEmpty).join(' · ')),
+                    : Text(
+                        [
+                          aTexto(_cliente!['identification']),
+                          aTexto(_cliente!['phone']),
+                        ].where((x) => x.isNotEmpty).join(' · '),
+                      ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: _elegirCliente,
               ),
@@ -234,8 +282,16 @@ class _PedidoFormState extends State<PedidoForm> {
             const SeccionTitulo('Entrega'),
             SegmentedButton<bool>(
               segments: const [
-                ButtonSegment(value: false, label: Text('Retiro en local'), icon: Icon(Icons.storefront_outlined)),
-                ButtonSegment(value: true, label: Text('A domicilio'), icon: Icon(Icons.local_shipping_outlined)),
+                ButtonSegment(
+                  value: false,
+                  label: Text('Retiro en local'),
+                  icon: Icon(Icons.storefront_outlined),
+                ),
+                ButtonSegment(
+                  value: true,
+                  label: Text('A domicilio'),
+                  icon: Icon(Icons.local_shipping_outlined),
+                ),
               ],
               selected: {_entrega},
               onSelectionChanged: (v) => setState(() => _entrega = v.first),
@@ -244,18 +300,33 @@ class _PedidoFormState extends State<PedidoForm> {
             if (_entrega) ...[
               TextFormField(
                 controller: _direccion,
-                decoration: const InputDecoration(labelText: 'Dirección de entrega *'),
-                validator: (v) => _entrega && (v ?? '').trim().isEmpty ? 'Indica la dirección' : null,
+                decoration: const InputDecoration(
+                  labelText: 'Dirección de entrega *',
+                ),
+                validator: (v) => _entrega && (v ?? '').trim().isEmpty
+                    ? 'Indica la dirección'
+                    : null,
               ),
               const SizedBox(height: 12),
               Card(
                 clipBehavior: Clip.antiAlias,
                 child: ListTile(
-                  leading: Icon(Icons.map_outlined, color: _punto == null ? AppColors.warning : AppColors.success),
-                  title: Text(_punto == null ? 'Marcar ubicación en el mapa *' : 'Ubicación marcada'),
-                  subtitle: Text(_punto == null
-                      ? 'Necesaria para planificar la ruta'
-                      : '${_punto!.latitude.toStringAsFixed(5)}, ${_punto!.longitude.toStringAsFixed(5)}'),
+                  leading: Icon(
+                    Icons.map_outlined,
+                    color: _punto == null
+                        ? AppColors.warning
+                        : AppColors.success,
+                  ),
+                  title: Text(
+                    _punto == null
+                        ? 'Marcar ubicación en el mapa *'
+                        : 'Ubicación marcada',
+                  ),
+                  subtitle: Text(
+                    _punto == null
+                        ? 'Necesaria para planificar la ruta'
+                        : '${_punto!.latitude.toStringAsFixed(5)}, ${_punto!.longitude.toStringAsFixed(5)}',
+                  ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _elegirPunto,
                 ),
@@ -265,10 +336,18 @@ class _PedidoFormState extends State<PedidoForm> {
             TextFormField(
               controller: _recibe,
               textCapitalization: TextCapitalization.words,
-              decoration: InputDecoration(labelText: _entrega ? 'Quién recibe' : 'Quién retira'),
+              decoration: InputDecoration(
+                labelText: _entrega ? 'Quién recibe' : 'Quién retira',
+              ),
             ),
-            SeccionTitulo('Productos (${_lineas.length})',
-                accion: TextButton.icon(onPressed: _agregarProducto, icon: const Icon(Icons.add), label: const Text('Agregar'))),
+            SeccionTitulo(
+              'Productos (${_lineas.length})',
+              accion: TextButton.icon(
+                onPressed: _agregarProducto,
+                icon: const Icon(Icons.add),
+                label: const Text('Agregar'),
+              ),
+            ),
             if (_lineas.isEmpty)
               Card(
                 child: ListTile(
@@ -283,18 +362,30 @@ class _PedidoFormState extends State<PedidoForm> {
               OutlinedButton.icon(
                 onPressed: _consultando ? null : _consultar,
                 icon: _consultando
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.fact_check_outlined),
                 label: const Text('Consultar disponibilidad'),
               ),
               if (_avisoDisponibilidad != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Text(_avisoDisponibilidad!, style: const TextStyle(color: AppColors.textMuted)),
+                  child: Text(
+                    _avisoDisponibilidad!,
+                    style: TextStyle(color: AppColors.textMuted),
+                  ),
                 ),
             ],
             const SeccionTitulo('Datos adicionales'),
-            TextFormField(controller: _factura, decoration: const InputDecoration(labelText: 'Referencia de factura (opcional)')),
+            TextFormField(
+              controller: _factura,
+              decoration: const InputDecoration(
+                labelText: 'Referencia de factura (opcional)',
+              ),
+            ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _notas,
@@ -303,7 +394,7 @@ class _PedidoFormState extends State<PedidoForm> {
               decoration: const InputDecoration(labelText: 'Notas (opcional)'),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'El pedido se registra como confirmado y pagado fuera del sistema. La reserva dura 72 horas y se renueva con cada avance.',
               style: TextStyle(color: AppColors.textMuted, fontSize: 12),
             ),
@@ -331,17 +422,32 @@ class _PedidoFormState extends State<PedidoForm> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${p['name']}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                      Text('Disponible: ${fmtNum(aNum(p['availableStock']))} · ${p['code']}',
-                          style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                      Text(
+                        '${p['name']}',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        'Disponible: ${fmtNum(aNum(p['availableStock']))} · ${p['code']}',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                if (disp != null) EstadoChip(aTexto(disp['state']), texto: disp['state'] == 'RESERVADO' ? 'Disponible' : 'Falta ${fmtNum(aNum(disp['missingQuantity']))}'),
+                if (disp != null)
+                  EstadoChip(
+                    aTexto(disp['state']),
+                    texto: disp['state'] == 'RESERVADO'
+                        ? 'Disponible'
+                        : 'Falta ${fmtNum(aNum(disp['missingQuantity']))}',
+                  ),
                 IconButton(
                   tooltip: 'Quitar producto',
-                  icon: const Icon(Icons.delete_outline, color: AppColors.danger),
-                  onPressed: () => setState(() => _lineas.removeAt(i).dispose()),
+                  icon: Icon(Icons.delete_outline, color: AppColors.danger),
+                  onPressed: () =>
+                      setState(() => _lineas.removeAt(i).dispose()),
                 ),
               ],
             ),
@@ -356,10 +462,23 @@ class _PedidoFormState extends State<PedidoForm> {
                     width: 110,
                     child: TextFormField(
                       controller: l.cantidad,
-                      keyboardType: TextInputType.numberWithOptions(decimal: !l.porPiezas),
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(l.porPiezas ? r'[0-9]' : r'[0-9.,]'))],
-                      decoration: InputDecoration(labelText: l.porPiezas ? 'Piezas' : 'Cantidad'),
-                      validator: (v) => (double.tryParse((v ?? '').replaceAll(',', '.')) ?? 0) <= 0 ? 'Requerido' : null,
+                      keyboardType: TextInputType.numberWithOptions(
+                        decimal: !l.porPiezas,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          RegExp(l.porPiezas ? r'[0-9]' : r'[0-9.,]'),
+                        ),
+                      ],
+                      decoration: InputDecoration(
+                        labelText: l.porPiezas ? 'Piezas' : 'Cantidad',
+                      ),
+                      validator: (v) =>
+                          (double.tryParse((v ?? '').replaceAll(',', '.')) ??
+                                  0) <=
+                              0
+                          ? 'Requerido'
+                          : null,
                     ),
                   ),
                   if (esPerfil)
@@ -367,12 +486,21 @@ class _PedidoFormState extends State<PedidoForm> {
                       width: 150,
                       child: TextFormField(
                         controller: l.medida,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: InputDecoration(labelText: 'Largo (m)', helperText: 'Máx. ${fmtNum(l.largoCompleto ?? 0)} m'),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Largo (m)',
+                          helperText: 'Máx. ${fmtNum(l.largoCompleto ?? 0)} m',
+                        ),
                         validator: (v) {
-                          final n = double.tryParse((v ?? '').replaceAll(',', '.'));
+                          final n = double.tryParse(
+                            (v ?? '').replaceAll(',', '.'),
+                          );
                           if (n == null || n <= 0) return 'Indica el largo';
-                          if (l.largoCompleto != null && n > l.largoCompleto!) return 'Supera el perfil';
+                          if (l.largoCompleto != null && n > l.largoCompleto!) {
+                            return 'Supera el perfil';
+                          }
                           return null;
                         },
                       ),
@@ -382,15 +510,22 @@ class _PedidoFormState extends State<PedidoForm> {
                       width: 170,
                       child: TextFormField(
                         controller: l.medida,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Ancho (cm)',
-                          helperText: 'Alto fijo ${fmtNum(l.altoVidrio ?? 0)} cm',
+                          helperText:
+                              'Alto fijo ${fmtNum(l.altoVidrio ?? 0)} cm',
                         ),
                         validator: (v) {
-                          final n = double.tryParse((v ?? '').replaceAll(',', '.'));
+                          final n = double.tryParse(
+                            (v ?? '').replaceAll(',', '.'),
+                          );
                           if (n == null || n <= 0) return 'Indica el ancho';
-                          if (l.anchoCompleto != null && n > l.anchoCompleto!) return 'Supera la plancha';
+                          if (l.anchoCompleto != null && n > l.anchoCompleto!) {
+                            return 'Supera la plancha';
+                          }
                           return null;
                         },
                       ),
@@ -399,9 +534,18 @@ class _PedidoFormState extends State<PedidoForm> {
                     width: 130,
                     child: TextFormField(
                       controller: l.precio,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(labelText: 'Precio unit.', prefixText: r'$ '),
-                      validator: (v) => double.tryParse((v ?? '').replaceAll(',', '.')) == null ? 'Requerido' : null,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Precio unit.',
+                        prefixText: r'$ ',
+                      ),
+                      validator: (v) =>
+                          double.tryParse((v ?? '').replaceAll(',', '.')) ==
+                              null
+                          ? 'Requerido'
+                          : null,
                     ),
                   ),
                 ],
@@ -410,7 +554,10 @@ class _PedidoFormState extends State<PedidoForm> {
             if (disp != null && aTexto(disp['notice']).isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text(aTexto(disp['notice']), style: const TextStyle(color: AppColors.warning, fontSize: 12)),
+                child: Text(
+                  aTexto(disp['notice']),
+                  style: TextStyle(color: AppColors.warning, fontSize: 12),
+                ),
               ),
           ],
         ),
@@ -433,6 +580,8 @@ class _SelectorProductoState extends State<_SelectorProducto> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Column(
       children: [
         Padding(
@@ -449,10 +598,21 @@ class _SelectorProductoState extends State<_SelectorProducto> {
           child: FutureBuilder<List<Map<String, dynamic>>>(
             future: _f,
             builder: (ctx, snap) {
-              if (snap.hasError) return VistaError(mensaje: limpiarError(snap.error!), onReintentar: () => setState(() => _f = Api.productosVenta(q: _q)));
+              if (snap.hasError) {
+                return VistaError(
+                  mensaje: limpiarError(snap.error!),
+                  onReintentar: () =>
+                      setState(() => _f = Api.productosVenta(q: _q)),
+                );
+              }
               if (!snap.hasData) return const CargandoLista();
               final items = snap.data!;
-              if (items.isEmpty) return const VistaVacia(icono: Icons.search_off, titulo: 'Sin productos');
+              if (items.isEmpty) {
+                return const VistaVacia(
+                  icono: Icons.search_off,
+                  titulo: 'Sin productos',
+                );
+              }
               return ListView.builder(
                 itemCount: items.length,
                 itemBuilder: (_, i) {
@@ -461,15 +621,22 @@ class _SelectorProductoState extends State<_SelectorProducto> {
                   return ListTile(
                     leading: Icon(
                       p['piecesManaged'] == true
-                          ? (p['kind'] == 'VIDRIO' ? Icons.window_outlined : Icons.straighten)
+                          ? (p['kind'] == 'VIDRIO'
+                                ? Icons.window_outlined
+                                : Icons.straighten)
                           : Icons.inventory_2_outlined,
                     ),
                     title: Text('${p['name']}'),
-                    subtitle: Text('${p['code']}${p['piecesManaged'] == true ? ' · por medida' : ''}',
-                        style: const TextStyle(color: AppColors.textMuted)),
+                    subtitle: Text(
+                      '${p['code']}${p['piecesManaged'] == true ? ' · por medida' : ''}',
+                      style: TextStyle(color: AppColors.textMuted),
+                    ),
                     trailing: Text(
                       fmtNum(disp),
-                      style: TextStyle(fontWeight: FontWeight.w800, color: disp > 0 ? AppColors.success : AppColors.danger),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: disp > 0 ? AppColors.success : AppColors.danger,
+                      ),
                     ),
                     onTap: () => Navigator.pop(context, p),
                   );

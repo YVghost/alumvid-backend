@@ -36,14 +36,17 @@ class _FichaPiezaState extends State<FichaPieza> {
     }
   }
 
-  Map<String, dynamic> get _pieza => Map<String, dynamic>.from(_d!['piece'] as Map);
-  Map<String, dynamic> get _producto => Map<String, dynamic>.from(_d!['product'] as Map);
+  Map<String, dynamic> get _pieza =>
+      Map<String, dynamic>.from(_d!['piece'] as Map);
+  Map<String, dynamic> get _producto =>
+      Map<String, dynamic>.from(_d!['product'] as Map);
 
   Future<void> _trasladar() async {
     final ok = await trasladarMaterial(
       context,
       productoId: '${_producto['id']}',
-      descripcion: '${_producto['name']} · ${medidas(_pieza['lengthM'], _pieza['widthCm'], _pieza['heightCm'])}',
+      descripcion:
+          '${_producto['name']} · ${medidas(_pieza['lengthM'], _pieza['widthCm'], _pieza['heightCm'])}',
       piezas: [widget.piezaId],
       origen: aTexto(_pieza['location']),
     );
@@ -54,8 +57,13 @@ class _FichaPiezaState extends State<FichaPieza> {
   }
 
   Future<void> _descartar() async {
-    final motivo = await pedirTexto(context,
-        titulo: 'Descartar pieza', etiqueta: 'Motivo (rotura, defecto, merma…)', accion: 'Descartar', peligro: true);
+    final motivo = await pedirTexto(
+      context,
+      titulo: 'Descartar pieza',
+      etiqueta: 'Motivo (rotura, defecto, merma…)',
+      accion: 'Descartar',
+      peligro: true,
+    );
     if (motivo == null) return;
     try {
       await Api.descartarPieza('${_producto['id']}', widget.piezaId, motivo);
@@ -70,10 +78,14 @@ class _FichaPiezaState extends State<FichaPieza> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     if (_d == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Pieza')),
-        body: _error != null ? VistaError(mensaje: _error!, onReintentar: _cargar) : const Center(child: CircularProgressIndicator()),
+        body: _error != null
+            ? VistaError(mensaje: _error!, onReintentar: _cargar)
+            : const Center(child: CircularProgressIndicator()),
       );
     }
     final pz = _pieza, prod = _producto;
@@ -81,10 +93,18 @@ class _FichaPiezaState extends State<FichaPieza> {
     final disponible = estado == 'DISPONIBLE';
     final medida = medidas(pz['lengthM'], pz['widthCm'], pz['heightCm']);
     final porcentaje = aNum(pz['percentage']);
-    final pedido = _d!['order'] == null ? null : Map<String, dynamic>.from(_d!['order'] as Map);
-    final hijos = ((_d!['children'] as List?) ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    final historial = ((_d!['history'] as List?) ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    final padre = _d!['parent'] == null ? null : Map<String, dynamic>.from(_d!['parent'] as Map);
+    final pedido = _d!['order'] == null
+        ? null
+        : Map<String, dynamic>.from(_d!['order'] as Map);
+    final hijos = ((_d!['children'] as List?) ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    final historial = ((_d!['history'] as List?) ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    final padre = _d!['parent'] == null
+        ? null
+        : Map<String, dynamic>.from(_d!['parent'] as Map);
 
     return PopScope(
       canPop: false,
@@ -93,21 +113,29 @@ class _FichaPiezaState extends State<FichaPieza> {
       },
       child: Scaffold(
         appBar: AppBar(title: Text(medida.isEmpty ? 'Pieza' : 'Pieza $medida')),
-        bottomNavigationBar: widget.permisos.bodega && {'DISPONIBLE', 'PREPARADO'}.contains(estado)
+        bottomNavigationBar:
+            widget.permisos.bodega &&
+                {'DISPONIBLE', 'PREPARADO'}.contains(estado)
             ? SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                   child: Row(
                     children: [
                       Expanded(
-                        child: FilledButton.icon(onPressed: _trasladar, icon: const Icon(Icons.move_up), label: const Text('Trasladar')),
+                        child: FilledButton.icon(
+                          onPressed: _trasladar,
+                          icon: const Icon(Icons.move_up),
+                          label: const Text('Trasladar'),
+                        ),
                       ),
                       if (disponible) ...[
                         const SizedBox(width: 10),
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: _descartar,
-                            style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.danger,
+                            ),
                             icon: const Icon(Icons.delete_sweep_outlined),
                             label: const Text('Descartar'),
                           ),
@@ -129,7 +157,15 @@ class _FichaPiezaState extends State<FichaPieza> {
                   children: [
                     Row(
                       children: [
-                        Expanded(child: Text('${prod['name']}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
+                        Expanded(
+                          child: Text(
+                            '${prod['name']}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
                         EstadoChip(estado),
                       ],
                     ),
@@ -139,9 +175,20 @@ class _FichaPiezaState extends State<FichaPieza> {
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.end,
                       children: [
-                        Text(medida, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, height: 1)),
-                        Text(pz['fullPiece'] == true ? 'Unidad completa' : 'Retazo',
-                            style: const TextStyle(color: AppColors.textMuted)),
+                        Text(
+                          medida,
+                          style: const TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w800,
+                            height: 1,
+                          ),
+                        ),
+                        Text(
+                          pz['fullPiece'] == true
+                              ? 'Unidad completa'
+                              : 'Retazo',
+                          style: TextStyle(color: AppColors.textMuted),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -150,13 +197,20 @@ class _FichaPiezaState extends State<FichaPieza> {
                       child: LinearProgressIndicator(
                         value: (porcentaje / 100).clamp(0, 1),
                         minHeight: 8,
-                        color: pz['fullPiece'] == true ? AppColors.success : AppColors.violet,
+                        color: pz['fullPiece'] == true
+                            ? AppColors.success
+                            : AppColors.violet,
                         backgroundColor: AppColors.border,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text('${fmtNum(porcentaje)} % de una unidad completa · equivale a ${fmtNum(aNum(pz['equivalentUnits']))} unid.',
-                        style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                    Text(
+                      '${fmtNum(porcentaje)} % de una unidad completa · equivale a ${fmtNum(aNum(pz['equivalentUnits']))} unid.',
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -164,14 +218,38 @@ class _FichaPiezaState extends State<FichaPieza> {
             const SizedBox(height: 12),
             Card(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Column(
                   children: [
-                    DatoFila('Ubicación', aTexto(pz['location'], 'Sin ubicación'), icono: Icons.shelves),
-                    DatoFila('Código', '${prod['code']}', icono: Icons.qr_code_2),
-                    if (pz['areaCm2'] != null) DatoFila('Área', '${fmtNum(aNum(pz['areaCm2']))} cm²', icono: Icons.square_foot),
-                    DatoFila('Registrada', fmtFecha(aFecha(pz['createdAt'])), icono: Icons.event_outlined),
-                    DatoFila('Identificador', '${pz['id']}'.substring(0, 8), icono: Icons.tag),
+                    DatoFila(
+                      'Ubicación',
+                      aTexto(pz['location'], 'Sin ubicación'),
+                      icono: Icons.shelves,
+                    ),
+                    DatoFila(
+                      'Código',
+                      '${prod['code']}',
+                      icono: Icons.qr_code_2,
+                    ),
+                    if (pz['areaCm2'] != null)
+                      DatoFila(
+                        'Área',
+                        '${fmtNum(aNum(pz['areaCm2']))} cm²',
+                        icono: Icons.square_foot,
+                      ),
+                    DatoFila(
+                      'Registrada',
+                      fmtFecha(aFecha(pz['createdAt'])),
+                      icono: Icons.event_outlined,
+                    ),
+                    DatoFila(
+                      'Identificador',
+                      '${pz['id']}'.substring(0, 8),
+                      icono: Icons.tag,
+                    ),
                   ],
                 ),
               ),
@@ -180,8 +258,10 @@ class _FichaPiezaState extends State<FichaPieza> {
               const SeccionTitulo('Reservada para'),
               Card(
                 child: ListTile(
-                  leading: const Icon(Icons.receipt_long, color: AppColors.warning),
-                  title: Text('Pedido #${pedido['number']} · ${pedido['client_name']}'),
+                  leading: Icon(Icons.receipt_long, color: AppColors.warning),
+                  title: Text(
+                    'Pedido #${pedido['number']} · ${pedido['client_name']}',
+                  ),
                   trailing: EstadoChip(aTexto(pedido['state'])),
                 ),
               ),
@@ -191,7 +271,13 @@ class _FichaPiezaState extends State<FichaPieza> {
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.call_split),
-                  title: Text(medidas(padre['lengthM'], padre['widthCm'], padre['heightCm'])),
+                  title: Text(
+                    medidas(
+                      padre['lengthM'],
+                      padre['widthCm'],
+                      padre['heightCm'],
+                    ),
+                  ),
                   subtitle: Text(humanizar(aTexto(padre['state']))),
                 ),
               ),
@@ -204,7 +290,9 @@ class _FichaPiezaState extends State<FichaPieza> {
                     for (final h in hijos)
                       ListTile(
                         leading: const Icon(Icons.content_cut),
-                        title: Text(medidas(h['lengthM'], h['widthCm'], h['heightCm'])),
+                        title: Text(
+                          medidas(h['lengthM'], h['widthCm'], h['heightCm']),
+                        ),
                         subtitle: Text(aTexto(h['location'], 'Sin ubicación')),
                         trailing: EstadoChip(aTexto(h['state'])),
                       ),
@@ -222,8 +310,13 @@ class _FichaPiezaState extends State<FichaPieza> {
                         dense: true,
                         leading: const Icon(Icons.history, size: 20),
                         title: Text(humanizar(aTexto(h['action']))),
-                        subtitle: Text('${aTexto(h['reason'])} · ${aTexto(h['actor_name'])} · ${fmtFecha(aFecha(h['created_at']))}',
-                            style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                        subtitle: Text(
+                          '${aTexto(h['reason'])} · ${aTexto(h['actor_name'])} · ${fmtFecha(aFecha(h['created_at']))}',
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
                   ],
                 ),

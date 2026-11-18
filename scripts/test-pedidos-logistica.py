@@ -73,6 +73,7 @@ def run():
         def order(quantity):
             result=call('/api/pedidos/orders','POST',{'requestId':uid(),'clientId':client['id'],'deliveryMode':'ENTREGA','deliveryAddress':'Destino de pruebas QA','externallyConfirmed':True,'lines':[{'productId':product['id'],'quantity':str(quantity),'unitPrice':'1'}]},admin)
             oid=result['order']['id'];orders.append(oid)
+            call('/api/pedidos/orders/'+oid+'/start-preparation','POST',{'requestId':uid(),'reason':'Inicio de preparación QA'},admin)
             call('/api/pedidos/orders/'+oid+'/prepare','POST',{'requestId':uid(),'reason':'Preparación QA'},admin)
             return oid,result['lines'][0]['id']
         def ship(oid,line,quantity):

@@ -26,7 +26,11 @@ const _estadosPieza = <String, String>{
 /// Ficha del material: existencias reales (unidades por ubicación o piezas
 /// con medida), movimientos y operaciones manuales permitidas.
 class ProductoDetalle extends StatefulWidget {
-  const ProductoDetalle({super.key, required this.producto, required this.permisos});
+  const ProductoDetalle({
+    super.key,
+    required this.producto,
+    required this.permisos,
+  });
   final Producto producto;
   final Permisos permisos;
 
@@ -56,13 +60,23 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
   Future<void> _cargar() async {
     setState(() => _error = null);
     try {
-      final r = await ApiService.obtenerProductos(q: _p.code, includeInactive: true, size: 10);
-      final nuevo = (r['items'] as List).cast<Producto>().where((x) => x.id == _p.id).firstOrNull;
+      final r = await ApiService.obtenerProductos(
+        q: _p.code,
+        includeInactive: true,
+        size: 10,
+      );
+      final nuevo = (r['items'] as List)
+          .cast<Producto>()
+          .where((x) => x.id == _p.id)
+          .firstOrNull;
       if (nuevo != null) _p = nuevo;
       await Future.wait([
         if (_p.piecesManaged) ...[
           Api.resumenPiezas(_p.id).then((v) => _resumen = v),
-          Api.piezasDeProducto(_p.id, estado: _estadoPiezas).then((v) => _piezas = v),
+          Api.piezasDeProducto(
+            _p.id,
+            estado: _estadoPiezas,
+          ).then((v) => _piezas = v),
         ] else
           Api.ubicacionesDe(_p.id).then((v) => _ubicaciones = v),
         ApiService.obtenerMovimientos(_p.id, size: 40).then((v) => _movs = v),
@@ -107,25 +121,41 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
   }
 
   Future<void> _editar() async {
-    final ok = await abrirPanel<bool>(context, (_) => ProductoForm(producto: _p));
+    final ok = await abrirPanel<bool>(
+      context,
+      (_) => ProductoForm(producto: _p),
+    );
     if (ok == true) _cargar();
   }
 
   Future<void> _abrirPieza(String id) async {
-    final cambio = await abrirPanel<bool>(context, (_) => FichaPieza(piezaId: id, permisos: perm));
+    final cambio = await abrirPanel<bool>(
+      context,
+      (_) => FichaPieza(piezaId: id, permisos: perm),
+    );
     if (cambio == true) _cargar();
   }
 
   Future<void> _trasladarSeleccion() async {
     final porUbicacion = <String, List<String>>{};
     for (final pz in _piezas.where((x) => _seleccion.contains('${x['id']}'))) {
-      porUbicacion.putIfAbsent(aTexto(pz['location']), () => []).add('${pz['id']}');
+      porUbicacion
+          .putIfAbsent(aTexto(pz['location']), () => [])
+          .add('${pz['id']}');
     }
     // Las piezas pueden estar en distintos espacios: el origen se valida por pieza.
-    final ok = await trasladarVarios(context, items: [
-      for (final e in porUbicacion.entries)
-        ItemTraslado(productoId: _p.id, nombre: '${e.value.length} pieza(s) en ${e.key.isEmpty ? 'sin ubicación' : e.key}', piezas: e.value),
-    ]);
+    final ok = await trasladarVarios(
+      context,
+      items: [
+        for (final e in porUbicacion.entries)
+          ItemTraslado(
+            productoId: _p.id,
+            nombre:
+                '${e.value.length} pieza(s) en ${e.key.isEmpty ? 'sin ubicación' : e.key}',
+            piezas: e.value,
+          ),
+      ],
+    );
     if (ok) {
       _seleccion.clear();
       _cargar();
@@ -136,15 +166,28 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         appBar: AppBar(
           title: Text(_p.code),
           actions: [
-            if (perm.editaCatalogo) IconButton(tooltip: 'Editar producto', icon: const Icon(Icons.edit_outlined), onPressed: _editar),
+            if (perm.editaCatalogo)
+              IconButton(
+                tooltip: 'Editar producto',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: _editar,
+              ),
           ],
-          bottom: const TabBar(tabAlignment: TabAlignment.fill, tabs: [Tab(text: 'Existencias'), Tab(text: 'Movimientos')]),
+          bottom: const TabBar(
+            tabAlignment: TabAlignment.fill,
+            tabs: [
+              Tab(text: 'Existencias'),
+              Tab(text: 'Movimientos'),
+            ],
+          ),
         ),
         bottomNavigationBar: _barra(),
         body: _cargando
@@ -166,7 +209,10 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: Row(
             children: [
-              TextButton(onPressed: () => setState(_seleccion.clear), child: const Text('Cancelar')),
+              TextButton(
+                onPressed: () => setState(_seleccion.clear),
+                child: const Text('Cancelar'),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: FilledButton.icon(
@@ -182,15 +228,30 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
     }
     final botones = <Widget>[
       if (perm.bodega && _p.active)
-        FilledButton.icon(onPressed: _recepcion, icon: const Icon(Icons.add_box_outlined), label: const Text('Recepción de compra')),
+        FilledButton.icon(
+          onPressed: _recepcion,
+          icon: const Icon(Icons.add_box_outlined),
+          label: const Text('Recepción de compra'),
+        ),
       if (perm.ajustaInventario && !_p.piecesManaged && _p.active)
-        OutlinedButton.icon(onPressed: _conteo, icon: const Icon(Icons.fact_check_outlined), label: const Text('Conteo físico')),
+        OutlinedButton.icon(
+          onPressed: _conteo,
+          icon: const Icon(Icons.fact_check_outlined),
+          label: const Text('Conteo físico'),
+        ),
     ];
     if (botones.isEmpty) return null;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: Row(children: [for (final (i, b) in botones.indexed) ...[if (i > 0) const SizedBox(width: 10), Expanded(child: b)]]),
+        child: Row(
+          children: [
+            for (final (i, b) in botones.indexed) ...[
+              if (i > 0) const SizedBox(width: 10),
+              Expanded(child: b),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -205,13 +266,26 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_p.name, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+                  Text(
+                    _p.name,
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   Text(
-                    [humanizar(_p.category), if (_p.supplier.isNotEmpty) _p.supplier, 'mínimo ${fmtNum(_p.minStock)}'].join(' · '),
-                    style: const TextStyle(color: AppColors.textMuted),
+                    [
+                      humanizar(_p.category),
+                      if (_p.supplier.isNotEmpty) _p.supplier,
+                      'mínimo ${fmtNum(_p.minStock)}',
+                    ].join(' · '),
+                    style: TextStyle(color: AppColors.textMuted),
                   ),
-                  if (!_p.active) ...[const SizedBox(height: 8), const EstadoChip('INACTIVO', texto: 'Inactivo')],
+                  if (!_p.active) ...[
+                    const SizedBox(height: 8),
+                    const EstadoChip('INACTIVO', texto: 'Inactivo'),
+                  ],
                 ],
               ),
             ),
@@ -230,9 +304,17 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 12),
-            child: Card(child: ListTile(leading: const Icon(Icons.error_outline, color: AppColors.danger), title: Text(_error!))),
+            child: Card(
+              child: ListTile(
+                leading: Icon(Icons.error_outline, color: AppColors.danger),
+                title: Text(_error!),
+              ),
+            ),
           ),
-        if (_p.piecesManaged) ..._existenciasPorPieza() else ..._existenciasPorUnidad(),
+        if (_p.piecesManaged)
+          ..._existenciasPorPieza()
+        else
+          ..._existenciasPorUnidad(),
       ],
     );
   }
@@ -240,7 +322,9 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
   List<Widget> _existenciasPorUnidad() {
     final u = _ubicaciones;
     if (u == null) return [];
-    final lugares = ((u['placements'] as List?) ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final lugares = ((u['placements'] as List?) ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
     final sinUbicar = aNum(u['unlocatedStock']);
     return [
       const SeccionTitulo('Dónde está'),
@@ -248,17 +332,31 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
         child: Column(
           children: [
             if (lugares.isEmpty && sinUbicar <= 0)
-              const ListTile(leading: Icon(Icons.info_outline), title: Text('Sin existencias')),
+              const ListTile(
+                leading: Icon(Icons.info_outline),
+                title: Text('Sin existencias'),
+              ),
             for (final l in lugares)
               ListTile(
-                leading: const Icon(Icons.shelves, color: AppColors.primaryLight),
-                title: Text('${l['code']}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text('${fmtNum(aNum(l['quantity']))} ${unidadCorta(_p.unit)}'),
+                leading: Icon(Icons.shelves, color: AppColors.primaryLight),
+                title: Text(
+                  '${l['code']}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  '${fmtNum(aNum(l['quantity']))} ${unidadCorta(_p.unit)}',
+                ),
                 trailing: perm.bodega
                     ? TextButton.icon(
                         onPressed: () async {
-                          final ok = await trasladarMaterial(context,
-                              productoId: _p.id, descripcion: _p.name, cantidadMax: aNum(l['quantity']), origen: '${l['code']}', origenId: '${l['space_id']}');
+                          final ok = await trasladarMaterial(
+                            context,
+                            productoId: _p.id,
+                            descripcion: _p.name,
+                            cantidadMax: aNum(l['quantity']),
+                            origen: '${l['code']}',
+                            origenId: '${l['space_id']}',
+                          );
                           if (ok) _cargar();
                         },
                         icon: const Icon(Icons.move_up, size: 18),
@@ -268,13 +366,18 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
               ),
             if (sinUbicar > 0)
               ListTile(
-                leading: const Icon(Icons.help_outline, color: AppColors.warning),
+                leading: Icon(Icons.help_outline, color: AppColors.warning),
                 title: const Text('Sin ubicación asignada'),
                 subtitle: Text('${fmtNum(sinUbicar)} ${unidadCorta(_p.unit)}'),
                 trailing: perm.bodega
                     ? TextButton.icon(
                         onPressed: () async {
-                          final ok = await trasladarMaterial(context, productoId: _p.id, descripcion: _p.name, cantidadMax: sinUbicar);
+                          final ok = await trasladarMaterial(
+                            context,
+                            productoId: _p.id,
+                            descripcion: _p.name,
+                            cantidadMax: sinUbicar,
+                          );
                           if (ok) _cargar();
                         },
                         icon: const Icon(Icons.place_outlined, size: 18),
@@ -290,39 +393,78 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
 
   List<Widget> _existenciasPorPieza() {
     final r = _resumen;
-    final grupos = ((r?['breakdown'] as List?) ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final grupos = ((r?['breakdown'] as List?) ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
     final seleccionando = _seleccion.isNotEmpty;
     return [
       if (r != null) ...[
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _Kpi('Unidades completas', '${r['fullPieces'] ?? 0}', AppColors.success)),
+            Expanded(
+              child: _Kpi(
+                'Unidades completas',
+                '${r['fullPieces'] ?? 0}',
+                AppColors.success,
+              ),
+            ),
             const SizedBox(width: 10),
-            Expanded(child: _Kpi('Retazos', '${r['remnantPieces'] ?? 0}', AppColors.violet)),
+            Expanded(
+              child: _Kpi(
+                'Retazos',
+                '${r['remnantPieces'] ?? 0}',
+                AppColors.violet,
+              ),
+            ),
             const SizedBox(width: 10),
-            Expanded(child: _Kpi('Equivalente', fmtNum(aNum(r['calculatedStock'])), AppColors.primaryLight)),
+            Expanded(
+              child: _Kpi(
+                'Equivalente',
+                fmtNum(aNum(r['calculatedStock'])),
+                AppColors.primaryLight,
+              ),
+            ),
           ],
         ),
         Padding(
           padding: const EdgeInsets.only(top: 8),
           child: Text(
             'Unidad completa: ${medidas(r['fullLengthM'], r['fullWidthCm'], r['fullHeightCm'])} (${humanizar(aTexto(r['kind']))})',
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
           ),
         ),
         const SeccionTitulo('Por medida y ubicación'),
         Card(
           child: Column(
             children: [
-              if (grupos.isEmpty) const ListTile(title: Text('Sin piezas disponibles')),
+              if (grupos.isEmpty)
+                const ListTile(title: Text('Sin piezas disponibles')),
               for (final g in grupos)
                 ListTile(
-                  leading: Icon(g['fullPiece'] == true ? Icons.crop_square : Icons.content_cut,
-                      color: g['fullPiece'] == true ? AppColors.success : AppColors.violet),
-                  title: Text(medidas(g['lengthM'], g['widthCm'], g['heightCm']), style: const TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: Text(aTexto(g['location'], 'Sin ubicación'), style: const TextStyle(color: AppColors.textMuted)),
-                  trailing: Text('× ${g['quantity']}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                  leading: Icon(
+                    g['fullPiece'] == true
+                        ? Icons.crop_square
+                        : Icons.content_cut,
+                    color: g['fullPiece'] == true
+                        ? AppColors.success
+                        : AppColors.violet,
+                  ),
+                  title: Text(
+                    medidas(g['lengthM'], g['widthCm'], g['heightCm']),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    aTexto(g['location'], 'Sin ubicación'),
+                    style: TextStyle(color: AppColors.textMuted),
+                  ),
+                  trailing: Text(
+                    '× ${g['quantity']}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -330,9 +472,14 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
       ],
       SeccionTitulo(
         'Piezas (${_piezas.length})',
-        accion: perm.bodega && _estadoPiezas == 'DISPONIBLE' && _piezas.isNotEmpty && !seleccionando
+        accion:
+            perm.bodega &&
+                _estadoPiezas == 'DISPONIBLE' &&
+                _piezas.isNotEmpty &&
+                !seleccionando
             ? TextButton.icon(
-                onPressed: () => setState(() => _seleccion.add('${_piezas.first['id']}')),
+                onPressed: () =>
+                    setState(() => _seleccion.add('${_piezas.first['id']}')),
                 icon: const Icon(Icons.checklist, size: 18),
                 label: const Text('Seleccionar'),
               )
@@ -368,18 +515,35 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
                   leading: seleccionando
                       ? Checkbox(
                           value: _seleccion.contains('${pz['id']}'),
-                          onChanged: (v) => setState(() => v == true ? _seleccion.add('${pz['id']}') : _seleccion.remove('${pz['id']}')),
+                          onChanged: (v) => setState(
+                            () => v == true
+                                ? _seleccion.add('${pz['id']}')
+                                : _seleccion.remove('${pz['id']}'),
+                          ),
                         )
-                      : Icon(pz['fullPiece'] == true ? Icons.crop_square : Icons.content_cut),
-                  title: Text(medidas(pz['lengthM'], pz['widthCm'], pz['heightCm']), style: const TextStyle(fontWeight: FontWeight.w700)),
-                  subtitle: Text('${aTexto(pz['location'], 'Sin ubicación')} · ${fmtNum(aNum(pz['percentage']))} %',
-                      style: const TextStyle(color: AppColors.textMuted)),
-                  trailing: seleccionando ? null : const Icon(Icons.chevron_right),
+                      : Icon(
+                          pz['fullPiece'] == true
+                              ? Icons.crop_square
+                              : Icons.content_cut,
+                        ),
+                  title: Text(
+                    medidas(pz['lengthM'], pz['widthCm'], pz['heightCm']),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    '${aTexto(pz['location'], 'Sin ubicación')} · ${fmtNum(aNum(pz['percentage']))} %',
+                    style: TextStyle(color: AppColors.textMuted),
+                  ),
+                  trailing: seleccionando
+                      ? null
+                      : const Icon(Icons.chevron_right),
                   onTap: seleccionando
                       ? () => setState(() {
-                            final id = '${pz['id']}';
-                            _seleccion.contains(id) ? _seleccion.remove(id) : _seleccion.add(id);
-                          })
+                          final id = '${pz['id']}';
+                          _seleccion.contains(id)
+                              ? _seleccion.remove(id)
+                              : _seleccion.add(id);
+                        })
                       : () => _abrirPieza('${pz['id']}'),
                 ),
             ],
@@ -390,7 +554,11 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
 
   Widget _movimientos() {
     if (_movs.isEmpty) {
-      return const VistaVacia(icono: Icons.history, titulo: 'Sin movimientos', mensaje: 'Las salidas por pedidos y las recepciones aparecerán aquí.');
+      return const VistaVacia(
+        icono: Icons.history,
+        titulo: 'Sin movimientos',
+        mensaje: 'Las salidas por pedidos y las recepciones aparecerán aquí.',
+      );
     }
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -401,24 +569,51 @@ class _ProductoDetalleState extends State<ProductoDetalle> {
               for (final m in _movs)
                 ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: (m.delta >= 0 ? AppColors.success : AppColors.danger).withValues(alpha: 0.16),
+                    backgroundColor:
+                        (m.delta >= 0 ? AppColors.success : AppColors.danger)
+                            .withValues(alpha: 0.16),
                     child: Icon(
-                      m.type == 'INGRESO' ? Icons.south_west : m.type == 'SALIDA' ? Icons.north_east : Icons.tune,
-                      color: m.type == 'AJUSTE' ? AppColors.violet : m.delta >= 0 ? AppColors.success : AppColors.danger,
+                      m.type == 'INGRESO'
+                          ? Icons.south_west
+                          : m.type == 'SALIDA'
+                          ? Icons.north_east
+                          : Icons.tune,
+                      color: m.type == 'AJUSTE'
+                          ? AppColors.violet
+                          : m.delta >= 0
+                          ? AppColors.success
+                          : AppColors.danger,
                       size: 20,
                     ),
                   ),
-                  title: Text(m.reason.isEmpty ? humanizar(m.type) : m.reason, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  title: Text(
+                    m.reason.isEmpty ? humanizar(m.type) : m.reason,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   subtitle: Text(
-                    [if (m.reference.isNotEmpty) m.reference, m.actorName, fmtFecha(m.occurredAt)].join(' · '),
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    [
+                      if (m.reference.isNotEmpty) m.reference,
+                      m.actorName,
+                      fmtFecha(m.occurredAt),
+                    ].join(' · '),
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                   ),
                   trailing: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('${m.delta >= 0 ? '+' : ''}${fmtNum(m.delta)}', style: const TextStyle(fontWeight: FontWeight.w800)),
-                      Text('→ ${fmtNum(m.stockAfter)}', style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                      Text(
+                        '${m.delta >= 0 ? '+' : ''}${fmtNum(m.delta)}',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      Text(
+                        '→ ${fmtNum(m.stockAfter)}',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -442,8 +637,18 @@ class _Kpi extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(valor, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: color)),
-          Text(titulo, style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+          Text(
+            valor,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+          Text(
+            titulo,
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+          ),
         ],
       ),
     ),
@@ -463,13 +668,16 @@ class _RecepcionSheet extends StatefulWidget {
 class _RecepcionSheetState extends State<_RecepcionSheet> {
   final _form = GlobalKey<FormState>();
   final _cantidad = TextEditingController();
-  late final _medida = TextEditingController(text: widget.producto.piecesManaged ? fmtNum(_medidaCompleta()) : '');
+  late final _medida = TextEditingController(
+    text: widget.producto.piecesManaged ? fmtNum(_medidaCompleta()) : '',
+  );
 
   /// Medida de una unidad completa: ancho de la plancha o largo del perfil.
   double _medidaCompleta() {
     final r = widget.resumen ?? const <String, dynamic>{};
     return aNum(r['kind'] == 'VIDRIO' ? r['fullWidthCm'] : r['fullLengthM']);
   }
+
   final _referencia = TextEditingController();
   final _motivo = TextEditingController(text: 'Compra a proveedor');
   late final Future<List<Map<String, dynamic>>> _espacios = Api.espacios();
@@ -491,21 +699,37 @@ class _RecepcionSheetState extends State<_RecepcionSheet> {
     setState(() => _enviando = true);
     final p = widget.producto;
     final n = double.parse(_cantidad.text.replaceAll(',', '.'));
-    final motivo = [_motivo.text.trim(), if (_referencia.text.trim().isNotEmpty) 'Ref. ${_referencia.text.trim()}'].join(' · ');
+    final motivo = [
+      _motivo.text.trim(),
+      if (_referencia.text.trim().isNotEmpty) 'Ref. ${_referencia.text.trim()}',
+    ].join(' · ');
     try {
       if (p.piecesManaged) {
         final m = double.parse(_medida.text.replaceAll(',', '.'));
-        await Api.registrarPiezas(p.id,
-            cantidad: n.toInt(),
-            largoM: _vidrio ? null : m,
-            anchoCm: _vidrio ? m : null,
-            altoCm: _vidrio ? aNumONulo(widget.resumen?['fullHeightCm']) : null,
-            ubicacion: _ubicacion ?? '',
-            motivo: motivo);
+        await Api.registrarPiezas(
+          p.id,
+          cantidad: n.toInt(),
+          largoM: _vidrio ? null : m,
+          anchoCm: _vidrio ? m : null,
+          altoCm: _vidrio ? aNumONulo(widget.resumen?['fullHeightCm']) : null,
+          ubicacion: _ubicacion ?? '',
+          motivo: motivo,
+        );
       } else {
-        await Api.movimientoInventario(p.id, tipo: 'INGRESO', cantidad: n, motivo: _motivo.text.trim(), referencia: _referencia.text.trim());
+        await Api.movimientoInventario(
+          p.id,
+          tipo: 'INGRESO',
+          cantidad: n,
+          motivo: _motivo.text.trim(),
+          referencia: _referencia.text.trim(),
+        );
         if (_ubicacion != null) {
-          await Api.trasladar(productoId: p.id, haciaEspacioId: _ubicacion!, cantidad: n, motivo: 'Ubicación de la recepción');
+          await Api.trasladar(
+            productoId: p.id,
+            haciaEspacioId: _ubicacion!,
+            cantidad: n,
+            motivo: 'Ubicación de la recepción',
+          );
         }
       }
       if (!mounted) return;
@@ -521,9 +745,16 @@ class _RecepcionSheetState extends State<_RecepcionSheet> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final p = widget.producto;
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
       child: Form(
         key: _form,
         child: SingleChildScrollView(
@@ -531,14 +762,23 @@ class _RecepcionSheetState extends State<_RecepcionSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Recepción de compra', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-              Text(p.name, style: const TextStyle(color: AppColors.textMuted)),
+              const Text(
+                'Recepción de compra',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              ),
+              Text(p.name, style: TextStyle(color: AppColors.textMuted)),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _cantidad,
                 autofocus: true,
-                keyboardType: TextInputType.numberWithOptions(decimal: !p.piecesManaged),
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(p.piecesManaged ? r'[0-9]' : r'[0-9.,]'))],
+                keyboardType: TextInputType.numberWithOptions(
+                  decimal: !p.piecesManaged,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(
+                    RegExp(p.piecesManaged ? r'[0-9]' : r'[0-9.,]'),
+                  ),
+                ],
                 decoration: InputDecoration(
                   labelText: p.piecesManaged ? 'Número de piezas' : 'Cantidad',
                   suffixText: p.piecesManaged ? 'piezas' : unidadCorta(p.unit),
@@ -546,7 +786,9 @@ class _RecepcionSheetState extends State<_RecepcionSheet> {
                 validator: (v) {
                   final n = double.tryParse((v ?? '').replaceAll(',', '.'));
                   if (n == null || n <= 0) return 'Indica la cantidad';
-                  if (p.piecesManaged && n > 200) return 'Máximo 200 piezas por registro';
+                  if (p.piecesManaged && n > 200) {
+                    return 'Máximo 200 piezas por registro';
+                  }
                   return null;
                 },
               ),
@@ -554,14 +796,22 @@ class _RecepcionSheetState extends State<_RecepcionSheet> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _medida,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
-                    labelText: _vidrio ? 'Ancho de cada plancha (cm)' : 'Largo de cada perfil (m)',
+                    labelText: _vidrio
+                        ? 'Ancho de cada plancha (cm)'
+                        : 'Largo de cada perfil (m)',
                     helperText: _vidrio
                         ? 'Alto fijo ${fmtNum(aNum(widget.resumen?['fullHeightCm']))} cm. Unidad completa: ${fmtNum(aNum(widget.resumen?['fullWidthCm']))} cm'
                         : 'Perfil completo: ${fmtNum(aNum(widget.resumen?['fullLengthM']))} m',
                   ),
-                  validator: (v) => (double.tryParse((v ?? '').replaceAll(',', '.')) ?? 0) <= 0 ? 'Indica la medida' : null,
+                  validator: (v) =>
+                      (double.tryParse((v ?? '').replaceAll(',', '.')) ?? 0) <=
+                          0
+                      ? 'Indica la medida'
+                      : null,
                 ),
               ],
               const SizedBox(height: 12),
@@ -569,25 +819,45 @@ class _RecepcionSheetState extends State<_RecepcionSheet> {
                 future: _espacios,
                 builder: (ctx, snap) => DropdownButtonFormField<String?>(
                   initialValue: _ubicacion,
-                  decoration: const InputDecoration(labelText: 'Guardar en (opcional)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Guardar en (opcional)',
+                  ),
                   items: [
-                    const DropdownMenuItem(value: null, child: Text('Sin ubicación')),
-                    for (final e in (snap.data ?? const <Map<String, dynamic>>[]).where((e) => e['active'] != false))
-                      DropdownMenuItem(value: p.piecesManaged ? '${e['code']}' : '${e['id']}', child: Text('${e['code']}')),
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('Sin ubicación'),
+                    ),
+                    for (final e
+                        in (snap.data ?? const <Map<String, dynamic>>[]).where(
+                          (e) => e['active'] != false,
+                        ))
+                      DropdownMenuItem(
+                        value: p.piecesManaged ? '${e['code']}' : '${e['id']}',
+                        child: Text('${e['code']}'),
+                      ),
                   ],
                   onChanged: (v) => setState(() => _ubicacion = v),
                 ),
               ),
               const SizedBox(height: 12),
-              TextFormField(controller: _referencia, decoration: const InputDecoration(labelText: 'Factura o guía (opcional)')),
+              TextFormField(
+                controller: _referencia,
+                decoration: const InputDecoration(
+                  labelText: 'Factura o guía (opcional)',
+                ),
+              ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _motivo,
                 decoration: const InputDecoration(labelText: 'Motivo'),
-                validator: (v) => (v ?? '').trim().length < 3 ? 'Describe el motivo' : null,
+                validator: (v) =>
+                    (v ?? '').trim().length < 3 ? 'Describe el motivo' : null,
               ),
               const SizedBox(height: 18),
-              FilledButton(onPressed: _enviando ? null : _guardar, child: const Text('Registrar recepción')),
+              FilledButton(
+                onPressed: _enviando ? null : _guardar,
+                child: const Text('Registrar recepción'),
+              ),
             ],
           ),
         ),
@@ -622,8 +892,12 @@ class _ConteoSheetState extends State<_ConteoSheet> {
     if (!_form.currentState!.validate()) return;
     setState(() => _enviando = true);
     try {
-      await Api.movimientoInventario(widget.producto.id,
-          tipo: 'AJUSTE', cantidad: double.parse(_cantidad.text.replaceAll(',', '.')), motivo: _motivo.text.trim());
+      await Api.movimientoInventario(
+        widget.producto.id,
+        tipo: 'AJUSTE',
+        cantidad: double.parse(_cantidad.text.replaceAll(',', '.')),
+        motivo: _motivo.text.trim(),
+      );
       if (!mounted) return;
       avisoOk(context, 'Conteo registrado');
       Navigator.pop(context, true);
@@ -637,43 +911,73 @@ class _ConteoSheetState extends State<_ConteoSheet> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final p = widget.producto;
     final contado = double.tryParse(_cantidad.text.replaceAll(',', '.'));
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
       child: Form(
         key: _form,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Conteo físico', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-            Text('${p.name} · sistema: ${fmtNum(p.stock)} ${unidadCorta(p.unit)}', style: const TextStyle(color: AppColors.textMuted)),
+            const Text(
+              'Conteo físico',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              '${p.name} · sistema: ${fmtNum(p.stock)} ${unidadCorta(p.unit)}',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _cantidad,
               autofocus: true,
               onChanged: (_) => setState(() {}),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(labelText: 'Cantidad contada', suffixText: unidadCorta(p.unit)),
-              validator: (v) => (double.tryParse((v ?? '').replaceAll(',', '.')) ?? -1) < 0 ? 'Indica la cantidad contada' : null,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Cantidad contada',
+                suffixText: unidadCorta(p.unit),
+              ),
+              validator: (v) =>
+                  (double.tryParse((v ?? '').replaceAll(',', '.')) ?? -1) < 0
+                  ? 'Indica la cantidad contada'
+                  : null,
             ),
             if (contado != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
                   'Diferencia: ${contado - p.stock >= 0 ? '+' : ''}${fmtNum(contado - p.stock)} ${unidadCorta(p.unit)}',
-                  style: TextStyle(color: contado - p.stock == 0 ? AppColors.textMuted : AppColors.warning, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: contado - p.stock == 0
+                        ? AppColors.textMuted
+                        : AppColors.warning,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _motivo,
               decoration: const InputDecoration(labelText: 'Motivo'),
-              validator: (v) => (v ?? '').trim().length < 3 ? 'Describe el motivo' : null,
+              validator: (v) =>
+                  (v ?? '').trim().length < 3 ? 'Describe el motivo' : null,
             ),
             const SizedBox(height: 18),
-            FilledButton(onPressed: _enviando ? null : _guardar, child: const Text('Registrar conteo')),
+            FilledButton(
+              onPressed: _enviando ? null : _guardar,
+              child: const Text('Registrar conteo'),
+            ),
           ],
         ),
       ),

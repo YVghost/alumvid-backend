@@ -1,3 +1,5 @@
+> Flujo actualizado de bodega y permisos de rutas: [Preparación y rutas](FLUJO_PEDIDOS_Y_RUTAS.md).
+
 > Despliegue de un solo backend en Railway (rama `despliegue_test`): [configuración y pruebas](deploy/unificado/README.md).
 
 # Plataforma Integral AlumVid

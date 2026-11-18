@@ -33,12 +33,15 @@ class Ruta {
 
   int get totalParadas => paradas.length;
   int get paradasEntregadas => paradas.where((p) => p.isEntregado).length;
-  double get porcentajeAvance => totalParadas == 0 ? 0.0 : (paradasEntregadas / totalParadas);
+  double get porcentajeAvance =>
+      totalParadas == 0 ? 0.0 : (paradasEntregadas / totalParadas);
 
   factory Ruta.fromJson(Map<String, dynamic> json) {
     List<Despacho> listaParadas = [];
     if (json['paradas'] is List) {
-      listaParadas = (json['paradas'] as List).map((p) => Despacho.fromJson(p)).toList();
+      listaParadas = (json['paradas'] as List)
+          .map((p) => Despacho.fromJson(p))
+          .toList();
       listaParadas.sort((a, b) => a.ordenParada.compareTo(b.ordenParada));
     }
 
@@ -49,9 +52,15 @@ class Ruta {
       choferNombre: json['choferNombre']?.toString(),
       choferTelefono: json['choferTelefono']?.toString(),
       estado: json['estado']?.toString() ?? 'PENDIENTE',
-      fechaCreacion: json['fechaCreacion'] != null ? DateTime.tryParse(json['fechaCreacion'].toString()) : null,
-      fechaInicio: json['fechaInicio'] != null ? DateTime.tryParse(json['fechaInicio'].toString()) : null,
-      fechaFin: json['fechaFin'] != null ? DateTime.tryParse(json['fechaFin'].toString()) : null,
+      fechaCreacion: json['fechaCreacion'] != null
+          ? DateTime.tryParse(json['fechaCreacion'].toString())
+          : null,
+      fechaInicio: json['fechaInicio'] != null
+          ? DateTime.tryParse(json['fechaInicio'].toString())
+          : null,
+      fechaFin: json['fechaFin'] != null
+          ? DateTime.tryParse(json['fechaFin'].toString())
+          : null,
       comentarios: json['comentarios']?.toString(),
       paradas: listaParadas,
     );
