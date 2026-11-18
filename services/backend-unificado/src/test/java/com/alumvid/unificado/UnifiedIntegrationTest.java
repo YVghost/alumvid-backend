@@ -121,7 +121,7 @@ class UnifiedIntegrationTest {
         request.put("lines",List.of(Map.of("productId",product,"quantity",2,"unitPrice",5)));
         var order=call("POST","/api/pedidos/orders",token,request,200).path("order").path("id").asText();
         for(var action:List.of("confirm","start-preparation","prepare"))call("POST","/api/pedidos/orders/"+order+"/"+action,token,Map.of("requestId",UUID.randomUUID(),"reason","Prueba "+action),200);
-        var route=call("POST","/api/v1/logistica/rutas",token,Map.of("codigoRuta","TEST-"+UUID.randomUUID(),"choferId",driver.id(),"pedidos",List.of(Map.of("pedidoId",order))),201);
+        var route=call("POST","/api/v1/logistica/rutas",login(driver.identification()),Map.of("codigoRuta","TEST-"+UUID.randomUUID(),"choferId",driver.id(),"pedidos",List.of(Map.of("pedidoId",order))),201);
         assertEquals(1,route.path("paradas").size());
         var dispatch=route.path("paradas").get(0).path("id").asText();
         var driverToken=login(driver.identification());
