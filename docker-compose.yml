@@ -26,10 +26,6 @@ services:
     container_name: alumvid-usuarios
     restart: on-failure
     environment:
-      DB_SSLMODE: ${DB_SSLMODE:-prefer}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
-      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-1}
-      DB_INIT_TIMEOUT: ${DB_INIT_TIMEOUT:-60000}
       DB_HOST: postgres-postgis
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-alumvid_db}
@@ -58,10 +54,6 @@ services:
     container_name: alumvid-inventario
     restart: on-failure
     environment:
-      DB_SSLMODE: ${DB_SSLMODE:-prefer}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
-      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-1}
-      DB_INIT_TIMEOUT: ${DB_INIT_TIMEOUT:-60000}
       DB_HOST: postgres-postgis
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-alumvid_db}
@@ -90,10 +82,6 @@ services:
     environment:
       AUTH_URL: http://usuarios-service:8081
       PEDIDOS_URL: http://pedidos-service:8085
-      DB_SSLMODE: ${DB_SSLMODE:-prefer}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
-      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-1}
-      DB_INIT_TIMEOUT: ${DB_INIT_TIMEOUT:-60000}
       DB_HOST: postgres-postgis
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-alumvid_db}
@@ -114,10 +102,6 @@ services:
     container_name: alumvid-retazos
     restart: on-failure
     environment:
-      DB_SSLMODE: ${DB_SSLMODE:-prefer}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
-      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-1}
-      DB_INIT_TIMEOUT: ${DB_INIT_TIMEOUT:-60000}
       DB_HOST: postgres-postgis
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-alumvid_db}
@@ -144,10 +128,6 @@ services:
     container_name: alumvid-pedidos
     restart: on-failure
     environment:
-      DB_SSLMODE: ${DB_SSLMODE:-prefer}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
-      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-1}
-      DB_INIT_TIMEOUT: ${DB_INIT_TIMEOUT:-60000}
       DB_HOST: postgres-postgis
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-alumvid_db}
@@ -172,10 +152,6 @@ services:
     container_name: alumvid-ubicaciones
     restart: on-failure
     environment:
-      DB_SSLMODE: ${DB_SSLMODE:-prefer}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
-      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-1}
-      DB_INIT_TIMEOUT: ${DB_INIT_TIMEOUT:-60000}
       DB_HOST: postgres-postgis
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-alumvid_db}

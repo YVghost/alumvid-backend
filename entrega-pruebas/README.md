@@ -1,19 +1,3 @@
-# Local y Railway
-
-Los paquetes actualizados conservan la versión funcional actual y añaden dos perfiles de conexión. En el login → Servidor se puede elegir **Local** o **Railway**, pegar un dominio HTTPS y guardar. La dirección se recuerda por separado y cambiarla exige volver a iniciar sesión. Si Railway cae, cambiar a Local explícitamente; no se mezclan bases de datos ni se reenvían operaciones a otra base automáticamente.
-
-El APK y Windows funcionan sin Railway usando el backend Docker local. Para la configuración completa de backend y PostgreSQL consultar [DESPLIEGUE_RAILWAY.md](../DESPLIEGUE_RAILWAY.md). Para regenerar ambos paquetes desde el `.env`:
-
-```powershell
-.\scripts\build-pruebas.ps1
-# Opcional, para iniciar por defecto en una instalación Railway existente:
-.\scripts\build-pruebas.ps1 -DefaultEnvironment Railway -RailwayUrl https://tu-gateway.up.railway.app
-```
-
-Las contraseñas, el estado demo y los binarios permanecen locales y excluidos de Git. Este cambio no recrea ni renueva los datos demo existentes; algunas reservas antiguas pueden haber vencido según sus reglas normales.
-
----
-
 # Entrega para pruebas manuales (teléfono real + PC)
 
 ```
