@@ -99,6 +99,8 @@ class _InicioScreenState extends State<InicioScreen> {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild semantic colors when the appearance changes.
 
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     final nombre = s.usuario.fullName.split(' ').first;
     return Scaffold(
       body: SafeArea(
@@ -285,7 +287,8 @@ class _InicioScreenState extends State<InicioScreen> {
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 1.45,
+        mainAxisExtent:
+            156 + (MediaQuery.textScalerOf(context).scale(16) - 16) * 5,
         children: tarjetas,
       ),
     ];

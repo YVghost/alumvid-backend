@@ -117,6 +117,8 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild semantic colors when the appearance changes.
 
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
     return Scaffold(
       body: Stack(
         children: [
@@ -144,16 +146,16 @@ class _MonitoreoScreenState extends State<MonitoreoScreen> {
                               color: AppColors.primary,
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: Colors.white,
+                                color: AppColors.text,
                                 width: 2.5,
                               ),
                               boxShadow: const [
                                 BoxShadow(color: Colors.black45, blurRadius: 8),
                               ],
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.navigation,
-                              color: Colors.white,
+                              color: AppColors.text,
                               size: 22,
                             ),
                           ),

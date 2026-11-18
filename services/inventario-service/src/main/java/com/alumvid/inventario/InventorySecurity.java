@@ -37,6 +37,7 @@ class InventorySecurity {
         };
         return http.csrf(c->c.disable()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a->a.requestMatchers("/actuator/health").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET,"/api/products/**","/api/inventario/**").hasAnyRole("ADMINISTRADOR","VENDEDOR","BODEGUERO","CHOFER")
                 .requestMatchers(org.springframework.http.HttpMethod.GET,"/api/**").hasAnyRole("ADMINISTRADOR","VENDEDOR","BODEGUERO")
                 .requestMatchers(org.springframework.http.HttpMethod.POST,"/api/products/*/movements").hasAnyRole("ADMINISTRADOR","BODEGUERO")
                 .requestMatchers("/api/**").hasRole("ADMINISTRADOR").anyRequest().denyAll())

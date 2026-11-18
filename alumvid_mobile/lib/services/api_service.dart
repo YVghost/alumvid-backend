@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -105,9 +106,9 @@ class ApiService {
     }
 
     for (final prefijo in prefijos) {
-      final candidatos = [
-        for (var i = 1; i < 255; i++) '$prefijo.$i',
-      ].where((h) => !propias.contains(h)).toList();
+      final candidatos = [for (var i = 1; i < 255; i++) '$prefijo.$i']
+          .where((h) => !propias.contains(h))
+          .toList();
       const lote = 48;
       for (var i = 0; i < candidatos.length; i += lote) {
         final grupo = candidatos.skip(i).take(lote).toList();
@@ -428,15 +429,21 @@ class ApiService {
           throw Exception(err['message']);
         }
       } catch (e) {
-        if (e is! FormatException && !e.toString().contains('FormatException')) rethrow;
+        if (e is! FormatException && !e.toString().contains('FormatException')) {
+          rethrow;
+        }
       }
       throw Exception('Error al registrar consentimiento de inicio de ruta');
     }
   }
 
-  static Future<Map<String, dynamic>> reintentarParada(String despachoId) async {
+  static Future<Map<String, dynamic>> reintentarParada(
+    String despachoId,
+  ) async {
     final token = await getToken();
-    final url = Uri.parse('$baseUrl/logistica/despachos/$despachoId/reintentar');
+    final url = Uri.parse(
+      '$baseUrl/logistica/despachos/$despachoId/reintentar',
+    );
     final response = await http.post(
       url,
       headers: {
@@ -454,7 +461,9 @@ class ApiService {
           throw Exception(err['message']);
         }
       } catch (e) {
-        if (e is! FormatException && !e.toString().contains('FormatException')) rethrow;
+        if (e is! FormatException && !e.toString().contains('FormatException')) {
+          rethrow;
+        }
       }
       throw Exception('Error al reintentar la entrega');
     }

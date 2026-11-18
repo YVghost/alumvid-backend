@@ -9,6 +9,7 @@ import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Apariencia.instancia.cargar();
   await initializeDateFormatting('es');
   await ApiService.initialize();
   // Si hay una sesión guardada y válida se entra directo (sin volver a escribir la clave).
@@ -29,11 +30,18 @@ class AlumVidApp extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild semantic colors when the appearance changes.
 
-    return MaterialApp(
-      title: 'AlumVid',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
-      home: sesion == null ? const LoginScreen() : pantallaInicial(sesion!),
+    Theme.of(context); // Rebuild semantic colors when the appearance changes.
+
+    return ListenableBuilder(
+      listenable: Apariencia.instancia,
+      builder: (context, _) => MaterialApp(
+        title: 'AlumVid',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: Apariencia.instancia.modo,
+        home: sesion == null ? const LoginScreen() : pantallaInicial(sesion!),
+      ),
     );
   }
 }

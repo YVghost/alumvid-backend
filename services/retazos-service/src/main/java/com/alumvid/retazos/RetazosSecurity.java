@@ -37,6 +37,7 @@ class RetazosSecurity {
         };
         return http.csrf(c->c.disable()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a->a.requestMatchers("/actuator/health").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET,"/api/retazos/products/**","/api/retazos/pieces/**").hasAnyRole("ADMINISTRADOR","VENDEDOR","BODEGUERO","CHOFER")
                 .requestMatchers(org.springframework.http.HttpMethod.GET,"/api/**").hasAnyRole("ADMINISTRADOR","VENDEDOR","BODEGUERO")
                 .requestMatchers(org.springframework.http.HttpMethod.POST,"/api/retazos/products/*/pieces","/api/retazos/products/*/pieces/*/cut","/api/retazos/products/*/pieces/*/discard").hasAnyRole("ADMINISTRADOR","BODEGUERO")
                 .requestMatchers("/api/**").hasRole("ADMINISTRADOR").anyRequest().denyAll())
