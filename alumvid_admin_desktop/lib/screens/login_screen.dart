@@ -40,9 +40,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _abrirConfiguracionHost() async {
     final hostCtrl = TextEditingController(text: _hostActual);
-    final localServer = await ApiService.getLocalServer();
-    final railwayServer = await ApiService.getRailwayServer();
-    if (!mounted) return;
     final nuevoHost = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -63,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Local: http://localhost:8080 o IP de la PC.\nRailway: dominio HTTPS público del gateway, sin /api/v1.',
+              'En Windows Escritorio usa http://localhost:8080.\nPara emulador Android usa http://10.0.2.2:8080.',
               style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
             ),
             const SizedBox(height: 12),
@@ -77,20 +74,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, localServer),
-            child: const Text('Local'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (railwayServer.isEmpty) {
-                hostCtrl.text = 'https://';
-                return;
-              }
-              Navigator.pop(ctx, railwayServer);
-            },
-            child: const Text('Railway'),
-          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text(
@@ -107,16 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (nuevoHost != null && nuevoHost.isNotEmpty) {
-      try {
-        await ApiService.setBaseHost(nuevoHost, clearSession: true);
-      } on FormatException catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(e.message)));
-        }
-        return;
-      }
+      await ApiService.setBaseHost(nuevoHost);
       _cargarHost();
     }
   }
@@ -156,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
           msg.contains('rechazó la conexión') ||
           msg.contains('errno = 1225')) {
         msg =
-            'No se pudo conectar a $_hostActual. Comprueba el servidor seleccionado o cambia a Local si Railway no está disponible.';
+            'Error de conexión con el API Gateway (http://localhost:8080). Espere unos segundos a que los microservicios terminen de iniciar o verifique Docker.';
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg), backgroundColor: AppTheme.statusAlerta),

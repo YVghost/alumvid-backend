@@ -1,4 +1,3 @@
-import 'package:alumvid_admin_desktop/shared/server_config.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -8,22 +7,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   static String? _serverOverride;
-  static String normalizeServer(String input) =>
-      '${ServerConfig.host(input)}/api/v1';
-  static Future<String> getLocalServer() async {
-    final prefs = await SharedPreferences.getInstance();
-    const configured = String.fromEnvironment('LOCAL_API_URL');
-    final fallback = !kIsWeb && defaultTargetPlatform == TargetPlatform.android
-        ? 'http://10.0.2.2:8080'
-        : 'http://localhost:8080';
-    return prefs.getString('local_api_url') ??
-        (configured.isNotEmpty ? configured : fallback);
-  }
-
-  static Future<String> getRailwayServer() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('railway_api_url') ??
-        const String.fromEnvironment('RAILWAY_API_URL');
+  static String normalizeServer(String input) {
+    final uri = Uri.tryParse(input.trim());
+    if (uri == null ||
+        !['http', 'https'].contains(uri.scheme) ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment ||
+        !['', '/', '/api/v1', '/api/v1/'].contains(uri.path)) {
+      throw const FormatException(
+        'Usa una dirección como http://192.168.1.10:8080',
+      );
+    }
+    return uri.replace(path: '/api/v1').toString();
   }
 
   static Future<void> initialize() async {
@@ -44,12 +41,6 @@ class ApiService {
     await logout();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('api_base_url', next);
-    await prefs.setString(
-      ServerConfig.isLocal(Uri.parse(next))
-          ? 'local_api_url'
-          : 'railway_api_url',
-      ServerConfig.host(next),
-    );
     _serverOverride = next;
   }
 
@@ -64,13 +55,7 @@ class ApiService {
     final client = HttpClient()..connectionTimeout = timeout;
     try {
       final request = await client
-          .getUrl(
-            Uri.parse(
-              host.contains('://')
-                  ? '${ServerConfig.host(host)}/platform-info'
-                  : 'http://$host:$gatewayPort/platform-info',
-            ),
-          )
+          .getUrl(Uri.parse('http://$host:$gatewayPort/platform-info'))
           .timeout(timeout);
       final response = await request.close().timeout(timeout);
       if (response.statusCode != 200) return false;
@@ -93,7 +78,7 @@ class ApiService {
     final actual = Uri.tryParse(baseUrl);
     if (actual != null &&
         actual.host.isNotEmpty &&
-        await _esGatewayAlumVid(ServerConfig.host(baseUrl))) {
+        await _esGatewayAlumVid(actual.host)) {
       return baseUrl;
     }
 
@@ -443,22 +428,15 @@ class ApiService {
           throw Exception(err['message']);
         }
       } catch (e) {
-        if (e is! FormatException &&
-            !e.toString().contains('FormatException')) {
-          rethrow;
-        }
+        if (e is! FormatException && !e.toString().contains('FormatException')) rethrow;
       }
       throw Exception('Error al registrar consentimiento de inicio de ruta');
     }
   }
 
-  static Future<Map<String, dynamic>> reintentarParada(
-    String despachoId,
-  ) async {
+  static Future<Map<String, dynamic>> reintentarParada(String despachoId) async {
     final token = await getToken();
-    final url = Uri.parse(
-      '$baseUrl/logistica/despachos/$despachoId/reintentar',
-    );
+    final url = Uri.parse('$baseUrl/logistica/despachos/$despachoId/reintentar');
     final response = await http.post(
       url,
       headers: {
@@ -476,10 +454,7 @@ class ApiService {
           throw Exception(err['message']);
         }
       } catch (e) {
-        if (e is! FormatException &&
-            !e.toString().contains('FormatException')) {
-          rethrow;
-        }
+        if (e is! FormatException && !e.toString().contains('FormatException')) rethrow;
       }
       throw Exception('Error al reintentar la entrega');
     }
